@@ -8,7 +8,8 @@ import { AlertBanner, AppText, Button } from '@/components/ui';
 import { AuthScaffold } from '@/features/auth/auth-scaffold';
 import { authErrorMessage } from '@/features/auth/auth-errors';
 import { signUp } from '@/features/auth/auth-service';
-import { FormTextField } from '@/features/auth/form-text-field';
+import { FormTextField } from '@/components/form-text-field';
+import { GoogleSignInButton } from '@/features/auth/google-sign-in-button';
 import { signUpSchema, type SignUpValues } from '@/features/auth/schemas';
 import { theme } from '@/theme';
 
@@ -66,6 +67,7 @@ export default function SignUpScreen() {
         loading={formState.isSubmitting}
         onPress={onSubmit}
       />
+      <GoogleSignInButton />
       <View style={styles.footer}>
         <AppText color="inkMuted">Déjà un compte ?</AppText>
         <Button label="Se connecter" variant="ghost" onPress={() => router.replace('/sign-in')} />

@@ -1,4 +1,5 @@
-import { LogOut } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { LogOut, Store } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -6,10 +7,12 @@ import { AlertBanner, AppText, Button, Screen } from '@/components/ui';
 import { authErrorMessage } from '@/features/auth/auth-errors';
 import { signOut } from '@/features/auth/auth-service';
 import { useAuthStore } from '@/features/auth/auth-store';
+import { useMyShop } from '@/features/shop/use-shop';
 import { theme } from '@/theme';
 
 export default function MoreScreen() {
   const email = useAuthStore((s) => s.user?.email);
+  const { data: shop } = useMyShop();
   const [error, setError] = useState<string>();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -27,6 +30,19 @@ export default function MoreScreen() {
   return (
     <Screen>
       <AppText variant="title">Plus</AppText>
+      <View style={styles.account}>
+        <AppText variant="caption" color="inkMuted">
+          Boutique
+        </AppText>
+        <AppText variant="heading">{shop?.name}</AppText>
+        {shop?.description ? <AppText color="inkMuted">{shop.description}</AppText> : null}
+      </View>
+      <Button
+        label="Modifier la boutique"
+        icon={Store}
+        fullWidth
+        onPress={() => router.push('/shop-settings')}
+      />
       <View style={styles.account}>
         <AppText variant="caption" color="inkMuted">
           Connecté en tant que

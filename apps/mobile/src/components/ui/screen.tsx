@@ -1,19 +1,21 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { theme } from '@/theme';
 
 type ScreenProps = {
   children: ReactNode;
+  /** Safe-area edges to pad; use [] under a native header. */
+  edges?: Edge[];
   scroll?: boolean;
   /** Pinned at the bottom, above the tab bar (e.g. the primary action). */
   footer?: ReactNode;
 };
 
-export function Screen({ children, scroll = true, footer }: ScreenProps) {
+export function Screen({ children, scroll = true, footer, edges = ['top'] }: ScreenProps) {
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={edges}>
       {scroll ? (
         <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView>
       ) : (

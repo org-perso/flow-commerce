@@ -7,7 +7,7 @@ import { AlertBanner, Button } from '@/components/ui';
 import { AuthScaffold } from '@/features/auth/auth-scaffold';
 import { authErrorMessage } from '@/features/auth/auth-errors';
 import { sendPasswordReset } from '@/features/auth/auth-service';
-import { FormTextField } from '@/features/auth/form-text-field';
+import { FormTextField } from '@/components/form-text-field';
 import { forgotPasswordSchema, type ForgotPasswordValues } from '@/features/auth/schemas';
 
 export default function ForgotPasswordScreen() {

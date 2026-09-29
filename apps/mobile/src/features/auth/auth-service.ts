@@ -7,7 +7,9 @@ import {
 } from 'firebase/auth';
 
 import { auth } from '@/lib/firebase';
+import { queryClient } from '@/lib/query-client';
 
+import { signOutFromGoogle } from './google-auth';
 import { notifyUserReloaded } from './auth-store';
 
 export async function signUp(email: string, password: string) {
@@ -19,8 +21,14 @@ export async function signIn(email: string, password: string) {
   await signInWithEmailAndPassword(auth, email.trim(), password);
 }
 
-export function signOut() {
-  return firebaseSignOut(auth);
+export async function signOut() {
+  try {
+    await signOutFromGoogle();
+  } finally {
+    // Always end the Firebase session, even if clearing the Google account fails.
+    await firebaseSignOut(auth);
+    queryClient.clear();
+  }
 }
 
 export function sendPasswordReset(email: string) {

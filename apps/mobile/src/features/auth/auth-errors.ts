@@ -7,6 +7,8 @@ const messages: Record<string, string> = {
   'auth/invalid-credential': 'Email ou mot de passe incorrect.',
   'auth/user-disabled': 'Ce compte a été désactivé.',
   'auth/too-many-requests': 'Trop de tentatives. Réessayez dans quelques minutes.',
+  'auth/account-exists-with-different-credential':
+    'Un compte existe déjà avec cet email. Connectez-vous avec votre mot de passe.',
   'auth/network-request-failed': 'Pas de connexion internet. Vérifiez votre réseau.',
 };
 
