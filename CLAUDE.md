@@ -7,7 +7,7 @@ Promesse : « De la commande au bénéfice, directement depuis votre téléphone
 
 ```
 apps/mobile/   React Native + Expo + TypeScript (Expo Router)
-apps/api/      Spring Boot (Java) — API REST
+apps/api/      Node.js + Express 5 + TypeScript — API REST
 apps/admin/    Next.js — plus tard, ne pas créer pour l'instant
 docs/          Fiche projet, modèle de données, décisions (ADR)
 ```
@@ -15,8 +15,8 @@ docs/          Fiche projet, modèle de données, décisions (ADR)
 ## Stack
 
 - **Auth** : Firebase Authentication (email, Google). Le mobile envoie le Firebase ID Token en `Authorization: Bearer`.
-- **API** : Spring Boot, Spring Security en OAuth2 Resource Server (issuer `https://securetoken.google.com/<projectId>`). Pas de Firebase Admin SDK pour vérifier les tokens.
-- **BDD** : PostgreSQL, migrations Flyway uniquement (jamais `ddl-auto=update`).
+- **API** : Express 5 + TypeScript, `pg` (SQL écrit à la main, pas d'ORM), Zod pour la validation. Tokens Firebase vérifiés avec `jose` (JWKS Google, issuer `https://securetoken.google.com/<projectId>`). Pas de Firebase Admin SDK.
+- **BDD** : PostgreSQL, migrations SQL versionnées avec `node-pg-migrate` (`apps/api/migrations/`) uniquement. Colonnes en `snake_case`, API JSON en `camelCase`.
 - **Mobile** : TanStack Query (appels API + cache), Zustand (état local), React Hook Form + Zod (formulaires).
 - **Notifications** : Firebase Cloud Messaging. **Images** : Firebase Storage, compressées côté client avant upload.
 
@@ -24,19 +24,21 @@ docs/          Fiche projet, modèle de données, décisions (ADR)
 
 ```bash
 # Mobile
-cd apps/mobile && npx expo start
+cd apps/mobile && yarn expo start
 
 # API
-cd apps/api && ./mvnw spring-boot:run
-cd apps/api && ./mvnw test
+cd apps/api && yarn dev            # API en local (hot reload)
+cd apps/api && yarn migrate:up     # appliquer les migrations
+cd apps/api && yarn migrate:create <nom>  # nouvelle migration SQL
 
-# BDD locale
+# BDD locale / stack complète
 docker compose up -d postgres
+docker compose up -d --build       # Postgres + API (migrations au démarrage)
 ```
 
 ## Règles métier non négociables
 
-- **Montants** : entiers en Ariary (`BIGINT` en BDD, `long` en Java, `number` entier en TS). Jamais de `double`/`float`.
+- **Montants** : entiers en Ariary (`BIGINT` en BDD, `number` entier en TS côté API et mobile). Jamais de `double`/`float`.
 - **Multi-tenant** : toute entité métier porte un `shopId`. Chaque requête filtre par la boutique de l'utilisateur authentifié. Ne jamais faire confiance à un `shopId` envoyé par le client.
 - **Stock** : ne jamais modifier `stockQuantity` directement. Tout changement passe par un `StockMovement` dans la même transaction. Décrémentation atomique : `UPDATE ... SET stock = stock - :q WHERE id = :id AND stock >= :q`.
 - **Commandes** : `OrderItem` fige `unitSellingPrice` et `unitPurchasePrice` au moment de la commande. Les calculs historiques utilisent ces valeurs, jamais le prix actuel du produit.

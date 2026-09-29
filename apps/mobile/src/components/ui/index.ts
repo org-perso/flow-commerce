@@ -4,3 +4,4 @@ export { Button } from './button';
 export { KpiCard } from './kpi-card';
 export { Screen } from './screen';
 export { StatusBadge, type OrderStatus } from './status-badge';
+export { TextField } from './text-field';

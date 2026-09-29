@@ -11,6 +11,8 @@ import {
   type OrderStatus,
 } from '@/components/ui';
 import { theme } from '@/theme';
+import { EmailVerificationBanner } from '@/features/auth/email-verification-banner';
+import { useMyShop } from '@/features/shop/use-shop';
 import { formatAr } from '@/utils/format';
 
 // Static data until the dashboard API exists.
@@ -38,6 +40,8 @@ const recentOrders: {
 ];
 
 export default function DashboardScreen() {
+  const { data: shop } = useMyShop();
+
   return (
     <Screen
       footer={
@@ -50,9 +54,10 @@ export default function DashboardScreen() {
         />
       }
     >
+      <EmailVerificationBanner />
       <View style={styles.section}>
         <AppText variant="caption" color="inkMuted">
-          Bonjour, Boutique Hery
+          Bonjour, {shop?.name}
         </AppText>
         <KpiCard
           variant="hero"
