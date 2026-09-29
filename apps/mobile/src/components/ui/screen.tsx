@@ -11,6 +11,8 @@ type ScreenProps = {
   scroll?: boolean;
   /** Pinned at the bottom, above the tab bar (e.g. the primary action). */
   footer?: ReactNode;
+  /** Full-width header bar (e.g. ScreenHeader); it handles the top safe area itself. */
+  header?: ReactNode;
   /** Enables pull-to-refresh on a scrolling screen. */
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -20,12 +22,14 @@ export function Screen({
   children,
   scroll = true,
   footer,
-  edges = ['top'],
+  edges,
+  header,
   onRefresh,
   refreshing = false,
 }: ScreenProps) {
   return (
-    <SafeAreaView style={styles.root} edges={edges}>
+    <SafeAreaView style={styles.root} edges={edges ?? (header ? [] : ['top'])}>
+      {header}
       {scroll ? (
         <ScrollView
           contentContainerStyle={styles.content}

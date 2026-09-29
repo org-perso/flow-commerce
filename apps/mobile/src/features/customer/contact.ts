@@ -1,10 +1,6 @@
 import { Linking } from 'react-native';
 
-/** "0341234567" → "034 12 345 67" (Madagascar mobile format); other numbers unchanged. */
-export function formatPhone(phone: string): string {
-  const m = /^(0\d{2})(\d{2})(\d{3})(\d{2})$/.exec(phone);
-  return m ? m.slice(1).join(' ') : phone;
-}
+export { formatPhone } from '@/utils/format';
 
 export function callPhone(phone: string) {
   return Linking.openURL(`tel:${phone}`);

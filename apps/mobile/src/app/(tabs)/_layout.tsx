@@ -19,6 +19,9 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
       variant="caption"
       color={focused ? 'ink' : 'inkMuted'}
       style={focused && styles.labelActive}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={theme.layout.minFontScale}
     >
       {label}
     </AppText>

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Plus, Wallet } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -93,11 +93,7 @@ export default function ExpensesScreen() {
           expenses.isPending ? (
             <ActivityIndicator color={theme.colors.ink} style={styles.loader} />
           ) : (
-            <EmptyState
-              icon={Wallet}
-              title="Aucune dépense"
-              message="Publicité, emballage, transport… Notez vos dépenses pour connaître votre vrai bénéfice."
-            />
+            <EmptyState message="Aucune dépense sur cette période." />
           )
         }
         style={styles.list}

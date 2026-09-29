@@ -65,8 +65,21 @@ function RootNavigator() {
       >
         <Stack.Protected guard={hasShop}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="shop-settings" options={headerOptions('Ma boutique')} />
-          <Stack.Screen name="new-shop" options={headerOptions('Nouvelle boutique')} />
+          <Stack.Screen
+            name="shop-switcher"
+            options={{
+              ...headerOptions('Changer de boutique', { showShop: false }),
+              presentation: 'modal',
+            }}
+          />
+          <Stack.Screen
+            name="shop-settings"
+            options={headerOptions('Modifier la boutique', { showShop: false })}
+          />
+          <Stack.Screen
+            name="new-shop"
+            options={headerOptions('Nouvelle boutique', { showShop: false })}
+          />
           <Stack.Screen name="products/new" options={headerOptions('Nouveau produit')} />
           <Stack.Screen name="products/[productId]/index" options={headerOptions('Produit')} />
           <Stack.Screen

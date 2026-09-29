@@ -1,11 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Package, Plus } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { useDeferredValue, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import {
+  ScreenHeader,
   AlertBanner,
-  AppText,
   Button,
   EmptyState,
   FilterChips,
@@ -45,6 +45,7 @@ export default function StockScreen() {
 
   return (
     <Screen
+      header={<ScreenHeader title="Stock" />}
       scroll={false}
       footer={
         <Button
@@ -57,7 +58,6 @@ export default function StockScreen() {
       }
     >
       <View style={styles.header}>
-        <AppText variant="title">Stock</AppText>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Rechercher un produit" />
         <FilterChips options={filters} value={filter} onChange={setFilter} />
       </View>
@@ -85,12 +85,11 @@ export default function StockScreen() {
           products.isPending ? (
             <ActivityIndicator color={theme.colors.ink} style={styles.loader} />
           ) : isFiltered ? (
-            <EmptyState icon={Package} title="Aucun produit trouvé" />
+            <EmptyState message="Aucun produit trouvé." />
           ) : (
             <EmptyState
-              icon={Package}
-              title="Aucun produit pour l'instant"
-              message="Ajoutez vos produits pour suivre votre stock et créer des commandes."
+              message="Aucun produit pour l'instant."
+              action={{ label: 'Ajouter un produit', onPress: openNew }}
             />
           )
         }

@@ -1,10 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Plus, Receipt } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import {
+  ScreenHeader,
   AlertBanner,
-  AppText,
   Button,
   EmptyState,
   FilterChips,
@@ -33,6 +33,7 @@ export default function OrdersScreen() {
 
   return (
     <Screen
+      header={<ScreenHeader title="Commandes" />}
       scroll={false}
       footer={
         <Button
@@ -45,7 +46,6 @@ export default function OrdersScreen() {
       }
     >
       <View style={styles.header}>
-        <AppText variant="title">Commandes</AppText>
         <FilterChips options={filters} value={status} onChange={setStatus} />
       </View>
 
@@ -72,10 +72,10 @@ export default function OrdersScreen() {
             <ActivityIndicator color={theme.colors.ink} style={styles.loader} />
           ) : (
             <EmptyState
-              icon={Receipt}
-              title={status === 'ALL' ? 'Aucune commande pour l’instant' : 'Aucune commande'}
               message={
-                status === 'ALL' ? 'Créez votre première commande en quelques secondes.' : undefined
+                status === 'ALL'
+                  ? 'Aucune commande pour l’instant.'
+                  : 'Aucune commande avec ce statut.'
               }
             />
           )

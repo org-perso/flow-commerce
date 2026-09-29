@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import {
+  ScreenHeader,
   AlertBanner,
   AppText,
   Button,
@@ -16,7 +17,6 @@ import { EmailVerificationBanner } from '@/features/auth/email-verification-bann
 import type { DashboardPeriod } from '@/features/dashboard/dashboard-api';
 import { useDashboard } from '@/features/dashboard/use-dashboard';
 import { OrderRow } from '@/features/order/order-row';
-import { useActiveShop } from '@/features/shop/use-shop';
 import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
 import { formatAr } from '@/utils/format';
@@ -40,7 +40,6 @@ const statusCounters: { status: OrderStatus; label: string }[] = [
 ];
 
 export default function DashboardScreen() {
-  const shop = useActiveShop();
   const [period, setPeriod] = useState<DashboardPeriod>('today');
   const dashboard = useDashboard(period);
   const d = dashboard.data;
@@ -50,6 +49,7 @@ export default function DashboardScreen() {
 
   return (
     <Screen
+      header={<ScreenHeader />}
       onRefresh={() => dashboard.refetch()}
       refreshing={dashboard.isRefetching}
       footer={
@@ -64,12 +64,7 @@ export default function DashboardScreen() {
     >
       <EmailVerificationBanner />
 
-      <View style={styles.section}>
-        <AppText variant="caption" color="inkMuted">
-          Bonjour, {shop.name}
-        </AppText>
-        <FilterChips options={periods} value={period} onChange={setPeriod} />
-      </View>
+      <FilterChips options={periods} value={period} onChange={setPeriod} />
 
       {dashboard.isError && (
         <AlertBanner

@@ -51,3 +51,72 @@ export function monthRange(iso: string, offset = 0): { from: string; to: string 
   const last = new Date(Date.UTC(y, m + offset, 0));
   return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
 }
+
+/** "0341234567" → "034 12 345 67" (Madagascar mobile format); other numbers unchanged. */
+export function formatPhone(phone: string): string {
+  const m = /^(0\d{2})(\d{2})(\d{3})(\d{2})$/.exec(phone);
+  return m ? m.slice(1).join(' ') : phone;
+}
+
+const TZ = 'Indian/Antananarivo';
+const dayKey = (date: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(date);
+const timeFormat = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: TZ,
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const dayMonthFormat = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: TZ,
+  day: '2-digit',
+  month: '2-digit',
+});
+const longDayFormat = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: TZ,
+  day: 'numeric',
+  month: 'long',
+});
+
+/** Calendar day relative to today in Madagascar: 0 today, 1 yesterday, … */
+function daysAgo(date: Date, now: Date): number {
+  const a = Date.parse(dayKey(date));
+  const b = Date.parse(dayKey(now));
+  return Math.round((b - a) / 86_400_000);
+}
+
+export function formatTime(date: string | Date): string {
+  return timeFormat.format(new Date(date));
+}
+
+/** "14:32" today, "Hier" yesterday, otherwise "25/09". */
+export function formatRelativeDate(date: string | Date, now = new Date()): string {
+  const d = new Date(date);
+  const ago = daysAgo(d, now);
+  if (ago === 0) return timeFormat.format(d);
+  if (ago === 1) return 'Hier';
+  return dayMonthFormat.format(d);
+}
+
+/**
+ * Groups items by calendar day (Madagascar time), newest first as given:
+ * sections titled "Aujourd'hui", "Hier", "25 septembre".
+ */
+export function groupByDay<T>(
+  items: T[],
+  getDate: (item: T) => string | Date,
+  now = new Date(),
+): { title: string; data: T[] }[] {
+  const sections: { key: string; title: string; data: T[] }[] = [];
+  for (const item of items) {
+    const date = new Date(getDate(item));
+    const key = dayKey(date);
+    let section = sections.find((s) => s.key === key);
+    if (!section) {
+      const ago = daysAgo(date, now);
+      const title = ago === 0 ? "Aujourd'hui" : ago === 1 ? 'Hier' : longDayFormat.format(date);
+      section = { key, title, data: [] };
+      sections.push(section);
+    }
+    section.data.push(item);
+  }
+  return sections.map(({ title, data }) => ({ title, data }));
+}

@@ -1,33 +1,22 @@
-import type { LucideIcon } from 'lucide-react-native';
-import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { theme } from '@/theme';
 
 import { AppText } from './app-text';
+import { Button } from './button';
 
 type EmptyStateProps = {
-  icon: LucideIcon;
-  title: string;
-  message?: string;
-  action?: ReactNode;
+  message: string;
+  action?: { label: string; onPress: () => void };
 };
 
-export function EmptyState({ icon: Icon, title, message, action }: EmptyStateProps) {
+export function EmptyState({ message, action }: EmptyStateProps) {
   return (
     <View style={styles.root}>
-      <View style={styles.icon}>
-        <Icon size={28} color={theme.colors.ink} strokeWidth={2} />
-      </View>
-      <AppText variant="heading" style={styles.center}>
-        {title}
+      <AppText color="inkMuted" style={styles.message}>
+        {message}
       </AppText>
-      {message && (
-        <AppText color="inkMuted" style={styles.center}>
-          {message}
-        </AppText>
-      )}
-      {action}
+      {action && <Button label={action.label} onPress={action.onPress} />}
     </View>
   );
 }
@@ -35,20 +24,11 @@ export function EmptyState({ icon: Icon, title, message, action }: EmptyStatePro
 const styles = StyleSheet.create({
   root: {
     alignItems: 'center',
-    gap: theme.spacing[2],
+    gap: theme.spacing[4],
     paddingVertical: theme.spacing[8],
     paddingHorizontal: theme.spacing[4],
   },
-  icon: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.navySoft,
-    marginBottom: theme.spacing[2],
-  },
-  center: {
+  message: {
     textAlign: 'center',
   },
 });

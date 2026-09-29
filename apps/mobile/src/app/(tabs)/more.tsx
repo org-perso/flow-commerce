@@ -1,102 +1,122 @@
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { Check, LogOut, Plus, Store, Wallet } from 'lucide-react-native';
+import {
+  ChevronRight,
+  Pencil,
+  Plus,
+  UserRound,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { AlertBanner, AppText, Button, Screen } from '@/components/ui';
+import { AppText, InlineBanner, ListGroup, ListRow, Screen, ScreenHeader } from '@/components/ui';
 import { authErrorMessage } from '@/features/auth/auth-errors';
 import { signOut } from '@/features/auth/auth-service';
 import { useAuthStore } from '@/features/auth/auth-store';
-import { useActiveShop, useSetActiveShop, useShops } from '@/features/shop/use-shop';
 import { theme } from '@/theme';
+
+function RowIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return (
+    <View style={styles.icon}>
+      <Icon size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
+    </View>
+  );
+}
+
+const chevron = (
+  <ChevronRight size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
+);
 
 export default function MoreScreen() {
   const email = useAuthStore((s) => s.user?.email);
-  const { data: shops = [] } = useShops();
-  const activeShop = useActiveShop();
-  const setActiveShop = useSetActiveShop();
   const [error, setError] = useState<string>();
   const [signingOut, setSigningOut] = useState(false);
 
-  const handleSignOut = async () => {
-    setError(undefined);
-    setSigningOut(true);
-    try {
-      await signOut();
-    } catch (e) {
-      setError(authErrorMessage(e));
-      setSigningOut(false);
-    }
-  };
+  const confirmSignOut = () =>
+    Alert.alert('Se déconnecter ?', 'Vous devrez vous reconnecter pour accéder à vos boutiques.', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Se déconnecter',
+        style: 'destructive',
+        onPress: async () => {
+          setError(undefined);
+          setSigningOut(true);
+          try {
+            await signOut();
+          } catch (e) {
+            setError(authErrorMessage(e));
+            setSigningOut(false);
+          }
+        },
+      },
+    ]);
 
   return (
-    <Screen>
-      <AppText variant="title">Plus</AppText>
-
+    <Screen header={<ScreenHeader title="Plus" />}>
       <View style={styles.section}>
-        <AppText variant="heading">{shops.length > 1 ? 'Mes boutiques' : 'Ma boutique'}</AppText>
-        <View style={styles.list}>
-          {shops.map((shop) => {
-            const active = shop.id === activeShop.id;
-            return (
-              <Pressable
-                key={shop.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-                onPress={() => setActiveShop(shop.id)}
-                style={({ pressed }) => [styles.shopRow, pressed && styles.pressed]}
-              >
-                <Store size={20} color={theme.colors.inkMuted} strokeWidth={2} />
-                <View style={styles.shopText}>
-                  <AppText style={active && styles.activeName} numberOfLines={1}>
-                    {shop.name}
-                  </AppText>
-                  {shop.description ? (
-                    <AppText variant="caption" color="inkMuted" numberOfLines={1}>
-                      {shop.description}
-                    </AppText>
-                  ) : null}
-                </View>
-                {active && <Check size={20} color={theme.colors.blue} strokeWidth={2} />}
-              </Pressable>
-            );
-          })}
-        </View>
-        <Button
-          label="Modifier la boutique active"
-          icon={Store}
-          fullWidth
-          onPress={() => router.push('/shop-settings')}
-        />
-        <Button
-          label="Créer une autre boutique"
-          icon={Plus}
-          variant="ghost"
-          onPress={() => router.push('/new-shop')}
-        />
+        <AppText variant="label" color="inkMuted">
+          Boutique
+        </AppText>
+        <ListGroup>
+          <ListRow
+            leading={<RowIcon icon={Pencil} />}
+            title="Modifier la boutique"
+            trailing={chevron}
+            onPress={() => router.push('/shop-settings')}
+          />
+          <ListRow
+            leading={<RowIcon icon={Plus} />}
+            title="Créer une boutique"
+            trailing={chevron}
+            onPress={() => router.push('/new-shop')}
+          />
+        </ListGroup>
       </View>
 
       <View style={styles.section}>
-        <AppText variant="heading">Gestion</AppText>
-        <Button label="Dépenses" icon={Wallet} fullWidth onPress={() => router.push('/expenses')} />
+        <AppText variant="label" color="inkMuted">
+          Gestion
+        </AppText>
+        <ListGroup>
+          <ListRow
+            leading={<RowIcon icon={Wallet} />}
+            title="Dépenses"
+            trailing={chevron}
+            onPress={() => router.push('/expenses')}
+          />
+        </ListGroup>
       </View>
 
       <View style={styles.section}>
-        <AppText variant="heading">Compte</AppText>
-        <View style={styles.account}>
-          <AppText variant="caption" color="inkMuted">
-            Connecté en tant que
+        <AppText variant="label" color="inkMuted">
+          Compte
+        </AppText>
+        <ListGroup>
+          <ListRow
+            leading={<RowIcon icon={UserRound} />}
+            title="Connecté"
+            subtitle={email ?? undefined}
+          />
+        </ListGroup>
+      </View>
+
+      <View style={styles.footer}>
+        {error && <InlineBanner tone="danger" message={error} />}
+        <Pressable
+          onPress={confirmSignOut}
+          disabled={signingOut}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
+        >
+          <AppText color="statusCancelledFg" style={styles.signOutText}>
+            {signingOut ? 'Déconnexion…' : 'Se déconnecter'}
           </AppText>
-          <AppText>{email}</AppText>
-        </View>
-        {error && <AlertBanner tone="danger" message={error} />}
-        <Button
-          label="Se déconnecter"
-          icon={LogOut}
-          fullWidth
-          loading={signingOut}
-          onPress={handleSignOut}
-        />
+        </Pressable>
+        <AppText variant="caption" color="inkMuted" style={styles.center}>
+          FlowCommerce {Constants.expoConfig?.version ?? ''}
+        </AppText>
       </View>
     </Screen>
   );
@@ -104,35 +124,30 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   section: {
-    gap: theme.spacing[3],
+    gap: theme.spacing[2],
   },
-  list: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: theme.radius.md,
-    overflow: 'hidden',
-  },
-  shopRow: {
-    flexDirection: 'row',
+  icon: {
+    width: theme.layout.avatar,
+    height: theme.layout.avatar,
     alignItems: 'center',
-    gap: theme.spacing[3],
-    minHeight: theme.sizes.tapMin + theme.spacing[2],
-    paddingHorizontal: theme.spacing[4],
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.line,
+    justifyContent: 'center',
   },
-  shopText: {
-    flex: 1,
+  footer: {
+    gap: theme.spacing[2],
+    alignItems: 'stretch',
   },
-  activeName: {
+  signOut: {
+    minHeight: theme.sizes.tapMin,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signOutText: {
     fontFamily: theme.typography.heading.fontFamily,
   },
-  account: {
-    gap: theme.spacing[1],
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing[4],
+  center: {
+    textAlign: 'center',
   },
   pressed: {
-    opacity: 0.85,
+    opacity: theme.layout.pressedOpacity,
   },
 });

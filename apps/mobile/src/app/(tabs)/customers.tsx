@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ChevronRight, UserPlus, Users } from 'lucide-react-native';
+import { ChevronRight, UserPlus } from 'lucide-react-native';
 import { useDeferredValue, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,7 +10,15 @@ import {
   View,
 } from 'react-native';
 
-import { AlertBanner, AppText, Button, EmptyState, Screen, SearchBar } from '@/components/ui';
+import {
+  AlertBanner,
+  AppText,
+  Button,
+  EmptyState,
+  Screen,
+  ScreenHeader,
+  SearchBar,
+} from '@/components/ui';
 import { formatPhone } from '@/features/customer/contact';
 import { useCustomers } from '@/features/customer/use-customers';
 import { apiErrorMessage } from '@/lib/api-client';
@@ -23,6 +31,7 @@ export default function CustomersScreen() {
 
   return (
     <Screen
+      header={<ScreenHeader title="Clients" />}
       scroll={false}
       footer={
         <Button
@@ -35,7 +44,6 @@ export default function CustomersScreen() {
       }
     >
       <View style={styles.header}>
-        <AppText variant="title">Clients</AppText>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Nom ou téléphone" />
       </View>
 
@@ -80,12 +88,11 @@ export default function CustomersScreen() {
           customers.isPending ? (
             <ActivityIndicator color={theme.colors.ink} style={styles.loader} />
           ) : q ? (
-            <EmptyState icon={Users} title="Aucun client trouvé" />
+            <EmptyState message="Aucun client trouvé." />
           ) : (
             <EmptyState
-              icon={Users}
-              title="Aucun client pour l'instant"
-              message="Vos clients sont aussi enregistrés automatiquement quand vous créez une commande."
+              message="Aucun client pour l'instant."
+              action={{ label: 'Ajouter un client', onPress: () => router.push('/customers/new') }}
             />
           )
         }
