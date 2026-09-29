@@ -30,6 +30,8 @@ cd apps/mobile && yarn expo start
 cd apps/api && yarn dev            # API en local (hot reload)
 cd apps/api && yarn migrate:up     # appliquer les migrations
 cd apps/api && yarn migrate:create <nom>  # nouvelle migration SQL
+cd apps/api && yarn test           # tests d'intégration (Postgres du docker compose)
+cd apps/api && yarn verify         # typecheck + lint + format
 
 # BDD locale / stack complète
 docker compose up -d postgres
@@ -39,7 +41,7 @@ docker compose up -d --build       # Postgres + API (migrations au démarrage)
 ## Règles métier non négociables
 
 - **Montants** : entiers en Ariary (`BIGINT` en BDD, `number` entier en TS côté API et mobile). Jamais de `double`/`float`.
-- **Multi-tenant** : toute entité métier porte un `shopId`. Chaque requête filtre par la boutique de l'utilisateur authentifié. Ne jamais faire confiance à un `shopId` envoyé par le client.
+- **Multi-tenant** : un utilisateur peut posséder plusieurs boutiques. Toute entité métier porte un `shopId`. Les routes métier sont sous `/api/v1/shops/:shopId/...` et passent par `requireShop`, qui vérifie que la boutique appartient à l'utilisateur (sinon 404). Ne jamais lire un `shopId` depuis le body ou la query : uniquement `currentShop(req)`. En BDD, les références entre tables passent par des FK composites `(id, shop_id)` pour empêcher tout mélange entre boutiques.
 - **Stock** : ne jamais modifier `stockQuantity` directement. Tout changement passe par un `StockMovement` dans la même transaction. Décrémentation atomique : `UPDATE ... SET stock = stock - :q WHERE id = :id AND stock >= :q`.
 - **Commandes** : `OrderItem` fige `unitSellingPrice` et `unitPurchasePrice` au moment de la commande. Les calculs historiques utilisent ces valeurs, jamais le prix actuel du produit.
 - **Annulation / retour** : recréer le mouvement de stock inverse.
@@ -48,11 +50,12 @@ docker compose up -d --build       # Postgres + API (migrations au démarrage)
 - **Fuseau horaire** : `Indian/Antananarivo` pour tout calcul « aujourd'hui / semaine / mois ».
 - **Produits** : archivage (soft delete), pas de suppression physique.
 
-## Décisions en attente (demander avant d'implémenter)
+## Décisions prises
 
-- Moment exact de la décrémentation du stock : création ou confirmation de la commande ?
-- Les frais de livraison entrent-ils dans le CA ?
-- La dépense « Achat de produits » fait doublon avec le coût des produits vendus : l'exclure du calcul du bénéfice ?
+- **Stock décrémenté à la confirmation** de la commande (passage à `CONFIRMEE`), pas à la création. Une commande `EN_ATTENTE` ne bloque pas de stock et ses lignes restent modifiables ; une fois confirmée, les lignes sont figées. Statuts « vendus » (qui tiennent du stock) : `CONFIRMEE`, `EN_PREPARATION`, `EN_LIVRAISON`, `LIVREE`. Passer à `ANNULEE` ou `RETOUR` depuis l'un d'eux recrée les mouvements inverses (`RETOUR`). Les changements de statut passent par `POST /orders/:id/status`, qui applique la table `TRANSITIONS`.
+- **Frais de livraison hors CA** : CA = somme des sous-totaux des lignes. `totalAmount` (ce que paie le client) = lignes + livraison.
+- **« Achat de produits » exclu du bénéfice** : déjà compté via le coût des produits vendus. Bénéfice estimé = CA − coût des produits vendus − dépenses hors `ACHAT_PRODUITS`.
+- Le CA et les ventes d'une période se basent sur la date de création de la commande (fuseau `Indian/Antananarivo`).
 
 ## Hors périmètre MVP 1 — ne pas implémenter
 
