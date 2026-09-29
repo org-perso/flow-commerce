@@ -11,6 +11,7 @@ import {
   type OrderStatus,
 } from '@/components/ui';
 import { theme } from '@/theme';
+import { EmailVerificationBanner } from '@/features/auth/email-verification-banner';
 import { formatAr } from '@/utils/format';
 
 // Static data until the dashboard API exists.
@@ -50,6 +51,7 @@ export default function DashboardScreen() {
         />
       }
     >
+      <EmailVerificationBanner />
       <View style={styles.section}>
         <AppText variant="caption" color="inkMuted">
           Bonjour, Boutique Hery

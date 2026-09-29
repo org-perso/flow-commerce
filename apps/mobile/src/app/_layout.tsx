@@ -10,6 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { useAuthStore } from '@/features/auth/auth-store';
 import { theme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -21,7 +22,9 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
-  const ready = fontsLoaded || fontError !== null;
+  const authInitialized = useAuthStore((s) => s.initialized);
+  const signedIn = useAuthStore((s) => s.user !== null);
+  const ready = (fontsLoaded || fontError !== null) && authInitialized;
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
@@ -31,13 +34,20 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style={signedIn ? 'dark' : 'light'} />
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: theme.colors.surface },
         }}
-      />
+      >
+        <Stack.Protected guard={signedIn}>
+          <Stack.Screen name="(tabs)" />
+        </Stack.Protected>
+        <Stack.Protected guard={!signedIn}>
+          <Stack.Screen name="(auth)" />
+        </Stack.Protected>
+      </Stack>
     </>
   );
 }
