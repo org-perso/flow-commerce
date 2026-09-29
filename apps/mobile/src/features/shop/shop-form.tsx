@@ -4,11 +4,11 @@ import { View } from 'react-native';
 
 import { FormTextField } from '@/components/form-text-field';
 import { AlertBanner, Button } from '@/components/ui';
+import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
 
 import { shopSchema, toShopInput, type ShopFormValues } from './schemas';
 import type { Shop, ShopInput } from './shop-api';
-import { shopErrorMessage } from './shop-errors';
 
 type ShopFormProps = {
   initialShop?: Shop;
@@ -33,7 +33,7 @@ export function ShopForm({ initialShop, submitLabel, onSubmit, error }: ShopForm
 
   return (
     <View style={{ gap: theme.spacing[4] }}>
-      {error != null && <AlertBanner tone="danger" message={shopErrorMessage(error)} />}
+      {error != null && <AlertBanner tone="danger" message={apiErrorMessage(error)} />}
       <FormTextField
         control={control}
         name="name"

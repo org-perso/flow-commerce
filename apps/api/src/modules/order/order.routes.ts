@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 import { currentShopId } from '../../http/context.js';
 import { idParam, notFound } from '../../http/params.js';
-import { amount, isoDate, optionalText, pagination } from '../../http/schemas.js';
+import { amount, isoDate, optionalText, pagination, requiredText } from '../../http/schemas.js';
+import { phoneField } from '../customer/phone.js';
 import { ORDER_STATUSES } from './order-status.js';
 import { findOrder, listOrders } from './order.repository.js';
 import { changeOrderStatus, createOrder, updateOrder } from './order.service.js';
@@ -13,16 +14,30 @@ const items = z
   .min(1, 'An order needs at least one item.')
   .max(100);
 
-const createOrderSchema = z.object({
-  customerId: z.uuid().nullable().default(null),
-  items,
-  deliveryFee: amount.default(0),
-  paymentMethod: optionalText(30).default(null),
-  /** Defaults to the customer's address. */
-  address: optionalText(1000).default(null),
-  /** Create directly as confirmed to take stock right away. */
-  status: z.enum(['EN_ATTENTE', 'CONFIRMEE']).default('EN_ATTENTE'),
-});
+const createOrderSchema = z
+  .object({
+    customerId: z.uuid().nullable().default(null),
+    /** New or returning customer (matched by phone), instead of customerId. */
+    customer: z
+      .object({
+        name: requiredText(150),
+        phone: phoneField.default(null),
+        address: optionalText(1000).default(null),
+      })
+      .nullable()
+      .default(null),
+    items,
+    deliveryFee: amount.default(0),
+    paymentMethod: optionalText(30).default(null),
+    /** Defaults to the customer's address. */
+    address: optionalText(1000).default(null),
+    /** Create directly as confirmed to take stock right away. */
+    status: z.enum(['EN_ATTENTE', 'CONFIRMEE']).default('EN_ATTENTE'),
+  })
+  .refine((o) => !(o.customerId && o.customer), {
+    message: 'Provide customerId or customer, not both.',
+    path: ['customer'],
+  });
 
 const updateOrderSchema = z
   .object({

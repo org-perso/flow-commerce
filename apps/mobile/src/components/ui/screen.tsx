@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { theme } from '@/theme';
@@ -11,13 +11,31 @@ type ScreenProps = {
   scroll?: boolean;
   /** Pinned at the bottom, above the tab bar (e.g. the primary action). */
   footer?: ReactNode;
+  /** Enables pull-to-refresh on a scrolling screen. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 };
 
-export function Screen({ children, scroll = true, footer, edges = ['top'] }: ScreenProps) {
+export function Screen({
+  children,
+  scroll = true,
+  footer,
+  edges = ['top'],
+  onRefresh,
+  refreshing = false,
+}: ScreenProps) {
   return (
     <SafeAreaView style={styles.root} edges={edges}>
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined
+          }
+        >
+          {children}
+        </ScrollView>
       ) : (
         <View style={[styles.content, styles.fill]}>{children}</View>
       )}

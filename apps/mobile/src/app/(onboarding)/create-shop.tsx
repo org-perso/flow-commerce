@@ -2,10 +2,10 @@ import { AuthScaffold } from '@/features/auth/auth-scaffold';
 import { Button } from '@/components/ui';
 import { signOut } from '@/features/auth/auth-service';
 import { ShopForm } from '@/features/shop/shop-form';
-import { useSaveShop } from '@/features/shop/use-shop';
+import { useCreateShop } from '@/features/shop/use-shop';
 
 export default function CreateShopScreen() {
-  const createShop = useSaveShop('create');
+  const createShop = useCreateShop();
 
   // Once the shop exists, the root layout's guard switches to the app.
   return (

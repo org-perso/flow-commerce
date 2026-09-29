@@ -3,7 +3,11 @@ import type pg from 'pg';
 import { withTransaction } from '../../db/pool.js';
 import { notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
-import { findCustomer } from '../customer/customer.repository.js';
+import {
+  findCustomer,
+  findOrCreateCustomer,
+  type CustomerInput,
+} from '../customer/customer.repository.js';
 import { applyStockMovement } from '../stock/stock.service.js';
 import { holdsStock, TRANSITIONS, type OrderStatus } from './order-status.js';
 import { findOrder, type Order } from './order.repository.js';
@@ -12,6 +16,8 @@ export type ItemInput = { productId: string; quantity: number };
 
 export type CreateOrderInput = {
   customerId: string | null;
+  /** New or returning customer typed in the order form (matched by phone). */
+  customer: CustomerInput | null;
   items: ItemInput[];
   deliveryFee: number;
   paymentMethod: string | null;
@@ -19,7 +25,7 @@ export type CreateOrderInput = {
   status: 'EN_ATTENTE' | 'CONFIRMEE';
 };
 
-export type UpdateOrderInput = Partial<Omit<CreateOrderInput, 'status'>>;
+export type UpdateOrderInput = Partial<Omit<CreateOrderInput, 'status' | 'customer'>>;
 
 type LockedOrder = { status: OrderStatus; deliveryFee: number; totalAmount: number };
 
@@ -134,16 +140,21 @@ async function lockOrder(client: pg.PoolClient, shopId: string, orderId: string)
 
 export function createOrder(shopId: string, input: CreateOrderInput): Promise<Order> {
   return withTransaction(async (client) => {
+    let customerId = input.customerId;
     let address = input.address;
     if (input.customerId) {
       const customer = await assertCustomer(client, shopId, input.customerId);
+      address ??= customer.address;
+    } else if (input.customer) {
+      const customer = await findOrCreateCustomer(client, shopId, input.customer);
+      customerId = customer.id;
       address ??= customer.address;
     }
 
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO orders (shop_id, customer_id, status, delivery_fee, payment_method, address)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [shopId, input.customerId, input.status, input.deliveryFee, input.paymentMethod, address],
+      [shopId, customerId, input.status, input.deliveryFee, input.paymentMethod, address],
     );
     const orderId = rows[0]!.id;
 
