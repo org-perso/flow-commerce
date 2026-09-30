@@ -1,41 +1,43 @@
 import { router } from 'expo-router';
-import { Phone, Plus } from 'lucide-react-native';
+import { ChevronRight, UserPlus, Users } from 'lucide-react-native';
 import { useDeferredValue, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import {
-  Avatar,
+  AppText,
   EmptyState,
   InlineBanner,
-  ListRow,
-  Screen,
   PageTitle,
+  Screen,
   ScreenHeader,
   SearchBar,
 } from '@/components/ui';
-import type { Customer } from '@/features/customer/customer-api';
-import { callPhone } from '@/features/customer/contact';
-import { useCustomers } from '@/features/customer/use-customers';
+import { CustomerRow } from '@/features/customer/customer-row';
+import { useCustomers, useUnlinkedOrdersCount } from '@/features/customer/use-customers';
 import { apiErrorMessage } from '@/lib/api-client';
-import { hitSlopFor, theme } from '@/theme';
-import { formatPhone } from '@/utils/format';
-
-function subtitle(customer: Customer): string | undefined {
-  const [main, ...others] = customer.phones;
-  const phone = main ? formatPhone(main) + (others.length ? ` +${others.length}` : '') : null;
-  return [phone, customer.socialProfile].filter(Boolean).join(' · ') || undefined;
-}
+import { theme } from '@/theme';
 
 export default function CustomersScreen() {
   const [search, setSearch] = useState('');
   const q = useDeferredValue(search.trim());
   const customers = useCustomers(q || undefined);
+  const unlinked = useUnlinkedOrdersCount().data?.count ?? 0;
   const openNew = () => router.push('/customers/new');
 
   return (
     <Screen scroll={false} header={<ScreenHeader />}>
-      <PageTitle title="Clients" action={{ label: 'Ajouter', icon: Plus, onPress: openNew }} />
-      <SearchBar value={search} onChangeText={setSearch} placeholder="Nom, téléphone ou profil" />
+      <PageTitle title="Clients" action={{ label: 'Ajouter', icon: UserPlus, onPress: openNew }} />
+      <View style={styles.controls}>
+        <SearchBar value={search} onChangeText={setSearch} placeholder="Nom, téléphone ou profil" />
+        {unlinked > 0 && !q && <UnlinkedBanner count={unlinked} />}
+      </View>
 
       {customers.isError && (
         <InlineBanner
@@ -48,28 +50,10 @@ export default function CustomersScreen() {
       <FlatList
         data={customers.data ?? []}
         keyExtractor={(c) => c.id}
-        renderItem={({ item, index }) => (
-          <ListRow
-            divider={index > 0}
-            onPress={() => router.push(`/customers/${item.id}`)}
-            leading={<Avatar name={item.name} />}
-            title={item.name}
-            subtitle={subtitle(item)}
-            trailing={
-              item.phones[0] ? (
-                <Pressable
-                  onPress={() => callPhone(item.phones[0]!)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Appeler ${item.name}`}
-                  hitSlop={hitSlopFor(theme.layout.controlHeight)}
-                  style={styles.call}
-                >
-                  <Phone size={theme.layout.iconMd} color={theme.colors.blue} strokeWidth={2} />
-                </Pressable>
-              ) : undefined
-            }
-          />
+        renderItem={({ item }) => (
+          <CustomerRow customer={item} onPress={() => router.push(`/customers/${item.id}`)} />
         )}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -96,24 +80,58 @@ export default function CustomersScreen() {
   );
 }
 
+/** Orders taken without a customer file: an invitation to link them. */
+function UnlinkedBanner({ count }: { count: number }) {
+  return (
+    <Pressable
+      onPress={() => router.navigate({ pathname: '/orders', params: { when: 'all' } })}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.banner, pressed && styles.pressed]}
+    >
+      <Users size={theme.layout.iconMd} color={theme.colors.goldInk} strokeWidth={2} />
+      <AppText color="goldInk" style={styles.flex}>
+        <AppText color="goldInk" style={styles.strong}>
+          {count} commande{count > 1 ? 's' : ''}
+        </AppText>{' '}
+        sans fiche client. Associez-les pour suivre vos habitués.
+      </AppText>
+      <ChevronRight size={theme.layout.iconMd} color={theme.colors.goldInk} strokeWidth={2} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  controls: {
+    gap: theme.spacing[3],
+  },
   list: {
     flex: 1,
     marginTop: -theme.spacing[3],
   },
   listContent: {
-    borderRadius: theme.radius.md,
-    overflow: 'hidden',
+    paddingBottom: theme.spacing[4],
   },
-  call: {
-    width: theme.layout.controlHeight,
-    height: theme.layout.controlHeight,
+  separator: {
+    height: theme.spacing[3],
+  },
+  banner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.navySoft,
+    gap: theme.spacing[3],
+    padding: theme.spacing[3],
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.goldSoft,
+  },
+  flex: {
+    flex: 1,
+  },
+  strong: {
+    fontFamily: theme.typography.heading.fontFamily,
   },
   loader: {
     marginTop: theme.spacing[8],
+  },
+  pressed: {
+    opacity: theme.layout.pressedOpacity,
   },
 });

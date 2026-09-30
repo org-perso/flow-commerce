@@ -1,44 +1,38 @@
 import { router } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import {
-  ScreenHeader,
   AlertBanner,
   AppText,
-  Button,
-  FilterChips,
-  KpiCard,
   Screen,
+  ScreenHeader,
+  SegmentedControl,
   type OrderStatus,
 } from '@/components/ui';
-import type { DashboardPeriod } from '@/features/dashboard/dashboard-api';
+import type { Dashboard, DashboardPeriod } from '@/features/dashboard/dashboard-api';
 import { GettingStarted } from '@/features/dashboard/getting-started';
+import { RevenueCard } from '@/features/dashboard/revenue-card';
+import { TodoCard } from '@/features/dashboard/todo-card';
 import { useDashboard } from '@/features/dashboard/use-dashboard';
 import { useExpenses } from '@/features/expense/use-expenses';
-import { OrderRow } from '@/features/order/order-row';
 import { useProducts } from '@/features/product/use-products';
 import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
 import { formatAr } from '@/utils/format';
 
 const periods = [
-  { value: 'today', label: "Aujourd'hui" },
-  { value: 'week', label: 'Cette semaine' },
-  { value: 'month', label: 'Ce mois' },
+  { key: 'today', label: "Aujourd'hui" },
+  { key: '7d', label: '7 jours' },
+  { key: '30d', label: '30 jours' },
 ] as const;
-
-const revenueLabels: Record<DashboardPeriod, string> = {
-  today: "CA aujourd'hui",
-  week: 'CA cette semaine',
-  month: 'CA ce mois',
-};
 
 const statusCounters: { status: OrderStatus; label: string }[] = [
   { status: 'EN_ATTENTE', label: 'En attente' },
+  { status: 'CONFIRMEE', label: 'Confirmée' },
   { status: 'EN_LIVRAISON', label: 'En livraison' },
-  { status: 'LIVREE', label: 'Livrées' },
+  { status: 'LIVREE', label: 'Livrée' },
 ];
 
 export default function DashboardScreen() {
@@ -54,9 +48,6 @@ export default function DashboardScreen() {
   // Brand-new shop: only the first steps, no wall of zeros.
   const isEmptyShop = !!d && products.isSuccess && !hasProducts && !hasOrders;
 
-  const openOrders = (status: OrderStatus) =>
-    router.navigate({ pathname: '/orders', params: { status, when: 'all' } });
-
   return (
     <Screen
       header={<ScreenHeader />}
@@ -67,7 +58,11 @@ export default function DashboardScreen() {
         <GettingStarted hasProducts={hasProducts} hasOrders={hasOrders} hasExpenses={hasExpenses} />
       )}
 
-      {!isEmptyShop && <FilterChips options={periods} value={period} onChange={setPeriod} />}
+      {!isEmptyShop && (
+        <View style={styles.periods}>
+          <SegmentedControl options={periods} value={period} onChange={setPeriod} />
+        </View>
+      )}
 
       {dashboard.isError && (
         <AlertBanner
@@ -80,77 +75,100 @@ export default function DashboardScreen() {
 
       {d && !isEmptyShop && (
         <>
-          <View style={styles.section}>
-            <KpiCard
-              variant="hero"
-              label={revenueLabels[period]}
-              value={formatAr(d.revenue)}
-              caption={`Bénéfice estimé · ${formatAr(d.estimatedProfit)}`}
-            />
-            <View style={styles.row}>
+          <View style={styles.block}>
+            <RevenueCard dashboard={d} />
+            <View style={styles.counters}>
               {statusCounters.map(({ status, label }) => (
-                <KpiCard
+                <StatusCounter
                   key={status}
+                  status={status}
                   label={label}
-                  value={String(d.ordersByStatus[status] ?? 0)}
-                  onPress={() => openOrders(status)}
+                  count={d.ordersByStatus[status] ?? 0}
                 />
               ))}
             </View>
-            {d.lowStockProducts.length > 0 && (
-              <AlertBanner
-                message={
-                  d.lowStockProducts.length === 1
-                    ? `« ${d.lowStockProducts[0]!.name} » a un stock faible`
-                    : `${d.lowStockProducts.length} produits ont un stock faible`
-                }
-                onPress={() => router.navigate({ pathname: '/stock', params: { filter: 'low' } })}
-              />
-            )}
           </View>
-
-          <View style={styles.section}>
-            <AppText variant="heading">Détail du bénéfice</AppText>
-            <View style={styles.card}>
-              <Line
-                label={`Chiffre d'affaires (${d.salesCount} vente${d.salesCount > 1 ? 's' : ''})`}
-                value={d.revenue}
-              />
-              <Line label="Coût des produits vendus" value={-d.costOfGoodsSold} />
-              <Line label="Dépenses" value={-d.expenses} onPress={() => router.push('/expenses')} />
-              <Line label="Bénéfice estimé" value={d.estimatedProfit} strong />
-            </View>
-            <AppText variant="caption" color="inkMuted">
-              Livraison exclue du CA. Les achats de produits ({formatAr(d.productPurchases)}) sont
-              déjà comptés dans le coût des produits vendus.
-            </AppText>
-          </View>
-
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <AppText variant="heading">Dernières commandes</AppText>
-              {d.recentOrders.length > 0 && (
-                <Button
-                  label="Voir tout"
-                  variant="ghost"
-                  onPress={() => router.navigate('/orders')}
-                />
-              )}
-            </View>
-            {d.recentOrders.length === 0 && (
-              <AppText color="inkMuted">Aucune commande pour l’instant.</AppText>
-            )}
-            {d.recentOrders.map((order) => (
-              <OrderRow
-                key={order.id}
-                order={order}
-                onPress={() => router.push(`/orders/${order.id}`)}
-              />
-            ))}
-          </View>
+          <TodoCard dashboard={d} />
+          <ProfitDetail dashboard={d} />
         </>
       )}
     </Screen>
+  );
+}
+
+function StatusCounter({
+  status,
+  label,
+  count,
+}: {
+  status: OrderStatus;
+  label: string;
+  count: number;
+}) {
+  return (
+    <Pressable
+      onPress={() => router.navigate({ pathname: '/orders', params: { status, when: 'all' } })}
+      accessibilityRole="button"
+      accessibilityLabel={`${count} ${label}`}
+      style={({ pressed }) => [styles.counter, pressed && styles.pressed]}
+    >
+      <AppText variant="heading" style={styles.counterValue}>
+        {count}
+      </AppText>
+      <View style={styles.counterLabel}>
+        <View style={[styles.dot, { backgroundColor: theme.statusColors[status].fg }]} />
+        <AppText
+          variant="caption"
+          color="inkMuted"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={theme.layout.minFontScale}
+          style={styles.flex}
+        >
+          {label}
+        </AppText>
+      </View>
+    </Pressable>
+  );
+}
+
+/** One-line profit formula; a tap shows the detailed lines. */
+function ProfitDetail({ dashboard: d }: { dashboard: Dashboard }) {
+  const [open, setOpen] = useState(false);
+  const Chevron = open ? ChevronUp : ChevronDown;
+  return (
+    <View style={styles.card}>
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={({ pressed }) => [styles.detailHead, pressed && styles.pressed]}
+      >
+        <View style={styles.flex}>
+          <AppText style={styles.strong}>Détail du bénéfice</AppText>
+          <AppText variant="caption" color="inkMuted" numberOfLines={1}>
+            CA {formatAr(d.revenue)} − coûts {formatAr(d.costOfGoodsSold)} − dépenses{' '}
+            {formatAr(d.expenses)}
+          </AppText>
+        </View>
+        <Chevron size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
+      </Pressable>
+      {open && (
+        <View style={styles.detail}>
+          <Line
+            label={`Chiffre d'affaires (${d.salesCount} vente${d.salesCount > 1 ? 's' : ''})`}
+            value={d.revenue}
+          />
+          <Line label="Coût des produits vendus" value={-d.costOfGoodsSold} />
+          <Line label="Dépenses" value={-d.expenses} onPress={() => router.push('/expenses')} />
+          <Line label="Bénéfice estimé" value={d.estimatedProfit} strong />
+          <AppText variant="caption" color="inkMuted">
+            Livraison exclue du CA. Les achats de produits ({formatAr(d.productPurchases)}) sont
+            déjà comptés dans le coût des produits vendus.
+          </AppText>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -175,40 +193,77 @@ function Line({
         {label}
       </AppText>
       <AppText style={[styles.amount, strong && styles.strong]}>{formatAr(value)}</AppText>
-      {onPress && <ChevronRight size={16} color={theme.colors.inkMuted} strokeWidth={2} />}
+      {onPress && (
+        <ChevronRight size={theme.layout.iconSm} color={theme.colors.inkMuted} strokeWidth={2} />
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  section: {
+  periods: {
+    alignSelf: 'flex-start',
+    marginBottom: -theme.spacing[3],
+  },
+  block: {
     gap: theme.spacing[3],
   },
-  sectionHeader: {
+  counters: {
+    flexDirection: 'row',
+    gap: theme.spacing[2],
+  },
+  counter: {
+    flex: 1,
+    gap: theme.spacing[1],
+    padding: theme.spacing[2],
+    borderRadius: theme.radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.line,
+    backgroundColor: theme.colors.surfaceRaised,
+  },
+  counterValue: {
+    fontVariant: ['tabular-nums'],
+  },
+  counterLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: theme.spacing[1],
   },
-  row: {
-    flexDirection: 'row',
-    gap: theme.spacing[3],
+  dot: {
+    width: theme.layout.dot,
+    height: theme.layout.dot,
+    borderRadius: theme.radius.pill,
   },
   card: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[2],
+    borderRadius: theme.radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.line,
+    backgroundColor: theme.colors.surfaceRaised,
+  },
+  detailHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[2],
+    minHeight: theme.layout.rowMinHeight,
+    paddingVertical: theme.spacing[3],
+  },
+  detail: {
+    gap: theme.spacing[1],
+    paddingBottom: theme.spacing[3],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.line,
+    paddingTop: theme.spacing[2],
   },
   line: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing[2],
-    minHeight: 40,
+    minHeight: theme.sizes.tapMin - theme.spacing[2],
   },
   lineTotal: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.line,
-    marginTop: theme.spacing[1],
   },
   flex: {
     flex: 1,
@@ -220,6 +275,6 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   pressed: {
-    opacity: 0.85,
+    opacity: theme.layout.pressedOpacity,
   },
 });

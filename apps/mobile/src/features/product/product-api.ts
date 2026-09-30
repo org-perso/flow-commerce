@@ -31,7 +31,19 @@ export type ProductInput = {
 export type ProductFilters = {
   q?: string;
   lowStock?: boolean;
+  outOfStock?: boolean;
   archived?: boolean;
+};
+
+export type StockSummary = {
+  productCount: number;
+  units: number;
+  /** Stock valued at purchase / selling price. */
+  stockValue: number;
+  stockSaleValue: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  archivedCount: number;
 };
 
 export type ManualMovementType = 'AJOUT' | 'RETRAIT' | 'AJUSTEMENT';
@@ -53,9 +65,14 @@ export function listProducts(shopId: string, filters: ProductFilters): Promise<P
   const params = new URLSearchParams();
   if (filters.q) params.set('q', filters.q);
   if (filters.lowStock) params.set('lowStock', 'true');
+  if (filters.outOfStock) params.set('outOfStock', 'true');
   if (filters.archived) params.set('archived', 'true');
   const query = params.toString();
   return apiFetch(`${base(shopId)}${query ? `?${query}` : ''}`);
+}
+
+export function getStockSummary(shopId: string): Promise<StockSummary> {
+  return apiFetch(`${base(shopId)}/summary`);
 }
 
 export function getProduct(shopId: string, productId: string): Promise<Product> {

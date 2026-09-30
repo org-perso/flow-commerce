@@ -24,6 +24,8 @@ export type OrderDelivery = {
 
 export type Order = {
   id: string;
+  /** Per-shop number, shown as #001. */
+  number: number;
   status: OrderStatus;
   source: OrderSource | null;
   /** Planned delivery / hand-over day (YYYY-MM-DD). */
@@ -48,6 +50,8 @@ export type Order = {
 export type OrderFilters = {
   /** today: planned today + overdue open orders; upcoming: planned later. */
   when?: 'today' | 'upcoming';
+  /** Customer name or phone, order number or product. */
+  q?: string;
   status?: OrderStatus;
   customerId?: string;
 };
@@ -74,9 +78,24 @@ const base = (shopId: string) => `/shops/${shopId}/orders`;
 export function listOrders(shopId: string, filters: OrderFilters): Promise<Order[]> {
   const params = new URLSearchParams({ limit: '100' });
   if (filters.when) params.set('when', filters.when);
+  if (filters.q) params.set('q', filters.q);
   if (filters.status) params.set('status', filters.status);
   if (filters.customerId) params.set('customerId', filters.customerId);
   return apiFetch(`${base(shopId)}?${params}`);
+}
+
+export type OrderCounts = { total: number; byStatus: Partial<Record<OrderStatus, number>> };
+
+/** Per-status counts with the same filters as the list (status excluded). */
+export function getOrderCounts(
+  shopId: string,
+  filters: Omit<OrderFilters, 'status'>,
+): Promise<OrderCounts> {
+  const params = new URLSearchParams();
+  if (filters.when) params.set('when', filters.when);
+  if (filters.q) params.set('q', filters.q);
+  if (filters.customerId) params.set('customerId', filters.customerId);
+  return apiFetch(`${base(shopId)}/counts?${params}`);
 }
 
 export function getOrder(shopId: string, orderId: string): Promise<Order> {

@@ -9,6 +9,7 @@ import {
   createProduct,
   createStockMovement,
   getProduct,
+  getStockSummary,
   listCategories,
   listProducts,
   listStockMovements,
@@ -28,6 +29,14 @@ export function useProducts(filters: ProductFilters) {
   return useQuery({
     queryKey: [...productsKey(shopId), 'list', filters],
     queryFn: () => listProducts(shopId, filters),
+  });
+}
+
+export function useStockSummary() {
+  const shopId = useActiveShop().id;
+  return useQuery({
+    queryKey: [...productsKey(shopId), 'summary'],
+    queryFn: () => getStockSummary(shopId),
   });
 }
 

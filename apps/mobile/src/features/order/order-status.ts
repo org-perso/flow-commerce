@@ -24,6 +24,14 @@ export const actionLabels: Record<OrderStatus, string> = {
   RETOUR: 'Enregistrer un retour',
 };
 
+/** Short labels for the quick action on list cards. */
+export const quickActionLabels: Partial<Record<OrderStatus, string>> = {
+  CONFIRMEE: 'Confirmer',
+  EN_PREPARATION: 'Préparer',
+  EN_LIVRAISON: 'Expédier',
+  LIVREE: 'Marquer livrée',
+};
+
 /** Orders still to be handled (not delivered, cancelled or returned). */
 export const OPEN_STATUSES: readonly OrderStatus[] = [
   'EN_ATTENTE',

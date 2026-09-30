@@ -1,5 +1,14 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { ArrowRight, CalendarDays, Check, MessageCircle, Phone } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import {
+  ArrowRight,
+  CalendarDays,
+  Check,
+  MessageCircle,
+  Phone,
+  Store,
+  Truck,
+  Wallet,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +27,7 @@ import type { Order } from '@/features/order/order-api';
 import {
   actionLabels,
   destructiveStatuses,
+  quickActionLabels,
   SOURCE_LABELS,
   TRANSITIONS,
 } from '@/features/order/order-status';
@@ -80,42 +90,147 @@ export default function OrderScreen() {
     ]);
   };
 
+  const editable = next.length > 0;
+  const nextStep = forward[0];
+  const otherStatuses = [...forward.slice(1), ...destructive];
+
   return (
     <Screen edges={[]}>
-      <Stack.Screen options={{ title: 'Commande' }} />
-
-      <View style={styles.headerRow}>
-        <StatusBadge status={o.status} />
+      {/* Summary: what the customer pays, where the order stands. */}
+      <View style={[styles.card, styles.summary]}>
+        <View style={styles.row}>
+          <AppText style={[styles.total, styles.flex]}>{formatAr(o.totalAmount)}</AppText>
+          {o.source && (
+            <AppText variant="caption" color="inkMuted">
+              {SOURCE_LABELS[o.source]}
+            </AppText>
+          )}
+        </View>
+        <View style={styles.row}>
+          <StatusBadge status={o.status} size="sm" />
+          <PaymentBadge isPaid={o.isPaid} />
+          {o.paymentMethod && (
+            <AppText variant="caption" color="inkMuted">
+              {o.paymentMethod}
+            </AppText>
+          )}
+        </View>
         <AppText variant="caption" color="inkMuted">
-          {formatDateTime(o.createdAt)}
+          Créée le {formatDateTime(o.createdAt)}
         </AppText>
       </View>
 
       {changeStatus.isError && (
         <AlertBanner tone="danger" message={statusErrorMessage(changeStatus.error, o)} />
       )}
+      {updateOrder.isError && !dateOpen && (
+        <AlertBanner tone="danger" message={apiErrorMessage(updateOrder.error)} />
+      )}
 
-      <View style={[styles.card, styles.dateCard]}>
-        <View style={styles.flex}>
-          <AppText variant="caption" color="inkMuted">
-            Date prévue
-          </AppText>
-          <AppText variant="heading" color={overdue ? 'statusCancelledFg' : 'ink'}>
-            {formatDayLabel(o.scheduledDate)}
-            {overdue ? ' · en retard' : ''}
-          </AppText>
+      {/* Actions first: next step and cashing in, one tap each. */}
+      {editable && (
+        <View style={styles.section}>
+          {(nextStep || !o.isPaid) && (
+            <View style={styles.row}>
+              {nextStep && (
+                <View style={styles.flex}>
+                  <Button
+                    label={quickActionLabels[nextStep] ?? actionLabels[nextStep]}
+                    icon={nextStep === 'LIVREE' ? Check : ArrowRight}
+                    variant="dark"
+                    fullWidth
+                    loading={changeStatus.isPending}
+                    onPress={() => moveTo(nextStep)}
+                  />
+                </View>
+              )}
+              {!o.isPaid && (
+                <View style={styles.flex}>
+                  <Button
+                    label="Encaisser"
+                    icon={Wallet}
+                    fullWidth
+                    loading={updateOrder.isPending && !dateOpen}
+                    onPress={() => updateOrder.mutate({ isPaid: true })}
+                  />
+                </View>
+              )}
+            </View>
+          )}
+          {otherStatuses.length > 0 && (
+            <Dropdown
+              title="Changer le statut"
+              value=""
+              onChange={(status) => status && moveTo(status)}
+              options={[
+                { value: '' as const, label: 'Changer le statut…' },
+                ...otherStatuses.map((status) => ({
+                  value: status,
+                  label: theme.statusColors[status].label,
+                  leading: (
+                    <View
+                      style={[styles.dot, { backgroundColor: theme.statusColors[status].fg }]}
+                    />
+                  ),
+                })),
+              ]}
+            />
+          )}
         </View>
-        {TRANSITIONS[o.status].length > 0 && (
-          <Button
-            label="Changer"
-            icon={CalendarDays}
-            compact
-            onPress={() => {
-              setNewDate(o.scheduledDate);
-              setDateOpen(true);
-            }}
-          />
-        )}
+      )}
+
+      <CustomerCard order={o} />
+
+      {/* Hand-over: planned day, pickup or delivery. */}
+      <View style={styles.section}>
+        <AppText variant="heading">Remise et date</AppText>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <CalendarDays
+              size={theme.layout.iconMd}
+              color={overdue ? theme.colors.statusCancelledFg : theme.colors.inkMuted}
+              strokeWidth={2}
+            />
+            <View style={styles.flex}>
+              <AppText style={styles.strong} color={overdue ? 'statusCancelledFg' : 'ink'}>
+                {formatDayLabel(o.scheduledDate)}
+                {overdue ? ' · en retard' : ''}
+              </AppText>
+              <AppText variant="caption" color="inkMuted">
+                Date prévue
+              </AppText>
+            </View>
+            {editable && (
+              <Button
+                label="Changer"
+                variant="ghost"
+                compact
+                onPress={() => {
+                  setNewDate(o.scheduledDate);
+                  setDateOpen(true);
+                }}
+              />
+            )}
+          </View>
+          <View style={[styles.row, styles.lineBorder, styles.block]}>
+            {o.delivery ? (
+              <Truck size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
+            ) : (
+              <Store size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
+            )}
+            <View style={styles.flex}>
+              <AppText style={styles.strong}>
+                {o.delivery ? (o.delivery.place ?? 'Livraison') : 'Retrait'}
+              </AppText>
+              <AppText variant="caption" color="inkMuted">
+                {o.delivery
+                  ? [o.delivery.address, o.delivery.note].filter(Boolean).join(' · ') ||
+                    'À une adresse'
+                  : 'En main propre'}
+              </AppText>
+            </View>
+          </View>
+        </View>
       </View>
 
       <Modal visible={dateOpen} animationType="slide" onRequestClose={() => setDateOpen(false)}>
@@ -141,8 +256,6 @@ export default function OrderScreen() {
         </View>
       </Modal>
 
-      <CustomerCard order={o} />
-
       <View style={styles.section}>
         <AppText variant="heading">Produits</AppText>
         <View style={styles.card}>
@@ -160,83 +273,27 @@ export default function OrderScreen() {
           {o.delivery && (
             <View style={[styles.line, styles.lineBorder]}>
               <AppText color="inkMuted" style={styles.flex}>
-                Livraison
+                Frais de livraison
               </AppText>
               <AppText style={styles.amount}>{formatAr(o.deliveryFee)}</AppText>
             </View>
           )}
           <View style={[styles.line, styles.lineBorder]}>
             <AppText style={[styles.flex, styles.strong]}>Total à payer</AppText>
-            <AppText style={styles.total}>{formatAr(o.totalAmount)}</AppText>
+            <AppText style={[styles.amount, styles.strong]}>{formatAr(o.totalAmount)}</AppText>
           </View>
         </View>
       </View>
 
-      <View style={[styles.card, styles.dateCard]}>
-        <View style={styles.flex}>
-          <AppText variant="caption" color="inkMuted">
-            Paiement{o.paymentMethod ? ` · ${o.paymentMethod}` : ''}
-          </AppText>
-          <PaymentBadge isPaid={o.isPaid} />
-        </View>
-        {TRANSITIONS[o.status].length > 0 && (
-          <Button
-            label={o.isPaid ? 'Marquer non payée' : 'Marquer comme payée'}
-            icon={o.isPaid ? undefined : Check}
-            compact
-            loading={updateOrder.isPending && !dateOpen}
-            onPress={() => updateOrder.mutate({ isPaid: !o.isPaid })}
-          />
-        )}
-      </View>
-      {updateOrder.isError && !dateOpen && (
-        <AlertBanner tone="danger" message={apiErrorMessage(updateOrder.error)} />
-      )}
-
-      <View style={[styles.card, styles.details]}>
-        <Detail
-          label="Livraison"
-          value={o.delivery ? 'À livrer' : 'Sans livraison (retrait ou remise en main propre)'}
+      {/* Rarely needed: undo a payment marked by mistake. */}
+      {editable && o.isPaid && (
+        <Button
+          label="Marquer non payée"
+          variant="ghost"
+          compact
+          loading={updateOrder.isPending && !dateOpen}
+          onPress={() => updateOrder.mutate({ isPaid: false })}
         />
-        {o.delivery?.place && <Detail label="Lieu" value={o.delivery.place} />}
-        {o.delivery?.address && <Detail label="Adresse" value={o.delivery.address} />}
-        {o.delivery?.note && <Detail label="Précisions" value={o.delivery.note} />}
-        {o.source && <Detail label="Source" value={SOURCE_LABELS[o.source]} />}
-      </View>
-
-      {next.length > 0 && (
-        <View style={styles.section}>
-          <AppText variant="heading">Suivi</AppText>
-          {/* The usual next step as a button; every other allowed status in the list. */}
-          {forward[0] && (
-            <Button
-              label={actionLabels[forward[0]]}
-              icon={ArrowRight}
-              fullWidth
-              loading={changeStatus.isPending}
-              onPress={() => moveTo(forward[0]!)}
-            />
-          )}
-          {next.length > (forward[0] ? 1 : 0) && (
-            <Dropdown
-              title="Changer le statut"
-              value=""
-              onChange={(status) => status && moveTo(status)}
-              options={[
-                { value: '' as const, label: 'Changer le statut…' },
-                ...[...forward.slice(1), ...destructive].map((status) => ({
-                  value: status,
-                  label: theme.statusColors[status].label,
-                  leading: (
-                    <View
-                      style={[styles.dot, { backgroundColor: theme.statusColors[status].fg }]}
-                    />
-                  ),
-                })),
-              ]}
-            />
-          )}
-        </View>
       )}
     </Screen>
   );
@@ -287,17 +344,6 @@ function CustomerCard({ order }: { order: Order }) {
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <View>
-      <AppText variant="caption" color="inkMuted">
-        {label}
-      </AppText>
-      <AppText>{value}</AppText>
-    </View>
-  );
-}
-
 function statusErrorMessage(error: unknown, order: Order): string {
   if (error instanceof ApiError && error.title === 'Insufficient Stock') {
     const name = order.items.find((i) => i.productId === error.body.productId)?.productName;
@@ -307,17 +353,14 @@ function statusErrorMessage(error: unknown, order: Order): string {
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  summary: {
+    gap: theme.spacing[2],
+  },
+  block: {
+    marginTop: theme.spacing[3],
+    paddingTop: theme.spacing[3],
   },
   section: {
-    gap: theme.spacing[3],
-  },
-  dateCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: theme.spacing[3],
   },
   modal: {
@@ -336,9 +379,6 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     padding: theme.spacing[4],
     gap: theme.spacing[1],
-  },
-  details: {
-    gap: theme.spacing[3],
   },
   row: {
     flexDirection: 'row',

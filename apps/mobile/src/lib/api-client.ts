@@ -1,6 +1,7 @@
 import { FirebaseError } from 'firebase/app';
 
 import { auth } from '@/lib/firebase';
+import { ImageUploadError } from '@/lib/product-image';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 if (!apiUrl) {
@@ -47,6 +48,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
 /** User-facing French message for any error thrown by apiFetch. */
 export function apiErrorMessage(error: unknown): string {
+  if (error instanceof ImageUploadError) return error.message;
   if (error instanceof FirebaseError && error.code.startsWith('storage/')) {
     return 'Impossible d’envoyer la photo. Vérifiez votre connexion et réessayez.';
   }

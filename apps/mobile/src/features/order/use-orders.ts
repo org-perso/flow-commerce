@@ -7,6 +7,7 @@ import {
   changeOrderStatus,
   createOrder,
   getOrder,
+  getOrderCounts,
   listOrders,
   updateOrder,
   type CreateOrderInput,
@@ -21,6 +22,14 @@ export function useOrders(filters: OrderFilters) {
   return useQuery({
     queryKey: [...ordersKey(shopId), 'list', filters],
     queryFn: () => listOrders(shopId, filters),
+  });
+}
+
+export function useOrderCounts(filters: Omit<OrderFilters, 'status'>) {
+  const shopId = useActiveShop().id;
+  return useQuery({
+    queryKey: [...ordersKey(shopId), 'counts', filters],
+    queryFn: () => getOrderCounts(shopId, filters),
   });
 }
 

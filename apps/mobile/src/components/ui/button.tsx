@@ -5,7 +5,7 @@ import { hitSlopFor, theme } from '@/theme';
 
 import { AppText } from './app-text';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'dark' | 'secondary' | 'ghost' | 'danger';
 
 type ButtonProps = {
   label: string;
@@ -20,6 +20,8 @@ type ButtonProps = {
 
 const variantColors = {
   primary: { bg: theme.colors.gold, fg: theme.colors.onGold },
+  /** Strong action that is not the gold one (e.g. an order's next step). */
+  dark: { bg: theme.colors.navy, fg: theme.colors.onNavy },
   secondary: { bg: theme.colors.surfaceRaised, fg: theme.colors.ink },
   ghost: { bg: 'transparent', fg: theme.colors.blue },
   danger: { bg: theme.colors.statusCancelledBg, fg: theme.colors.statusCancelledFg },

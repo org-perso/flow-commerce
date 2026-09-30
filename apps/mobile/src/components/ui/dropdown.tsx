@@ -1,4 +1,4 @@
-import { Check, ChevronDown } from 'lucide-react-native';
+import { Check, ChevronDown, type LucideIcon } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,10 +15,18 @@ type DropdownProps<V extends string> = {
   options: readonly { value: V; label: string; leading?: ReactNode }[];
   value: V;
   onChange: (value: V) => void;
+  /** Icon before the current value in the trigger. */
+  icon?: LucideIcon;
 };
 
 /** Compact select: shows the current option, a tap opens the full list. */
-export function Dropdown<V extends string>({ title, options, value, onChange }: DropdownProps<V>) {
+export function Dropdown<V extends string>({
+  title,
+  options,
+  value,
+  onChange,
+  icon: Icon,
+}: DropdownProps<V>) {
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const current = options.find((o) => o.value === value);
@@ -32,6 +40,7 @@ export function Dropdown<V extends string>({ title, options, value, onChange }: 
         hitSlop={hitSlopFor(theme.layout.controlHeight)}
         style={({ pressed }) => [styles.trigger, pressed && styles.pressed]}
       >
+        {Icon && <Icon size={theme.layout.iconSm} color={theme.colors.ink} strokeWidth={2} />}
         <AppText variant="label" numberOfLines={1} style={styles.triggerText}>
           {current?.label}
         </AppText>

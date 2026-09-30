@@ -6,6 +6,7 @@ import {
   createCustomer,
   deleteCustomer,
   getCustomer,
+  getUnlinkedOrdersCount,
   listCustomers,
   updateCustomer,
   type CustomerInput,
@@ -19,6 +20,15 @@ export function useCustomers(q?: string, { enabled = true } = {}) {
     queryKey: [...customersKey(shopId), 'list', q ?? ''],
     queryFn: () => listCustomers(shopId, q),
     enabled,
+  });
+}
+
+export function useUnlinkedOrdersCount() {
+  const shopId = useActiveShop().id;
+  return useQuery({
+    // Under 'orders': refreshed whenever an order changes.
+    queryKey: ['shops', shopId, 'orders', 'unlinked-count'],
+    queryFn: () => getUnlinkedOrdersCount(shopId),
   });
 }
 

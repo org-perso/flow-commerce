@@ -23,9 +23,16 @@ export function formatDateTime(iso: string): string {
   return dateTimeFormat.format(new Date(iso));
 }
 
+/** Day of a timestamp in Madagascar, as YYYY-MM-DD (today by default). */
+export function businessDate(date: string | Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Indian/Antananarivo' }).format(
+    new Date(date),
+  );
+}
+
 /** Today in Madagascar, as YYYY-MM-DD. */
 export function businessToday(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Indian/Antananarivo' }).format(new Date());
+  return businessDate();
 }
 
 /** "2026-09-29" → "29/09/2026" */

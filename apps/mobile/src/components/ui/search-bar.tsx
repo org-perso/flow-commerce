@@ -7,9 +7,10 @@ type SearchBarProps = {
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
+  autoFocus?: boolean;
 };
 
-export function SearchBar({ value, onChangeText, placeholder }: SearchBarProps) {
+export function SearchBar({ value, onChangeText, placeholder, autoFocus }: SearchBarProps) {
   return (
     <View style={styles.root}>
       <Search size={18} color={theme.colors.inkMuted} strokeWidth={2} />
@@ -20,6 +21,7 @@ export function SearchBar({ value, onChangeText, placeholder }: SearchBarProps) 
         placeholderTextColor={theme.colors.inkMuted}
         accessibilityLabel={placeholder}
         returnKeyType="search"
+        autoFocus={autoFocus}
         autoCorrect={false}
         style={styles.input}
       />

@@ -5,7 +5,7 @@ import { theme } from '@/theme';
 import { AppText } from './app-text';
 
 type FilterChipsProps<T extends string> = {
-  options: readonly { value: T; label: string }[];
+  options: readonly { value: T; label: string; count?: number }[];
   value: T;
   onChange: (value: T) => void;
 };
@@ -33,8 +33,13 @@ export function FilterChips<T extends string>({ options, value, onChange }: Filt
               pressed && styles.pressed,
             ]}
           >
-            <AppText variant="label" color={selected ? 'ink' : 'inkMuted'}>
+            <AppText variant="label" color={selected ? 'onNavy' : 'ink'}>
               {option.label}
+              {option.count !== undefined && (
+                <AppText variant="label" color={selected ? 'onNavyMuted' : 'inkMuted'}>
+                  {` ${option.count}`}
+                </AppText>
+              )}
             </AppText>
           </Pressable>
         );
@@ -51,7 +56,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing[2],
   },
   chip: {
-    minHeight: 36,
+    minHeight: theme.layout.controlHeight,
     justifyContent: 'center',
     paddingHorizontal: theme.spacing[4],
     borderRadius: theme.radius.pill,
@@ -60,10 +65,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceRaised,
   },
   selected: {
-    backgroundColor: theme.colors.navySoft,
-    borderColor: theme.colors.navySoft,
+    backgroundColor: theme.colors.navy,
+    borderColor: theme.colors.navy,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: theme.layout.pressedOpacity,
   },
 });

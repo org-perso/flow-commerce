@@ -7,6 +7,10 @@ export type Customer = {
   phones: string[];
   /** Facebook name, profile link, @handle… */
   socialProfile: string | null;
+  /** Orders not cancelled nor returned, and their total. */
+  orderCount: number;
+  totalSpent: number;
+  lastOrderAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -44,4 +48,9 @@ export function updateCustomer(
 
 export function deleteCustomer(shopId: string, customerId: string): Promise<void> {
   return apiFetch(`${base(shopId)}/${customerId}`, { method: 'DELETE' });
+}
+
+/** Live orders without a customer file. */
+export function getUnlinkedOrdersCount(shopId: string): Promise<{ count: number }> {
+  return apiFetch(`${base(shopId)}/unlinked-orders-count`);
 }

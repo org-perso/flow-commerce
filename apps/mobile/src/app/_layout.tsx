@@ -35,24 +35,27 @@ export default function RootLayout() {
     if (ready) SplashScreen.hideAsync();
   }, [ready]);
 
-  if (!ready) return null;
-
+  // The navigator is always rendered (the splash screen hides it while loading):
+  // expo-router must be mounted from the first render, or it updates an unmounted tree.
   return (
     <QueryClientProvider client={queryClient}>
-      <RootNavigator />
+      <RootNavigator ready={ready} />
     </QueryClientProvider>
   );
 }
 
 /** signed out → (auth) · signed in without shop → (onboarding) · with shop → app. */
-function RootNavigator() {
+function RootNavigator({ ready }: { ready: boolean }) {
   const signedIn = useAuthStore((s) => s.user !== null);
   const shopsQuery = useShops();
 
-  if (signedIn && shopsQuery.isPending) return <FullScreenLoader />;
-  if (signedIn && shopsQuery.isError) return <FullScreenError onRetry={shopsQuery.refetch} />;
-
   const hasShop = signedIn && (shopsQuery.data?.length ?? 0) > 0;
+  // Loading and errors cover the navigator instead of replacing it (see RootLayout).
+  const overlay = !ready ? null : signedIn && shopsQuery.isPending ? (
+    <FullScreenLoader />
+  ) : signedIn && shopsQuery.isError ? (
+    <FullScreenError onRetry={shopsQuery.refetch} />
+  ) : null;
 
   return (
     <>
@@ -110,6 +113,7 @@ function RootNavigator() {
           <Stack.Screen name="(auth)" />
         </Stack.Protected>
       </Stack>
+      {overlay}
     </>
   );
 }
@@ -136,7 +140,11 @@ function FullScreenError({ onRetry }: { onRetry: () => void }) {
 
 const styles = StyleSheet.create({
   center: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: theme.spacing[3],

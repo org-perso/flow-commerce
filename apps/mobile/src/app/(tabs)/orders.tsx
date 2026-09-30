@@ -1,58 +1,85 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import type { ReactNode } from 'react';
-import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { CalendarDays, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { useDeferredValue, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  SectionList,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import {
   AppText,
   Dropdown,
   EmptyState,
+  FilterChips,
   InlineBanner,
-  Screen,
   PageTitle,
+  Screen,
   ScreenHeader,
-  SegmentedControl,
+  SearchBar,
   type OrderStatus,
 } from '@/components/ui';
 import type { Order } from '@/features/order/order-api';
 import { isOverdue, OrderRow } from '@/features/order/order-row';
-import { useOrders } from '@/features/order/use-orders';
+import { useOrderCounts, useOrders } from '@/features/order/use-orders';
 import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
 import { businessToday, formatDayLabel } from '@/utils/format';
 
 type When = 'today' | 'upcoming' | 'all';
 
-// Defined before statusOptions, which is built at module load (styles below does not exist yet).
-const dotStyle = {
-  width: theme.layout.dot * 2,
-  height: theme.layout.dot * 2,
-  borderRadius: theme.radius.pill,
-};
+const whenOptions = [
+  { value: 'today', label: "Aujourd'hui" },
+  { value: 'upcoming', label: 'À venir' },
+  { value: 'all', label: 'Toutes les dates' },
+] as const;
 
-const statusOptions: { value: OrderStatus | 'ALL'; label: string; leading?: ReactNode }[] = [
-  { value: 'ALL', label: 'Tous les statuts' },
-  ...(Object.entries(theme.statusColors) as [OrderStatus, { label: string; fg: string }][]).map(
-    ([value, { label, fg }]) => ({
-      value,
-      label,
-      leading: <View style={[dotStyle, { backgroundColor: fg }]} />,
-    }),
-  ),
+/** Chip labels (plural), in workflow order. */
+const statusChips: { value: OrderStatus; label: string }[] = [
+  { value: 'EN_ATTENTE', label: 'En attente' },
+  { value: 'CONFIRMEE', label: 'Confirmées' },
+  { value: 'EN_PREPARATION', label: 'En préparation' },
+  { value: 'EN_LIVRAISON', label: 'En livraison' },
+  { value: 'LIVREE', label: 'Livrées' },
+  { value: 'ANNULEE', label: 'Annulées' },
+  { value: 'RETOUR', label: 'Retours' },
 ];
 
-/** Sections: overdue then today; per planned day for upcoming; one flat list otherwise. */
-function toSections(orders: Order[], when: When) {
-  if (when === 'all') return orders.length ? [{ title: '', data: orders }] : [];
+const OVERDUE = 'En retard';
+const DONE = 'Terminées';
+
+/** Nothing left to do: delivered and paid, cancelled or returned. */
+const isDone = (o: Order) =>
+  o.status === 'ANNULEE' || o.status === 'RETOUR' || (o.status === 'LIVREE' && o.isPaid);
+
+type Section = { title: string; data: Order[]; count: number };
+
+/**
+ * Sections: overdue then per planned day; one flat list for "all dates".
+ * With `foldDone`, finished orders go to a last "Terminées" section, folded unless `doneOpen`.
+ */
+function toSections(orders: Order[], when: When, foldDone: boolean, doneOpen: boolean) {
+  if (when === 'all')
+    return orders.length ? [{ title: '', data: orders, count: orders.length }] : [];
   const today = businessToday();
-  const sections: { title: string; data: Order[] }[] = [];
+  const sections: Section[] = [];
+  const done: Order[] = [];
   for (const order of orders) {
-    const title = isOverdue(order, today)
-      ? 'En retard'
-      : formatDayLabel(order.scheduledDate, today);
+    if (foldDone && isDone(order)) {
+      done.push(order);
+      continue;
+    }
+    const title = isOverdue(order, today) ? OVERDUE : formatDayLabel(order.scheduledDate, today);
     const last = sections.at(-1);
-    if (last?.title === title) last.data.push(order);
-    else sections.push({ title, data: [order] });
+    if (last?.title === title) {
+      last.data.push(order);
+      last.count += 1;
+    } else sections.push({ title, data: [order], count: 1 });
   }
+  if (done.length) sections.push({ title: DONE, data: doneOpen ? done : [], count: done.length });
   return sections;
 }
 
@@ -63,33 +90,60 @@ const emptyMessages: Record<When, string> = {
 };
 
 export default function OrdersScreen() {
-  // Filters live in the URL, so the dashboard counters can open this tab pre-filtered.
-  const params = useLocalSearchParams<{ when?: When; status?: OrderStatus }>();
+  // Filters live in the URL, so the dashboard and the header search can open this tab.
+  const params = useLocalSearchParams<{ when?: When; status?: OrderStatus; search?: string }>();
   const when = params.when ?? 'today';
   const status = params.status ?? 'ALL';
+  const [search, setSearch] = useState('');
+  const q = useDeferredValue(search.trim()) || undefined;
 
-  const orders = useOrders({
-    when: when === 'all' ? undefined : when,
-    status: status === 'ALL' ? undefined : status,
-  });
-  const sections = toSections(orders.data ?? [], when);
+  const filters = { when: when === 'all' ? undefined : when, q };
+  const orders = useOrders({ ...filters, status: status === 'ALL' ? undefined : status });
+  const counts = useOrderCounts(filters);
+  const [doneOpen, setDoneOpen] = useState(false);
+  // With a status filter, the seller asked for those orders: nothing is folded.
+  const sections = toSections(orders.data ?? [], when, status === 'ALL', doneOpen);
+  const hasOrders = sections.some((sec) => sec.count > 0);
+
+  const chips = [
+    { value: 'ALL' as const, label: 'Toutes', count: counts.data?.total },
+    ...statusChips
+      // Final statuses only show up when there are some, to keep the row short.
+      .filter(
+        (c) =>
+          !['ANNULEE', 'RETOUR'].includes(c.value) ||
+          (counts.data?.byStatus[c.value] ?? 0) > 0 ||
+          c.value === status,
+      )
+      .map((c) => ({
+        ...c,
+        count: counts.data ? (counts.data.byStatus[c.value] ?? 0) : undefined,
+      })),
+  ];
 
   return (
     <Screen scroll={false} header={<ScreenHeader />}>
-      <PageTitle title="Commandes" />
+      <PageTitle
+        title="Commandes"
+        right={
+          <Dropdown
+            title="Date prévue"
+            icon={CalendarDays}
+            options={whenOptions}
+            value={when}
+            onChange={(value) => router.setParams({ when: value })}
+          />
+        }
+      />
       <View style={styles.controls}>
-        <SegmentedControl
-          options={[
-            { key: 'today', label: "Aujourd'hui" },
-            { key: 'upcoming', label: 'À venir' },
-            { key: 'all', label: 'Toutes' },
-          ]}
-          value={when}
-          onChange={(value) => router.setParams({ when: value })}
+        <SearchBar
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Client, téléphone ou produit"
+          autoFocus={params.search === '1'}
         />
-        <Dropdown
-          title="Statut"
-          options={statusOptions}
+        <FilterChips
+          options={chips}
           value={status}
           onChange={(value) => router.setParams({ status: value === 'ALL' ? undefined : value })}
         />
@@ -104,33 +158,75 @@ export default function OrdersScreen() {
       )}
 
       <SectionList
-        sections={sections}
+        sections={hasOrders ? sections : []}
         keyExtractor={(o) => o.id}
-        renderItem={({ item }) => (
-          <OrderRow order={item} onPress={() => router.push(`/orders/${item.id}`)} />
+        renderItem={({ item, section }) => (
+          <OrderRow
+            order={item}
+            showActions={section.title === OVERDUE}
+            showDate={when === 'all' || section.title === OVERDUE || section.title === DONE}
+            onPress={() => router.push(`/orders/${item.id}`)}
+          />
         )}
         renderSectionHeader={({ section }) =>
-          section.title ? (
+          section.title === DONE ? (
+            <Pressable
+              onPress={() => setDoneOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: doneOpen }}
+              style={({ pressed }) => [styles.doneHeader, pressed && styles.pressed]}
+            >
+              <AppText variant="caption" color="inkMuted" style={styles.sectionTitleText}>
+                {`${DONE.toUpperCase()} · ${section.count}`}
+              </AppText>
+              {doneOpen ? (
+                <ChevronUp
+                  size={theme.layout.iconSm}
+                  color={theme.colors.inkMuted}
+                  strokeWidth={2}
+                />
+              ) : (
+                <ChevronDown
+                  size={theme.layout.iconSm}
+                  color={theme.colors.inkMuted}
+                  strokeWidth={2}
+                />
+              )}
+            </Pressable>
+          ) : section.title ? (
             <AppText
               variant="caption"
-              color={section.title === 'En retard' ? 'statusCancelledFg' : 'inkMuted'}
+              color={section.title === OVERDUE ? 'statusCancelledFg' : 'inkMuted'}
               style={styles.sectionTitle}
             >
-              {section.title.toUpperCase()}
+              {`${section.title.toUpperCase()} · ${section.count}`}
             </AppText>
           ) : null
         }
         stickySectionHeadersEnabled={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={orders.isRefetching} onRefresh={() => orders.refetch()} />
+          <RefreshControl
+            refreshing={orders.isRefetching}
+            onRefresh={() => {
+              orders.refetch();
+              counts.refetch();
+            }}
+          />
         }
         ListEmptyComponent={
           orders.isPending ? (
             <ActivityIndicator color={theme.colors.ink} style={styles.loader} />
           ) : (
             <EmptyState
-              message={status === 'ALL' ? emptyMessages[when] : 'Aucune commande avec ce statut.'}
+              message={
+                q
+                  ? 'Aucune commande ne correspond à la recherche.'
+                  : status === 'ALL'
+                    ? emptyMessages[when]
+                    : 'Aucune commande avec ce statut.'
+              }
             />
           )
         }
@@ -152,6 +248,19 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.heading.fontFamily,
     paddingTop: theme.spacing[3],
     paddingBottom: theme.spacing[2],
+  },
+  sectionTitleText: {
+    fontFamily: theme.typography.heading.fontFamily,
+  },
+  doneHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[1],
+    minHeight: theme.sizes.tapMin,
+    paddingTop: theme.spacing[2],
+  },
+  pressed: {
+    opacity: theme.layout.pressedOpacity,
   },
   separator: {
     height: theme.spacing[2],

@@ -31,6 +31,8 @@ cd apps/api && yarn dev            # API en local (hot reload)
 cd apps/api && yarn migrate:up     # appliquer les migrations
 cd apps/api && yarn migrate:create <nom>  # nouvelle migration SQL
 cd apps/api && yarn test           # tests d'intégration (Postgres du docker compose)
+cd apps/api && yarn seed [--shop "Nom"]        # données de test dans une boutique
+cd apps/api && yarn seed:clear [--shop "Nom"]  # vide la boutique (garde boutique et catégories)
 cd apps/api && yarn verify         # typecheck + lint + format
 
 # BDD locale / stack complète
@@ -62,9 +64,9 @@ docker compose up -d --build       # Postgres + API (migrations au démarrage)
 - **Livraison par commande** : facultative. `delivery: { place, address, note, fee }` ou `null` (retrait / remise en main propre, pas de frais — garanti par une contrainte BDD). **Source** de la commande : `FACEBOOK`, `MESSENGER`, `INSTAGRAM`, `WHATSAPP`, `TIKTOK`, `APPEL`, `BOUTIQUE`, `AUTRE`.
 - **Date prévue** (`scheduledDate`) : jour de livraison ou de remise, par défaut aujourd'hui (Madagascar). La vue « Aujourd'hui » = prévues aujourd'hui + commandes **en retard** encore ouvertes (prévues avant, statut `EN_ATTENTE` → `EN_LIVRAISON`) ; « À venir » = prévues après aujourd'hui (`GET /orders?when=today|upcoming`). Le CA reste basé sur la date de création.
 - **Paiement** : `paidAt` (null = non payée), exposé en `isPaid` ; indépendant du statut et du moyen de paiement. `PATCH /orders/:id { isPaid }` (garde la première date de paiement).
-- **Numéro de commande** : `number` par boutique (#001…), compteur `shops.last_order_number` incrémenté sous verrou de ligne à la création.
+- **Numéro de commande** : `number` par boutique (#001…), non affiché dans l'app pour l'instant (sert à la recherche), compteur `shops.last_order_number` incrémenté sous verrou de ligne à la création.
 - **Stats client** (`orderCount`, `totalSpent`, `lastOrderAt`) et **« à encaisser »** du dashboard : commandes hors `ANNULEE` / `RETOUR`. Valeur du stock : `stockValue` au prix d'achat, `stockSaleValue` au prix de vente.
-- **Images produits** : compressées côté mobile (1024 px, JPEG 0,7), envoyées dans Firebase Storage sous `shops/{shopId}/products/`, l'URL est stockée dans `products.image`.
+- **Images produits** : compressées côté mobile (1024 px, JPEG 0,7), envoyées par l'API REST de Firebase Storage (le SDK JS échoue sur Android avec `storage/unknown`) sous `shops/{shopId}/products/`, l'URL est stockée dans `products.image`.
 - Les schémas de création de l'API sont **stricts** : un champ inconnu (ancien contrat) renvoie 400 au lieu d'être ignoré.
 
 ## Roadmap
@@ -89,11 +91,14 @@ docker compose up -d --build       # Postgres + API (migrations au démarrage)
 - ✅ Onglets : Accueil · Commandes · « + » doré (nouvelle commande) · Stock · Clients ; l'onglet Plus devient l'écran « Compte et boutique » (`/account`)
 - 🚧 Refonte UX (spec du 29/09) : étapes 0–4 faites ; restent Commandes (étape 5) et Accueil (étape 6)
 - ✅ API refonte UI (30/09) : `orders.number`, `GET /orders?q=`, `GET /orders/counts`, dashboard `7d`/`30d` + `grossMarginRate` + `unpaid` + `overdueOrders`, stats client + `GET /customers/unlinked-orders-count`, `GET /products?outOfStock=` + `GET /products/summary`
-- 🚧 Refonte UI (maquettes du 30/09) : ~~1. en-tête + onglets + compte~~ · 2. Commandes · 3. Accueil · 4. Stock · 5. Clients
+- 🚧 Refonte UI (maquettes du 30/09) : ~~1. en-tête + onglets + compte~~ · ~~2. Commandes~~ · ~~3. Accueil~~ · ~~4. Stock~~ · ~~5. Clients~~ · ~~6. Nouvelle commande (étapes numérotées, cartes Retrait/Livraison et À encaisser/Déjà payée, options repliées, pied avec total et bénéfice)~~
+- ✅ Fiche commande refaite (résumé, actions en tête : étape suivante + Encaisser, remise et date, produits) ; liste : carte compacte sur 2 lignes (client, total · lieu, statut, paiement, 📞), section repliée « Terminées » (livrées et payées, annulées, retours)
+- ⏳ Filtres de liste Commandes « sans client » (`?withoutCustomer=true`, bandeau Clients) et « non payées » (`?isPaid=false`, « à encaisser » de l'Accueil) — reportés
 - ⏳ Modifier les lignes d'une commande en attente (l'API le permet déjà)
 
 **Avant la mise en production**
 - ⏳ Déploiement Render (API + Postgres) et variables EAS pour les builds `preview` / `production`
+- ⏳ Photos produits : activer Firebase Storage (plan Blaze requis), renseigner `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET`, publier les règles — en attendant, produits sans photo
 - ⏳ Règles Firebase Storage à durcir, limite de requêtes (rate limiting) sur l'API
 - ⏳ Notifications push (FCM) — définir d'abord quand notifier le vendeur
 - ⏳ Logo de la boutique (emplacement déjà prévu dans l'en-tête)
