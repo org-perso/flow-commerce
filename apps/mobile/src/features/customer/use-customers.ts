@@ -22,11 +22,12 @@ export function useCustomers(q?: string, { enabled = true } = {}) {
   });
 }
 
-export function useCustomer(customerId: string) {
+export function useCustomer(customerId: string | undefined) {
   const shopId = useActiveShop().id;
   return useQuery({
     queryKey: [...customersKey(shopId), 'detail', customerId],
-    queryFn: () => getCustomer(shopId, customerId),
+    queryFn: () => getCustomer(shopId, customerId!),
+    enabled: !!customerId,
   });
 }
 

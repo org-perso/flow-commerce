@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { requireAuth, type TokenVerifier } from './auth/firebase-auth.js';
 import { pool } from './db/pool.js';
+import { categoriesRouter } from './modules/category/category.routes.js';
 import { customersRouter } from './modules/customer/customer.routes.js';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes.js';
 import { expensesRouter } from './modules/expense/expense.routes.js';
@@ -29,6 +30,7 @@ export function createApiRouter(verifyToken: TokenVerifier) {
   const shopScoped = Router({ mergeParams: true });
   shopScoped.use(requireShop);
   shopScoped.use('/', shopRouter);
+  shopScoped.use('/categories', categoriesRouter);
   shopScoped.use('/products', productsRouter);
   shopScoped.use('/customers', customersRouter);
   shopScoped.use('/orders', ordersRouter);

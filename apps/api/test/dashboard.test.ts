@@ -23,7 +23,7 @@ describe('dashboard', () => {
       request
         .post(orders)
         .set(alice)
-        .send({ status, deliveryFee: 3000, items: [{ productId: soap.id, quantity }] });
+        .send({ status, delivery: { fee: 3000 }, items: [{ productId: soap.id, quantity }] });
 
     await order('CONFIRMEE', 2); // sale: 18 000 revenue, 10 000 cost
     await order('EN_ATTENTE', 5); // not a sale yet

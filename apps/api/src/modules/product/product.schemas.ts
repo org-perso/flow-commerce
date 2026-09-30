@@ -12,30 +12,32 @@ const fields = {
   name: requiredText(150),
   description: optionalText(2000),
   image: z.url().max(500).nullable(),
-  category: optionalText(100),
+  categoryId: z.uuid().nullable(),
   purchasePrice: amount,
   sellingPrice: amount,
   lowStockThreshold: z.number().int().min(0).max(1_000_000),
 };
 
-export const createProductSchema = z.object({
-  name: fields.name,
-  description: fields.description.default(null),
-  image: fields.image.default(null),
-  category: fields.category.default(null),
-  purchasePrice: fields.purchasePrice,
-  sellingPrice: fields.sellingPrice,
-  lowStockThreshold: fields.lowStockThreshold.default(0),
-  /** Recorded as an AJOUT stock movement. */
-  initialStock: z.number().int().min(0).max(1_000_000).default(0),
-});
+export const createProductSchema = z
+  .object({
+    name: fields.name,
+    description: fields.description.default(null),
+    image: fields.image.default(null),
+    categoryId: fields.categoryId.default(null),
+    purchasePrice: fields.purchasePrice,
+    sellingPrice: fields.sellingPrice,
+    lowStockThreshold: fields.lowStockThreshold.default(0),
+    /** Recorded as an AJOUT stock movement. */
+    initialStock: z.number().int().min(0).max(1_000_000).default(0),
+  })
+  .strict();
 
 export const updateProductSchema = z
   .object({
     name: fields.name,
     description: fields.description,
     image: fields.image,
-    category: fields.category,
+    categoryId: fields.categoryId,
     purchasePrice: fields.purchasePrice,
     sellingPrice: fields.sellingPrice,
     lowStockThreshold: fields.lowStockThreshold,
@@ -45,7 +47,7 @@ export const updateProductSchema = z
 
 export const listProductsQuery = z.object({
   q: z.string().trim().max(150).optional(),
-  category: z.string().trim().max(100).optional(),
+  categoryId: z.uuid().optional(),
   lowStock: queryBoolean,
   archived: queryBoolean,
 });

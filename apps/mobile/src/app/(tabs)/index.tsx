@@ -15,8 +15,11 @@ import {
 } from '@/components/ui';
 import { EmailVerificationBanner } from '@/features/auth/email-verification-banner';
 import type { DashboardPeriod } from '@/features/dashboard/dashboard-api';
+import { GettingStarted } from '@/features/dashboard/getting-started';
 import { useDashboard } from '@/features/dashboard/use-dashboard';
+import { useExpenses } from '@/features/expense/use-expenses';
 import { OrderRow } from '@/features/order/order-row';
+import { useProducts } from '@/features/product/use-products';
 import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
 import { formatAr } from '@/utils/format';
@@ -43,9 +46,17 @@ export default function DashboardScreen() {
   const [period, setPeriod] = useState<DashboardPeriod>('today');
   const dashboard = useDashboard(period);
   const d = dashboard.data;
+  const products = useProducts({});
+  const expenses = useExpenses({});
+
+  const hasProducts = (products.data?.length ?? 0) > 0;
+  const hasOrders = (d?.recentOrders.length ?? 0) > 0;
+  const hasExpenses = (expenses.data?.items.length ?? 0) > 0;
+  // Brand-new shop: only the first steps, no wall of zeros.
+  const isEmptyShop = !!d && products.isSuccess && !hasProducts && !hasOrders;
 
   const openOrders = (status: OrderStatus) =>
-    router.navigate({ pathname: '/orders', params: { status } });
+    router.navigate({ pathname: '/orders', params: { status, when: 'all' } });
 
   return (
     <Screen
@@ -53,18 +64,24 @@ export default function DashboardScreen() {
       onRefresh={() => dashboard.refetch()}
       refreshing={dashboard.isRefetching}
       footer={
-        <Button
-          label="Nouvelle commande"
-          icon={Plus}
-          variant="primary"
-          fullWidth
-          onPress={() => router.push('/orders/new')}
-        />
+        hasProducts ? (
+          <Button
+            label="Nouvelle commande"
+            icon={Plus}
+            variant="primary"
+            fullWidth
+            onPress={() => router.push('/orders/new')}
+          />
+        ) : undefined
       }
     >
       <EmailVerificationBanner />
 
-      <FilterChips options={periods} value={period} onChange={setPeriod} />
+      {d && !hasOrders && (
+        <GettingStarted hasProducts={hasProducts} hasOrders={hasOrders} hasExpenses={hasExpenses} />
+      )}
+
+      {!isEmptyShop && <FilterChips options={periods} value={period} onChange={setPeriod} />}
 
       {dashboard.isError && (
         <AlertBanner
@@ -75,7 +92,7 @@ export default function DashboardScreen() {
       )}
       {dashboard.isPending && <ActivityIndicator color={theme.colors.ink} />}
 
-      {d && (
+      {d && !isEmptyShop && (
         <>
           <View style={styles.section}>
             <KpiCard

@@ -3,31 +3,49 @@ import type pg from 'pg';
 import { withTransaction } from '../../db/pool.js';
 import { notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
-import {
-  findCustomer,
-  findOrCreateCustomer,
-  type CustomerInput,
-} from '../customer/customer.repository.js';
+import { findCustomer, findOrCreateCustomer } from '../customer/customer.repository.js';
 import { applyStockMovement } from '../stock/stock.service.js';
 import { holdsStock, TRANSITIONS, type OrderStatus } from './order-status.js';
+import type { OrderSource } from './order-source.js';
 import { findOrder, type Order } from './order.repository.js';
 
 export type ItemInput = { productId: string; quantity: number };
 
+export type DeliveryInput = {
+  place: string | null;
+  address: string | null;
+  note: string | null;
+  fee: number;
+};
+
 export type CreateOrderInput = {
   customerId: string | null;
   /** New or returning customer typed in the order form (matched by phone). */
-  customer: CustomerInput | null;
+  customer: { name: string; phone: string | null } | null;
   items: ItemInput[];
-  deliveryFee: number;
+  source: OrderSource | null;
+  /** Planned day (YYYY-MM-DD); null means today. */
+  scheduledDate: string | null;
+  /** null: not delivered (pickup, hand delivery), so no delivery fee. */
+  delivery: DeliveryInput | null;
   paymentMethod: string | null;
-  address: string | null;
   status: 'EN_ATTENTE' | 'CONFIRMEE';
 };
 
 export type UpdateOrderInput = Partial<Omit<CreateOrderInput, 'status' | 'customer'>>;
 
 type LockedOrder = { status: OrderStatus; deliveryFee: number; totalAmount: number };
+
+/** Column values for a delivery (or its absence). */
+function deliveryColumns(delivery: DeliveryInput | null) {
+  return [
+    delivery !== null,
+    delivery?.place ?? null,
+    delivery?.address ?? null,
+    delivery?.note ?? null,
+    delivery?.fee ?? 0,
+  ] as const;
+}
 
 function unprocessable(detail: string, extra?: Record<string, unknown>) {
   return new ProblemError(422, 'Unprocessable Content', detail, extra);
@@ -141,27 +159,35 @@ async function lockOrder(client: pg.PoolClient, shopId: string, orderId: string)
 export function createOrder(shopId: string, input: CreateOrderInput): Promise<Order> {
   return withTransaction(async (client) => {
     let customerId = input.customerId;
-    let address = input.address;
     if (input.customerId) {
-      const customer = await assertCustomer(client, shopId, input.customerId);
-      address ??= customer.address;
+      await assertCustomer(client, shopId, input.customerId);
     } else if (input.customer) {
-      const customer = await findOrCreateCustomer(client, shopId, input.customer);
-      customerId = customer.id;
-      address ??= customer.address;
+      customerId = (await findOrCreateCustomer(client, shopId, input.customer)).id;
     }
 
     const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO orders (shop_id, customer_id, status, delivery_fee, payment_method, address)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [shopId, customerId, input.status, input.deliveryFee, input.paymentMethod, address],
+      `INSERT INTO orders (shop_id, customer_id, status, source, payment_method,
+         is_delivery, delivery_place, delivery_address, delivery_note, delivery_fee,
+         scheduled_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+         COALESCE($11::date, (now() AT TIME ZONE 'Indian/Antananarivo')::date))
+       RETURNING id`,
+      [
+        shopId,
+        customerId,
+        input.status,
+        input.source,
+        input.paymentMethod,
+        ...deliveryColumns(input.delivery),
+        input.scheduledDate,
+      ],
     );
     const orderId = rows[0]!.id;
 
     const itemsAmount = await insertItems(client, shopId, orderId, normalizeItems(input.items));
     await client.query('UPDATE orders SET total_amount = $2 WHERE id = $1', [
       orderId,
-      itemsAmount + input.deliveryFee,
+      itemsAmount + (input.delivery?.fee ?? 0),
     ]);
 
     if (holdsStock(input.status)) {
@@ -199,15 +225,23 @@ export function updateOrder(
       await client.query('DELETE FROM order_items WHERE order_id = $1', [orderId]);
       itemsAmount = await insertItems(client, shopId, orderId, normalizeItems(patch.items));
     }
-    const deliveryFee = patch.deliveryFee ?? order.deliveryFee;
+    if (patch.delivery !== undefined) {
+      await client.query(
+        `UPDATE orders SET is_delivery = $2, delivery_place = $3, delivery_address = $4,
+           delivery_note = $5, delivery_fee = $6 WHERE id = $1`,
+        [orderId, ...deliveryColumns(patch.delivery)],
+      );
+    }
+    const deliveryFee =
+      patch.delivery !== undefined ? (patch.delivery?.fee ?? 0) : order.deliveryFee;
 
     await client.query(
       `UPDATE orders SET
          customer_id    = CASE WHEN $3::boolean THEN $4::uuid ELSE customer_id END,
          payment_method = CASE WHEN $5::boolean THEN $6 ELSE payment_method END,
-         address        = CASE WHEN $7::boolean THEN $8 ELSE address END,
-         delivery_fee   = $9,
-         total_amount   = $10
+         source         = CASE WHEN $7::boolean THEN $8 ELSE source END,
+         scheduled_date = COALESCE($10::date, scheduled_date),
+         total_amount   = $9
        WHERE id = $1 AND shop_id = $2`,
       [
         orderId,
@@ -216,10 +250,10 @@ export function updateOrder(
         patch.customerId ?? null,
         patch.paymentMethod !== undefined,
         patch.paymentMethod ?? null,
-        patch.address !== undefined,
-        patch.address ?? null,
-        deliveryFee,
+        patch.source !== undefined,
+        patch.source ?? null,
         itemsAmount + deliveryFee,
+        patch.scheduledDate ?? null,
       ],
     );
     return (await findOrder(shopId, orderId, client))!;

@@ -8,6 +8,7 @@ import {
   createOrder,
   getOrder,
   listOrders,
+  updateOrder,
   type CreateOrderInput,
   type OrderFilters,
 } from './order-api';
@@ -44,6 +45,12 @@ function useShopMutation<TVariables, TResult>(
 
 export function useCreateOrder() {
   return useShopMutation((shopId, input: CreateOrderInput) => createOrder(shopId, input));
+}
+
+export function useUpdateOrder(orderId: string) {
+  return useShopMutation((shopId, patch: { scheduledDate?: string }) =>
+    updateOrder(shopId, orderId, patch),
+  );
 }
 
 export function useChangeOrderStatus(orderId: string) {

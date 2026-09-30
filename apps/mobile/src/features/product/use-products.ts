@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useActiveShop } from '@/features/shop/use-shop';
+import { isLocalImage, uploadProductImage } from '@/lib/product-image';
 
 import {
   archiveProduct,
+  createCategory,
   createProduct,
   createStockMovement,
   getProduct,
+  listCategories,
   listProducts,
   listStockMovements,
   restoreProduct,
@@ -56,15 +59,21 @@ function useProductMutation<TVariables, TResult>(
   });
 }
 
+/** A freshly picked photo is compressed and uploaded first; the product stores its URL. */
+async function withUploadedImage<T extends { image?: string | null }>(shopId: string, input: T) {
+  if (!input.image || !isLocalImage(input.image)) return input;
+  return { ...input, image: await uploadProductImage(shopId, input.image) };
+}
+
 export function useCreateProduct() {
-  return useProductMutation((shopId, input: ProductInput & { initialStock: number }) =>
-    createProduct(shopId, input),
+  return useProductMutation(async (shopId, input: ProductInput & { initialStock: number }) =>
+    createProduct(shopId, await withUploadedImage(shopId, input)),
   );
 }
 
 export function useUpdateProduct(productId: string) {
-  return useProductMutation((shopId, input: Partial<ProductInput>) =>
-    updateProduct(shopId, productId, input),
+  return useProductMutation(async (shopId, input: Partial<ProductInput>) =>
+    updateProduct(shopId, productId, await withUploadedImage(shopId, input)),
   );
 }
 
@@ -80,4 +89,17 @@ export function useCreateStockMovement(productId: string) {
     (shopId, input: { type: ManualMovementType; quantity: number; reason: string | null }) =>
       createStockMovement(shopId, productId, input),
   );
+}
+
+export function useCategories() {
+  const shopId = useActiveShop().id;
+  return useQuery({
+    queryKey: ['shops', shopId, 'categories'],
+    queryFn: () => listCategories(shopId),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCreateCategory() {
+  return useProductMutation((shopId, name: string) => createCategory(shopId, name));
 }

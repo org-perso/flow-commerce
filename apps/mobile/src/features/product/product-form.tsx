@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 import { z } from 'zod';
 
@@ -10,11 +10,14 @@ import { amountField, optionalTextField, quantityField, toFieldValue } from '@/l
 import { theme } from '@/theme';
 import { formatAr } from '@/utils/format';
 
+import { CategoryPicker } from './category-picker';
+import { ImageField } from './image-field';
 import type { Product, ProductInput } from './product-api';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Le nom est requis.').max(150, '150 caractères maximum.'),
-  category: optionalTextField(100),
+  image: z.string().nullable(),
+  categoryId: z.string().nullable(),
   purchasePrice: amountField,
   sellingPrice: amountField,
   lowStockThreshold: quantityField,
@@ -43,7 +46,8 @@ export function ProductForm({ product, submitLabel, onSubmit, error }: ProductFo
     resolver: zodResolver(schema),
     defaultValues: {
       name: product?.name ?? '',
-      category: product?.category ?? '',
+      image: product?.image ?? null,
+      categoryId: product?.category?.id ?? null,
       purchasePrice: product ? toFieldValue(product.purchasePrice) : '',
       sellingPrice: product ? toFieldValue(product.sellingPrice) : '',
       lowStockThreshold: toFieldValue(product?.lowStockThreshold ?? 0),
@@ -66,6 +70,11 @@ export function ProductForm({ product, submitLabel, onSubmit, error }: ProductFo
   return (
     <View style={styles.root}>
       {error != null && <AlertBanner tone="danger" message={apiErrorMessage(error)} />}
+      <Controller
+        control={control}
+        name="image"
+        render={({ field }) => <ImageField value={field.value} onChange={field.onChange} />}
+      />
       <FormTextField
         control={control}
         name="name"
@@ -74,12 +83,10 @@ export function ProductForm({ product, submitLabel, onSubmit, error }: ProductFo
         autoCapitalize="sentences"
         maxLength={150}
       />
-      <FormTextField
+      <Controller
         control={control}
-        name="category"
-        label="Catégorie (facultatif)"
-        placeholder="Ex. Hygiène"
-        autoCapitalize="sentences"
+        name="categoryId"
+        render={({ field }) => <CategoryPicker value={field.value} onChange={field.onChange} />}
       />
       <View style={styles.row}>
         <View style={styles.cell}>

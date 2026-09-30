@@ -26,58 +26,105 @@ describe('normalizePhone', () => {
   });
 });
 
-describe('customer phone', () => {
-  it('stores the normalized phone and finds it however it is typed', async () => {
+describe('customer phones', () => {
+  it('stores several normalized phones, main one first, without duplicates', async () => {
     const res = await request
       .post(customers())
       .set(alice)
-      .send({ name: 'Rakoto', phone: '+261 34 12 345 67' });
-    expect(res.body.phone).toBe('0341234567');
-    expect((await request.get(customers('?q=034 12')).set(alice)).body).toHaveLength(1);
+      .send({ name: 'Rakoto', phones: ['+261 34 12 345 67', '032 00 000 00', '0341234567', ''] });
+    expect(res.status).toBe(201);
+    expect(res.body.phones).toEqual(['0341234567', '0320000000']);
+  });
+
+  it('finds a customer by any of its phones, however it is typed', async () => {
+    await request
+      .post(customers())
+      .set(alice)
+      .send({ name: 'Rakoto', phones: ['0341234567', '0320000000'] });
+    expect((await request.get(customers('?q=032 00')).set(alice)).body).toHaveLength(1);
     const international = encodeURIComponent('+261 34');
     expect((await request.get(customers(`?q=${international}`)).set(alice)).body).toHaveLength(1);
   });
 
-  it('refuses a second customer with the same phone, pointing to the existing one', async () => {
+  it('refuses a phone already used by another customer, pointing to it', async () => {
     const first = await request
       .post(customers())
       .set(alice)
-      .send({ name: 'Rakoto', phone: '0341234567' });
+      .send({ name: 'Rakoto', phones: ['0341234567'] });
     const dup = await request
       .post(customers())
       .set(alice)
-      .send({ name: 'Autre', phone: '034 12 345 67' });
+      .send({ name: 'Autre', phones: ['0330000000', '034 12 345 67'] });
     expect(dup.status).toBe(409);
     expect(dup.body).toMatchObject({ title: 'Duplicate Phone', customerId: first.body.id });
 
-    const other = await request
-      .post(customers())
-      .set(alice)
-      .send({ name: 'B', phone: '0320000000' });
+    const other = await request.post(customers()).set(alice).send({ name: 'B' });
     const patch = await request
       .patch(customers(`/${other.body.id}`))
       .set(alice)
-      .send({ phone: '0341234567' });
+      .send({ phones: ['0341234567'] });
     expect(patch.status).toBe(409);
   });
 
-  it('allows the same phone in two different shops, and several customers without phone', async () => {
+  it('replaces the phone list on update, keeping the kept numbers', async () => {
+    const c = await request
+      .post(customers())
+      .set(alice)
+      .send({ name: 'Rakoto', phones: ['0341234567', '0320000000'] });
+    const res = await request
+      .patch(customers(`/${c.body.id}`))
+      .set(alice)
+      .send({ phones: ['0320000000', '0330000000'] });
+    expect(res.body.phones).toEqual(['0320000000', '0330000000']);
+    // The removed number is free again.
+    const reuse = await request
+      .post(customers())
+      .set(alice)
+      .send({ name: 'Autre', phones: ['0341234567'] });
+    expect(reuse.status).toBe(201);
+  });
+
+  it('allows the same phone in two different shops', async () => {
     const otherShop = await createShop(alice, 'Autre');
-    await request.post(customers()).set(alice).send({ name: 'A', phone: '0341234567' });
+    await request
+      .post(customers())
+      .set(alice)
+      .send({ name: 'A', phones: ['0341234567'] });
     const res = await request
       .post(`/api/v1/shops/${otherShop}/customers`)
       .set(alice)
-      .send({ name: 'A', phone: '0341234567' });
+      .send({ name: 'A', phones: ['0341234567'] });
     expect(res.status).toBe(201);
-    await request.post(customers()).set(alice).send({ name: 'Sans tel 1' });
-    expect((await request.post(customers()).set(alice).send({ name: 'Sans tel 2' })).status).toBe(
-      201,
-    );
   });
 
-  it('rejects a phone with too few digits', async () => {
-    const res = await request.post(customers()).set(alice).send({ name: 'A', phone: '12' });
-    expect(res.status).toBe(400);
+  it('rejects invalid phones and the removed fields', async () => {
+    expect(
+      (
+        await request
+          .post(customers())
+          .set(alice)
+          .send({ name: 'A', phones: ['12'] })
+      ).status,
+    ).toBe(400);
+    expect(
+      (await request.post(customers()).set(alice).send({ name: 'A', address: 'Ivandry' })).status,
+    ).toBe(400);
+  });
+});
+
+describe('social profile', () => {
+  it('stores it and finds the customer by it', async () => {
+    const res = await request
+      .post(customers())
+      .set(alice)
+      .send({ name: 'Rasoa', socialProfile: 'fb.com/rasoa.hanta' });
+    expect(res.body.socialProfile).toBe('fb.com/rasoa.hanta');
+    expect((await request.get(customers('?q=rasoa.hanta')).set(alice)).body).toHaveLength(1);
+    const cleared = await request
+      .patch(customers(`/${res.body.id}`))
+      .set(alice)
+      .send({ socialProfile: '' });
+    expect(cleared.body.socialProfile).toBeNull();
   });
 });
 
@@ -92,22 +139,23 @@ describe('customer typed in the order', () => {
       .set(alice)
       .send({ customer, items: [{ productId, quantity: 1 }] });
 
-  it('creates the customer with the order, and uses its address', async () => {
-    const res = await order({ name: 'Rasoa', phone: '033 11 222 33', address: 'Ivandry' });
+  it('creates the customer with the order', async () => {
+    const res = await order({ name: 'Rasoa', phone: '033 11 222 33' });
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({
-      customer: { name: 'Rasoa', phone: '0331122233' },
-      address: 'Ivandry',
-    });
-    expect((await request.get(customers()).set(alice)).body).toHaveLength(1);
+    expect(res.body.customer).toMatchObject({ name: 'Rasoa', phone: '0331122233' });
+    const list = (await request.get(customers()).set(alice)).body;
+    expect(list).toMatchObject([{ name: 'Rasoa', phones: ['0331122233'] }]);
   });
 
-  it('reuses the existing customer with the same phone, without changing it', async () => {
-    const first = await order({ name: 'Rasoa', phone: '0331122233', address: 'Ivandry' });
-    const second = await order({ name: 'Rasoa H.', phone: '+261 33 11 222 33' });
-    expect(second.body.customer.id).toBe(first.body.customer.id);
-    expect(second.body.customer.name).toBe('Rasoa');
-    expect(second.body.address).toBe('Ivandry');
+  it('reuses the customer owning this phone, even as a secondary number', async () => {
+    const existing = await request
+      .post(customers())
+      .set(alice)
+      .send({ name: 'Rasoa', phones: ['0320000000', '0331122233'] });
+    const res = await order({ name: 'Rasoa H.', phone: '+261 33 11 222 33' });
+    expect(res.body.customer).toMatchObject({ id: existing.body.id, name: 'Rasoa' });
+    // The order shows the main number.
+    expect(res.body.customer.phone).toBe('0320000000');
     expect((await request.get(customers()).set(alice)).body).toHaveLength(1);
   });
 

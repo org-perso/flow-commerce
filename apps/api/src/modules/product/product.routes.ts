@@ -32,16 +32,17 @@ productsRouter.post('/', async (req, res) => {
   const { initialStock, ...input } = createProductSchema.parse(req.body);
 
   const product = await withTransaction(async (client) => {
-    const created = await insertProduct(client, shopId, input);
-    if (initialStock === 0) return created;
-    await applyStockMovement(client, {
-      shopId,
-      productId: created.id,
-      type: 'AJOUT',
-      quantity: initialStock,
-      reason: 'Stock initial',
-    });
-    return (await findProduct(shopId, created.id, client))!;
+    const productId = await insertProduct(client, shopId, input);
+    if (initialStock > 0) {
+      await applyStockMovement(client, {
+        shopId,
+        productId,
+        type: 'AJOUT',
+        quantity: initialStock,
+        reason: 'Stock initial',
+      });
+    }
+    return (await findProduct(shopId, productId, client))!;
   });
 
   res.status(201).location(`${req.baseUrl}/${product.id}`).json(product);

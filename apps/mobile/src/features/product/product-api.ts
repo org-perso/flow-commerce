@@ -5,7 +5,7 @@ export type Product = {
   name: string;
   description: string | null;
   image: string | null;
-  category: string | null;
+  category: Category | null;
   purchasePrice: number;
   sellingPrice: number;
   stockQuantity: number;
@@ -16,10 +16,13 @@ export type Product = {
   updatedAt: string;
 };
 
+export type Category = { id: string; name: string };
+
 export type ProductInput = {
   name: string;
   description: string | null;
-  category: string | null;
+  image: string | null;
+  categoryId: string | null;
   purchasePrice: number;
   sellingPrice: number;
   lowStockThreshold: number;
@@ -97,5 +100,16 @@ export function createStockMovement(
   return apiFetch(`${base(shopId)}/${productId}/stock-movements`, {
     method: 'POST',
     body: JSON.stringify(input),
+  });
+}
+
+export function listCategories(shopId: string): Promise<Category[]> {
+  return apiFetch(`/shops/${shopId}/categories`);
+}
+
+export function createCategory(shopId: string, name: string): Promise<Category> {
+  return apiFetch(`/shops/${shopId}/categories`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
   });
 }

@@ -1,71 +1,73 @@
-import { ChevronRight } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { AppText } from '@/components/ui';
+import { AppText, Avatar, ListRow } from '@/components/ui';
 import { textStyles, theme } from '@/theme';
 import { formatAr } from '@/utils/format';
 
 import type { Product } from './product-api';
 
-type ProductRowProps = { product: Product; onPress: () => void };
+type ProductRowProps = { product: Product; onPress: () => void; divider?: boolean };
 
-export function ProductRow({ product, onPress }: ProductRowProps) {
+export function ProductRow({ product, onPress, divider }: ProductRowProps) {
   const archived = product.archivedAt !== null;
+  const outOfStock = !archived && product.stockQuantity === 0;
+  const low = !archived && !outOfStock && product.isLowStock;
+
   return (
-    <Pressable
+    <ListRow
+      divider={divider}
       onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-    >
-      <View style={styles.info}>
-        <AppText style={styles.name} numberOfLines={1}>
-          {product.name}
-        </AppText>
-        <AppText variant="caption" color="inkMuted" numberOfLines={1}>
-          {formatAr(product.sellingPrice)}
-          {product.category ? ` · ${product.category}` : ''}
-        </AppText>
-      </View>
-      <View style={styles.stock}>
-        <AppText
-          style={styles.quantity}
-          color={product.isLowStock && !archived ? 'goldInk' : 'ink'}
-        >
-          {product.stockQuantity}
-        </AppText>
-        <AppText variant="caption" color={product.isLowStock && !archived ? 'goldInk' : 'inkMuted'}>
-          {archived ? 'Archivé' : product.isLowStock ? 'Stock faible' : 'en stock'}
-        </AppText>
-      </View>
-      <ChevronRight size={18} color={theme.colors.inkMuted} strokeWidth={2} />
-    </Pressable>
+      leading={<Avatar name={product.name} imageUri={product.image} />}
+      title={product.name}
+      subtitle={[formatAr(product.sellingPrice), product.category?.name]
+        .filter(Boolean)
+        .join(' · ')}
+      trailing={
+        <View style={styles.stock}>
+          <AppText style={styles.quantity}>{product.stockQuantity}</AppText>
+          {archived ? (
+            <AppText variant="caption" color="inkMuted">
+              Archivé
+            </AppText>
+          ) : outOfStock ? (
+            <View style={[styles.pill, styles.outPill]}>
+              <AppText variant="caption" color="statusCancelledFg">
+                Rupture
+              </AppText>
+            </View>
+          ) : low ? (
+            <View style={[styles.pill, styles.lowPill]}>
+              <AppText variant="caption" color="goldInk">
+                Stock faible
+              </AppText>
+            </View>
+          ) : (
+            <AppText variant="caption" color="inkMuted">
+              en stock
+            </AppText>
+          )}
+        </View>
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing[3],
-    minHeight: theme.sizes.tapMin + theme.spacing[4],
-    padding: theme.spacing[3],
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: theme.radius.md,
-  },
-  info: {
-    flex: 1,
-    gap: 2,
-  },
-  name: {
-    fontFamily: theme.typography.heading.fontFamily,
-  },
   stock: {
     alignItems: 'flex-end',
+    gap: theme.spacing[1] / 2,
   },
   quantity: {
     ...textStyles.amountMd,
   },
-  pressed: {
-    opacity: 0.85,
+  pill: {
+    paddingHorizontal: theme.spacing[2],
+    borderRadius: theme.radius.sm,
+  },
+  lowPill: {
+    backgroundColor: theme.colors.goldSoft,
+  },
+  outPill: {
+    backgroundColor: theme.colors.statusCancelledBg,
   },
 });

@@ -1,3 +1,5 @@
+import { FirebaseError } from 'firebase/app';
+
 import { auth } from '@/lib/firebase';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -45,6 +47,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
 /** User-facing French message for any error thrown by apiFetch. */
 export function apiErrorMessage(error: unknown): string {
+  if (error instanceof FirebaseError && error.code.startsWith('storage/')) {
+    return 'Impossible d’envoyer la photo. Vérifiez votre connexion et réessayez.';
+  }
   if (error instanceof TypeError) return 'Serveur injoignable. Vérifiez votre connexion.';
   if (error instanceof ApiError) {
     if (error.status === 401) return 'Session expirée. Reconnectez-vous.';

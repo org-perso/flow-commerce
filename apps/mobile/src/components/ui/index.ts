@@ -2,6 +2,7 @@ export { AlertBanner } from './alert-banner';
 export { AppText } from './app-text';
 export { Avatar, initials } from './avatar';
 export { Button } from './button';
+export { Dropdown } from './dropdown';
 export { EmptyState } from './empty-state';
 export { FilterChips } from './filter-chips';
 export { InlineBanner } from './inline-banner';

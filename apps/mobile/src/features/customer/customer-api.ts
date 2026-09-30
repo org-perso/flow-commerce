@@ -3,17 +3,18 @@ import { apiFetch } from '@/lib/api-client';
 export type Customer = {
   id: string;
   name: string;
-  /** Normalized by the API: "0341234567". */
-  phone: string | null;
-  address: string | null;
+  /** Normalized by the API ("0341234567"); the first one is the main number. */
+  phones: string[];
+  /** Facebook name, profile link, @handle… */
+  socialProfile: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export type CustomerInput = {
   name: string;
-  phone: string | null;
-  address: string | null;
+  phones: string[];
+  socialProfile: string | null;
 };
 
 const base = (shopId: string) => `/shops/${shopId}/customers`;

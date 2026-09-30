@@ -19,8 +19,10 @@ export {
 export const theme = {
   ...tokens,
   layout: {
-    /** Avatar / product thumbnail. */
+    /** Avatar / product thumbnail in lists. */
     avatar: 40,
+    /** Product photo preview in forms and details. */
+    thumbnail: 96,
     /** Minimum height of a list row. */
     rowMinHeight: 56,
     /** Visual height of compact controls (segments, chips, compact buttons); hitSlop tops them up to tapMin. */

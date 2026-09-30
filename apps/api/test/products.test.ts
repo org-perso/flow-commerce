@@ -45,7 +45,9 @@ describe('products', () => {
   });
 
   it('updates fields and filters the list', async () => {
-    const soap = await createProduct(alice, shopId, { category: 'Hygiène', initialStock: 1 });
+    const categories = await request.get(`/api/v1/shops/${shopId}/categories`).set(alice);
+    const hygiene = categories.body.find((c: { name: string }) => c.name === 'Hygiène');
+    const soap = await createProduct(alice, shopId, { categoryId: hygiene.id, initialStock: 1 });
     await createProduct(alice, shopId, { name: 'Thé hibiscus', initialStock: 50 });
     await request
       .patch(url(`/${soap.id}`))
@@ -56,7 +58,7 @@ describe('products', () => {
     expect(byName.body.map((p: { name: string }) => p.name)).toEqual(['Thé hibiscus']);
     const low = await request.get(url('?lowStock=true')).set(alice);
     expect(low.body.map((p: { id: string }) => p.id)).toEqual([soap.id]);
-    const byCategory = await request.get(url('?category=Hygiène')).set(alice);
+    const byCategory = await request.get(url(`?categoryId=${hygiene.id}`)).set(alice);
     expect(byCategory.body).toHaveLength(1);
   });
 

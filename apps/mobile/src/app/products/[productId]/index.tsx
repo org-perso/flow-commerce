@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { ArrowDownToLine, ArrowUpFromLine, ClipboardCheck, Pencil } from 'lucide-react-native';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
@@ -45,7 +46,21 @@ export default function ProductScreen() {
 
   return (
     <Screen edges={[]}>
-      <Stack.Screen options={{ title: p.name }} />
+      <Stack.Screen
+        options={{
+          title: p.name,
+          headerRight: () => (
+            <Button
+              label="Modifier"
+              icon={Pencil}
+              compact
+              onPress={() =>
+                router.push({ pathname: '/products/[productId]/edit', params: { productId } })
+              }
+            />
+          ),
+        }}
+      />
 
       {archived && <AlertBanner message="Ce produit est archivé." />}
       {!archived && p.isLowStock && (
@@ -60,11 +75,12 @@ export default function ProductScreen() {
           <KpiCard label="Prix d'achat" value={formatAr(p.purchasePrice)} />
         </View>
         <KpiCard label="Marge par unité" value={formatAr(p.sellingPrice - p.purchasePrice)} />
+        {p.image && <Image source={{ uri: p.image }} style={styles.photo} contentFit="cover" />}
         {p.category || p.description ? (
           <View style={styles.card}>
             {p.category && (
               <AppText variant="caption" color="inkMuted">
-                {p.category}
+                {p.category.name}
               </AppText>
             )}
             {p.description && <AppText>{p.description}</AppText>}
@@ -170,6 +186,12 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
+  },
+  photo: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.navySoft,
   },
   card: {
     backgroundColor: theme.colors.surfaceRaised,

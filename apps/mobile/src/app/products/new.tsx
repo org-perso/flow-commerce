@@ -13,8 +13,9 @@ export default function NewProductScreen() {
         submitLabel="Ajouter le produit"
         error={createProduct.error}
         onSubmit={async (values) => {
-          const product = await createProduct.mutateAsync(values);
-          router.replace(`/products/${product.id}`);
+          await createProduct.mutateAsync(values);
+          // Back to the list: the new product shows up there.
+          router.back();
         }}
       />
     </Screen>

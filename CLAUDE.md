@@ -56,6 +56,41 @@ docker compose up -d --build       # Postgres + API (migrations au démarrage)
 - **Frais de livraison hors CA** : CA = somme des sous-totaux des lignes. `totalAmount` (ce que paie le client) = lignes + livraison.
 - **« Achat de produits » exclu du bénéfice** : déjà compté via le coût des produits vendus. Bénéfice estimé = CA − coût des produits vendus − dépenses hors `ACHAT_PRODUITS`.
 - Le CA et les ventes d'une période se basent sur la date de création de la commande (fuseau `Indian/Antananarivo`).
+- **Catégories de produits** : table `product_categories` par boutique (nom unique, insensible à la casse). Chaque nouvelle boutique reçoit la liste standard `DEFAULT_CATEGORIES` ; le vendeur peut en ajouter. Un produit référence une catégorie (`categoryId`), jamais du texte libre.
+- **Clients** : plusieurs numéros par client (table `customer_phones`, ordre `position`, le premier est le principal). Numéros normalisés (`+261 34…` → `034…`) et **uniques par boutique** : un numéro identifie un client. Pas d'adresse sur le client ; à la place, un `socialProfile` (nom Facebook, lien, @compte).
+- **Commande avec client saisi** : `POST /orders` accepte `customer: { name, phone }` ; si le numéro existe dans la boutique, la fiche existante est réutilisée (sans être modifiée).
+- **Livraison par commande** : facultative. `delivery: { place, address, note, fee }` ou `null` (retrait / remise en main propre, pas de frais — garanti par une contrainte BDD). **Source** de la commande : `FACEBOOK`, `MESSENGER`, `INSTAGRAM`, `WHATSAPP`, `TIKTOK`, `APPEL`, `BOUTIQUE`, `AUTRE`.
+- **Date prévue** (`scheduledDate`) : jour de livraison ou de remise, par défaut aujourd'hui (Madagascar). La vue « Aujourd'hui » = prévues aujourd'hui + commandes **en retard** encore ouvertes (prévues avant, statut `EN_ATTENTE` → `EN_LIVRAISON`) ; « À venir » = prévues après aujourd'hui (`GET /orders?when=today|upcoming`). Le CA reste basé sur la date de création.
+- **Images produits** : compressées côté mobile (1024 px, JPEG 0,7), envoyées dans Firebase Storage sous `shops/{shopId}/products/`, l'URL est stockée dans `products.image`.
+- Les schémas de création de l'API sont **stricts** : un champ inconnu (ancien contrat) renvoie 400 au lieu d'être ignoré.
+
+## Roadmap
+
+À tenir à jour à chaque livraison (✅ fait · 🚧 en cours · ⏳ à faire).
+
+**MVP 1 — socle**
+- ✅ Auth Firebase : email/mot de passe, Google (development build), mot de passe oublié, vérification email non bloquante
+- ✅ Boutiques : plusieurs par utilisateur, boutique active, sélecteur dans l'en-tête
+- ✅ API Express + Postgres : boutiques, produits, stock, clients, commandes, dépenses, dashboard (tests d'intégration)
+- ✅ Mobile branché sur l'API : Stock, Clients, Commandes, Dépenses, Dashboard
+- ✅ Design system (tokens de la charte) et composants de base (`ScreenHeader`, `ListRow`, `SegmentedControl`…)
+
+**Itération UX en cours**
+- ✅ Stock : photo produit, catégories en liste déroulante (+ ajout), retour à la liste après ajout, bouton Modifier dans l'en-tête
+- ✅ Accueil : guide « Pour bien démarrer » pour une boutique vide
+- ✅ Clients : plusieurs numéros, profil Facebook/réseau, plus d'adresse ; fiche avec Appeler / WhatsApp / Nouvelle commande
+- ✅ Commandes : source, livraison facultative (lieu, adresse, précisions, frais), client prérempli depuis sa fiche
+- ✅ Commandes : date prévue ; liste « Aujourd'hui / À venir / Toutes » (retards en tête, regroupement par jour), statut en liste déroulante ; fiche : changer la date, étape suivante + « Changer le statut »
+- 🚧 Refonte UX (spec du 29/09) : étapes 0–4 faites ; restent Commandes (étape 5) et Accueil (étape 6)
+- ⏳ Liste Commandes : recherche par client / téléphone — besoin API : `GET /orders?q=`
+- ⏳ Liste Clients : nombre de commandes et total dépensé par ligne — besoin API : `orderCount`, `totalSpent`
+- ⏳ Modifier les lignes d'une commande en attente (l'API le permet déjà)
+
+**Avant la mise en production**
+- ⏳ Déploiement Render (API + Postgres) et variables EAS pour les builds `preview` / `production`
+- ⏳ Règles Firebase Storage à durcir, limite de requêtes (rate limiting) sur l'API
+- ⏳ Notifications push (FCM) — définir d'abord quand notifier le vendeur
+- ⏳ Logo de la boutique (emplacement déjà prévu dans l'en-tête)
 
 ## Hors périmètre MVP 1 — ne pas implémenter
 
@@ -66,7 +101,7 @@ Composants/nomenclatures, module livraison et livreurs, rôles et équipe, inté
 - Code, noms de variables, commits et API en **anglais** ; textes de l'interface en **français**.
 - Commits : Conventional Commits (`feat(mobile): ...`, `fix(api): ...`).
 - API REST : `/api/v1/...`, ressources au pluriel, erreurs au format RFC 7807 (`ProblemDetail`).
-- API organisée par domaine : `shop`, `product`, `customer`, `order`, `stock`, `expense`, `dashboard`.
+- API organisée par domaine : `shop`, `category`, `product`, `customer`, `order`, `stock`, `expense`, `dashboard`.
 - Mobile : UX mobile-first, utilisable à une main. Objectif : créer une commande en 20–30 s.
 - Garder le MVP simple : pas d'abstraction « pour plus tard » sans besoin réel.
 

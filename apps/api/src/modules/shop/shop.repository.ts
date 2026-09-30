@@ -1,4 +1,5 @@
-import { pool } from '../../db/pool.js';
+import { pool, withTransaction } from '../../db/pool.js';
+import { seedDefaultCategories } from '../category/category.repository.js';
 
 export type Shop = {
   id: string;
@@ -32,12 +33,17 @@ export async function findShopForOwner(shopId: string, ownerId: string): Promise
   return rows[0] ?? null;
 }
 
-export async function createShop(ownerId: string, input: ShopInput): Promise<Shop> {
-  const { rows } = await pool.query<Shop>(
-    `INSERT INTO shops (owner_id, name, description) VALUES ($1, $2, $3) RETURNING ${columns}`,
-    [ownerId, input.name, input.description],
-  );
-  return rows[0]!;
+/** Creates the shop with its standard product categories. */
+export function createShop(ownerId: string, input: ShopInput): Promise<Shop> {
+  return withTransaction(async (client) => {
+    const { rows } = await client.query<Shop>(
+      `INSERT INTO shops (owner_id, name, description) VALUES ($1, $2, $3) RETURNING ${columns}`,
+      [ownerId, input.name, input.description],
+    );
+    const shop = rows[0]!;
+    await seedDefaultCategories(client, shop.id);
+    return shop;
+  });
 }
 
 export async function updateShop(shopId: string, patch: Partial<ShopInput>): Promise<Shop> {

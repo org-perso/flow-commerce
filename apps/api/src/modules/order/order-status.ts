@@ -31,4 +31,12 @@ export const TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   RETOUR: [],
 };
 
+/** Orders still to be handled: not delivered, cancelled or returned. */
+export const OPEN_STATUSES: readonly OrderStatus[] = [
+  'EN_ATTENTE',
+  'CONFIRMEE',
+  'EN_PREPARATION',
+  'EN_LIVRAISON',
+];
+
 export const holdsStock = (status: OrderStatus) => STOCK_TAKEN_STATUSES.includes(status);

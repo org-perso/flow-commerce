@@ -4,13 +4,12 @@ import { useDeferredValue, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import {
-  ScreenHeader,
-  AlertBanner,
-  Button,
   EmptyState,
-  FilterChips,
+  InlineBanner,
   Screen,
+  ScreenHeader,
   SearchBar,
+  SegmentedControl,
 } from '@/components/ui';
 import { ProductRow } from '@/features/product/product-row';
 import { useProducts } from '@/features/product/use-products';
@@ -18,12 +17,6 @@ import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
 
 type Filter = 'all' | 'low' | 'archived';
-
-const filters = [
-  { value: 'all', label: 'Tous' },
-  { value: 'low', label: 'Stock faible' },
-  { value: 'archived', label: 'Archivés' },
-] as const;
 
 export default function StockScreen() {
   const [search, setSearch] = useState('');
@@ -39,44 +32,50 @@ export default function StockScreen() {
     lowStock: filter === 'low',
     archived: filter === 'archived',
   });
+  // Count shown on the "Stock faible" segment.
+  const lowStock = useProducts({ lowStock: true });
 
   const openNew = () => router.push('/products/new');
   const isFiltered = q !== '' || filter !== 'all';
 
   return (
     <Screen
-      header={<ScreenHeader title="Stock" />}
       scroll={false}
-      footer={
-        <Button
-          label="Ajouter un produit"
-          icon={Plus}
-          variant="primary"
-          fullWidth
-          onPress={openNew}
-        />
+      header={
+        <ScreenHeader title="Stock" action={{ label: 'Ajouter', icon: Plus, onPress: openNew }} />
       }
     >
-      <View style={styles.header}>
+      <View style={styles.controls}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Rechercher un produit" />
-        <FilterChips options={filters} value={filter} onChange={setFilter} />
+        <SegmentedControl
+          options={[
+            { key: 'all', label: 'Tous' },
+            { key: 'low', label: 'Stock faible', count: lowStock.data?.length },
+            { key: 'archived', label: 'Archivés' },
+          ]}
+          value={filter}
+          onChange={setFilter}
+        />
       </View>
 
       {products.isError && (
-        <AlertBanner
+        <InlineBanner
           tone="danger"
           message={apiErrorMessage(products.error)}
-          onPress={() => products.refetch()}
+          action={{ label: 'Réessayer', onPress: () => products.refetch() }}
         />
       )}
 
       <FlatList
         data={products.data ?? []}
         keyExtractor={(p) => p.id}
-        renderItem={({ item }) => (
-          <ProductRow product={item} onPress={() => router.push(`/products/${item.id}`)} />
+        renderItem={({ item, index }) => (
+          <ProductRow
+            product={item}
+            divider={index > 0}
+            onPress={() => router.push(`/products/${item.id}`)}
+          />
         )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={products.isRefetching} onRefresh={() => products.refetch()} />
@@ -94,21 +93,23 @@ export default function StockScreen() {
           )
         }
         style={styles.list}
+        contentContainerStyle={styles.listContent}
       />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
+  controls: {
     gap: theme.spacing[3],
   },
   list: {
     flex: 1,
     marginTop: -theme.spacing[3],
   },
-  separator: {
-    height: theme.spacing[2],
+  listContent: {
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
   },
   loader: {
     marginTop: theme.spacing[8],

@@ -5,7 +5,6 @@ import { currentShopId } from '../../http/context.js';
 import { idParam, notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
 import { optionalText, requiredText } from '../../http/schemas.js';
-import { phoneField } from './phone.js';
 import {
   deleteCustomer,
   findCustomer,
@@ -13,14 +12,23 @@ import {
   listCustomers,
   updateCustomer,
 } from './customer.repository.js';
+import { phoneField } from './phone.js';
 
-const createCustomerSchema = z.object({
-  name: requiredText(150),
-  phone: phoneField.default(null),
-  address: optionalText(1000).default(null),
-});
+/** Normalized, non-empty, without duplicates. */
+const phones = z
+  .array(phoneField)
+  .max(5, 'Five phone numbers at most.')
+  .transform((list) => [...new Set(list.filter((p): p is string => p !== null))]);
+
+const createCustomerSchema = z
+  .object({
+    name: requiredText(150),
+    phones: phones.default([]),
+    socialProfile: optionalText(255).default(null),
+  })
+  .strict();
 const updateCustomerSchema = z
-  .object({ name: requiredText(150), phone: phoneField, address: optionalText(1000) })
+  .object({ name: requiredText(150), phones, socialProfile: optionalText(255) })
   .partial()
   .strict();
 const listQuery = z.object({ q: z.string().trim().max(150).optional() });

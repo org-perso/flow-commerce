@@ -1,22 +1,32 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { MessageCircle, Phone } from 'lucide-react-native';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ArrowRight, CalendarDays, MessageCircle, Phone } from 'lucide-react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   AlertBanner,
   AppText,
   Button,
+  Dropdown,
   Screen,
   StatusBadge,
   type OrderStatus,
 } from '@/components/ui';
 import { callPhone, formatPhone, openWhatsApp } from '@/features/customer/contact';
 import type { Order } from '@/features/order/order-api';
-import { actionLabels, destructiveStatuses, TRANSITIONS } from '@/features/order/order-status';
-import { useChangeOrderStatus, useOrder } from '@/features/order/use-orders';
+import {
+  actionLabels,
+  destructiveStatuses,
+  SOURCE_LABELS,
+  TRANSITIONS,
+} from '@/features/order/order-status';
+import { DateChoice } from '@/features/order/date-choice';
+import { isOverdue } from '@/features/order/order-row';
+import { useChangeOrderStatus, useOrder, useUpdateOrder } from '@/features/order/use-orders';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
 import { textStyles, theme } from '@/theme';
-import { formatAr, formatDateTime } from '@/utils/format';
+import { formatAr, formatDateTime, formatDayLabel } from '@/utils/format';
 
 const confirmTexts: Partial<Record<OrderStatus, { title: string; message: string }>> = {
   ANNULEE: {
@@ -33,6 +43,10 @@ export default function OrderScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const order = useOrder(orderId);
   const changeStatus = useChangeOrderStatus(orderId);
+  const updateOrder = useUpdateOrder(orderId);
+  const insets = useSafeAreaInsets();
+  const [dateOpen, setDateOpen] = useState(false);
+  const [newDate, setNewDate] = useState<string | null>(null);
 
   if (!order.data) {
     return (
@@ -47,6 +61,7 @@ export default function OrderScreen() {
   }
 
   const o = order.data;
+  const overdue = isOverdue(o);
   const next = TRANSITIONS[o.status];
   const forward = next.filter((s) => !destructiveStatuses.includes(s));
   const destructive = next.filter((s) => destructiveStatuses.includes(s));
@@ -79,6 +94,52 @@ export default function OrderScreen() {
         <AlertBanner tone="danger" message={statusErrorMessage(changeStatus.error, o)} />
       )}
 
+      <View style={[styles.card, styles.dateCard]}>
+        <View style={styles.flex}>
+          <AppText variant="caption" color="inkMuted">
+            Date prévue
+          </AppText>
+          <AppText variant="heading" color={overdue ? 'statusCancelledFg' : 'ink'}>
+            {formatDayLabel(o.scheduledDate)}
+            {overdue ? ' · en retard' : ''}
+          </AppText>
+        </View>
+        {TRANSITIONS[o.status].length > 0 && (
+          <Button
+            label="Changer"
+            icon={CalendarDays}
+            compact
+            onPress={() => {
+              setNewDate(o.scheduledDate);
+              setDateOpen(true);
+            }}
+          />
+        )}
+      </View>
+
+      <Modal visible={dateOpen} animationType="slide" onRequestClose={() => setDateOpen(false)}>
+        <View style={[styles.modal, { paddingTop: insets.top + theme.spacing[3] }]}>
+          <AppText variant="heading">Date prévue</AppText>
+          <DateChoice value={newDate} onChange={setNewDate} />
+          {updateOrder.isError && (
+            <AlertBanner tone="danger" message={apiErrorMessage(updateOrder.error)} />
+          )}
+          <Button
+            label="Enregistrer la date"
+            fullWidth
+            loading={updateOrder.isPending}
+            onPress={() =>
+              newDate &&
+              updateOrder.mutate(
+                { scheduledDate: newDate },
+                { onSuccess: () => setDateOpen(false) },
+              )
+            }
+          />
+          <Button label="Annuler" variant="ghost" onPress={() => setDateOpen(false)} />
+        </View>
+      </Modal>
+
       <CustomerCard order={o} />
 
       <View style={styles.section}>
@@ -95,12 +156,14 @@ export default function OrderScreen() {
               <AppText style={styles.amount}>{formatAr(item.subtotal)}</AppText>
             </View>
           ))}
-          <View style={[styles.line, styles.lineBorder]}>
-            <AppText color="inkMuted" style={styles.flex}>
-              Livraison
-            </AppText>
-            <AppText style={styles.amount}>{formatAr(o.deliveryFee)}</AppText>
-          </View>
+          {o.delivery && (
+            <View style={[styles.line, styles.lineBorder]}>
+              <AppText color="inkMuted" style={styles.flex}>
+                Livraison
+              </AppText>
+              <AppText style={styles.amount}>{formatAr(o.deliveryFee)}</AppText>
+            </View>
+          )}
           <View style={[styles.line, styles.lineBorder]}>
             <AppText style={[styles.flex, styles.strong]}>Total à payer</AppText>
             <AppText style={styles.total}>{formatAr(o.totalAmount)}</AppText>
@@ -108,36 +171,50 @@ export default function OrderScreen() {
         </View>
       </View>
 
-      {(o.address || o.paymentMethod) && (
-        <View style={[styles.card, styles.details]}>
-          {o.address && <Detail label="Adresse de livraison" value={o.address} />}
-          {o.paymentMethod && <Detail label="Paiement" value={o.paymentMethod} />}
-        </View>
-      )}
+      <View style={[styles.card, styles.details]}>
+        <Detail
+          label="Livraison"
+          value={o.delivery ? 'À livrer' : 'Sans livraison (retrait ou remise en main propre)'}
+        />
+        {o.delivery?.place && <Detail label="Lieu" value={o.delivery.place} />}
+        {o.delivery?.address && <Detail label="Adresse" value={o.delivery.address} />}
+        {o.delivery?.note && <Detail label="Précisions" value={o.delivery.note} />}
+        {o.source && <Detail label="Source" value={SOURCE_LABELS[o.source]} />}
+        {o.paymentMethod && <Detail label="Paiement" value={o.paymentMethod} />}
+      </View>
 
       {next.length > 0 && (
         <View style={styles.section}>
           <AppText variant="heading">Suivi</AppText>
-          {forward.map((status, index) => (
+          {/* The usual next step as a button; every other allowed status in the list. */}
+          {forward[0] && (
             <Button
-              key={status}
-              label={actionLabels[status]}
-              variant={index === 0 ? 'primary' : 'secondary'}
+              label={actionLabels[forward[0]]}
+              icon={ArrowRight}
               fullWidth
-              loading={changeStatus.isPending && changeStatus.variables === status}
-              onPress={() => moveTo(status)}
+              loading={changeStatus.isPending}
+              onPress={() => moveTo(forward[0]!)}
             />
-          ))}
-          {destructive.map((status) => (
-            <Button
-              key={status}
-              label={actionLabels[status]}
-              variant="danger"
-              fullWidth
-              loading={changeStatus.isPending && changeStatus.variables === status}
-              onPress={() => moveTo(status)}
+          )}
+          {next.length > (forward[0] ? 1 : 0) && (
+            <Dropdown
+              title="Changer le statut"
+              value=""
+              onChange={(status) => status && moveTo(status)}
+              options={[
+                { value: '' as const, label: 'Changer le statut…' },
+                ...[...forward.slice(1), ...destructive].map((status) => ({
+                  value: status,
+                  label: theme.statusColors[status].label,
+                  leading: (
+                    <View
+                      style={[styles.dot, { backgroundColor: theme.statusColors[status].fg }]}
+                    />
+                  ),
+                })),
+              ]}
             />
-          ))}
+          )}
         </View>
       )}
     </Screen>
@@ -216,6 +293,22 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: theme.spacing[3],
+  },
+  dateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[3],
+  },
+  modal: {
+    flex: 1,
+    gap: theme.spacing[4],
+    padding: theme.spacing[4],
+    backgroundColor: theme.colors.surface,
+  },
+  dot: {
+    width: theme.layout.dot * 2,
+    height: theme.layout.dot * 2,
+    borderRadius: theme.radius.pill,
   },
   card: {
     backgroundColor: theme.colors.surfaceRaised,

@@ -17,7 +17,7 @@ describe('customers', () => {
     const created = await request
       .post(url())
       .set(alice)
-      .send({ name: 'Rakoto Jean', phone: '034 12 345 67', address: 'Analakely' });
+      .send({ name: 'Rakoto Jean', phones: ['034 12 345 67'], socialProfile: 'Rakoto Jean FB' });
     expect(created.status).toBe(201);
     await request.post(url()).set(alice).send({ name: 'Rasoa Hanta' });
 
@@ -27,8 +27,12 @@ describe('customers', () => {
     const updated = await request
       .patch(url(`/${created.body.id}`))
       .set(alice)
-      .send({ phone: null });
-    expect(updated.body).toMatchObject({ name: 'Rakoto Jean', phone: null, address: 'Analakely' });
+      .send({ phones: [] });
+    expect(updated.body).toMatchObject({
+      name: 'Rakoto Jean',
+      phones: [],
+      socialProfile: 'Rakoto Jean FB',
+    });
   });
 
   it('deletes a customer without orders, keeps one with orders', async () => {

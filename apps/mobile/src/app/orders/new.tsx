@@ -1,44 +1,78 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { UserPlus, X } from 'lucide-react-native';
-import { useDeferredValue, useState } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { useDeferredValue, useState, type ReactNode } from 'react';
+import { StyleSheet, Switch, View } from 'react-native';
 
 import {
   AlertBanner,
   AppText,
+  Avatar,
   Button,
   FilterChips,
+  ListGroup,
+  ListRow,
   Screen,
   SearchBar,
+  SectionHeader,
   TextField,
 } from '@/components/ui';
 import type { Customer } from '@/features/customer/customer-api';
-import { formatPhone } from '@/features/customer/contact';
-import { useCustomers } from '@/features/customer/use-customers';
-import { PAYMENT_METHODS } from '@/features/order/order-status';
+import { useCustomer, useCustomers } from '@/features/customer/use-customers';
+import type { OrderSource } from '@/features/order/order-api';
+import { DateChoice } from '@/features/order/date-choice';
+import { PAYMENT_METHODS, SOURCE_LABELS } from '@/features/order/order-status';
 import { QuantityStepper } from '@/features/order/quantity-stepper';
 import { useCreateOrder } from '@/features/order/use-orders';
 import type { Product } from '@/features/product/product-api';
 import { useProducts } from '@/features/product/use-products';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
 import { textStyles, theme } from '@/theme';
-import { formatAr } from '@/utils/format';
+import { businessToday, formatAr, formatPhone } from '@/utils/format';
 
 type Line = { product: Product; quantity: number };
-type NewCustomer = { name: string; phone: string; address: string };
 type CustomerChoice =
-  { kind: 'none' } | { kind: 'existing'; customer: Customer } | { kind: 'new'; draft: NewCustomer };
+  | { kind: 'none' }
+  | { kind: 'existing'; customer: Customer }
+  | { kind: 'new'; name: string; phone: string };
+
+const sourceOptions = [
+  { value: '', label: 'Non précisée' },
+  ...(Object.keys(SOURCE_LABELS) as OrderSource[]).map((value) => ({
+    value,
+    label: SOURCE_LABELS[value],
+  })),
+];
 
 const toInt = (text: string) => {
   const digits = text.replace(/\s/g, '');
   return /^\d+$/.test(digits) ? Number(digits) : null;
 };
 
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <View style={styles.section}>
+      <SectionHeader title={title} />
+      {children}
+    </View>
+  );
+}
+
 export default function NewOrderScreen() {
   const createOrder = useCreateOrder();
 
+  // Opened from a customer's page: that customer is preselected.
+  const params = useLocalSearchParams<{ customerId?: string }>();
+  const prefill = useCustomer(params.customerId);
+  const [prefillDismissed, setPrefillDismissed] = useState(false);
+
+  const [source, setSource] = useState<OrderSource | ''>('');
+
   // Customer
-  const [customer, setCustomer] = useState<CustomerChoice>({ kind: 'none' });
+  const [choice, setChoice] = useState<CustomerChoice>({ kind: 'none' });
+  const customer: CustomerChoice =
+    choice.kind === 'none' && prefill.data && !prefillDismissed
+      ? { kind: 'existing', customer: prefill.data }
+      : choice;
   const [customerSearch, setCustomerSearch] = useState('');
   const customerQuery = useDeferredValue(customerSearch.trim());
   const customerMatches = useCustomers(customerQuery, {
@@ -51,44 +85,41 @@ export default function NewOrderScreen() {
   const productQuery = useDeferredValue(productSearch.trim());
   const products = useProducts({ q: productQuery || undefined });
 
-  // Delivery & payment
+  // Planned day
+  const [scheduledDate, setScheduledDate] = useState<string | null>(businessToday());
+
+  // Delivery
+  const [isDelivery, setIsDelivery] = useState(false);
+  const [deliveryPlace, setDeliveryPlace] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryNote, setDeliveryNote] = useState('');
   const [deliveryFee, setDeliveryFee] = useState('');
-  const [address, setAddress] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('');
+
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [confirmNow, setConfirmNow] = useState(false);
   const [formError, setFormError] = useState<string>();
 
   const itemsAmount = lines.reduce((sum, l) => sum + l.quantity * l.product.sellingPrice, 0);
-  const fee = toInt(deliveryFee) ?? 0;
+  const fee = isDelivery ? (toInt(deliveryFee) ?? 0) : 0;
 
-  const selectCustomer = (c: Customer) => {
-    setCustomer({ kind: 'existing', customer: c });
-    if (!address && c.address) setAddress(c.address);
+  const resetCustomer = () => {
+    setPrefillDismissed(true);
+    setChoice({ kind: 'none' });
   };
 
   const startNewCustomer = () => {
     // Prefill from what was typed: digits go to the phone, text to the name.
     const typed = customerSearch.trim();
     const isPhone = /^[\d\s+.-]+$/.test(typed);
-    setCustomer({
-      kind: 'new',
-      draft: { name: isPhone ? '' : typed, phone: isPhone ? typed : '', address: '' },
-    });
+    setChoice({ kind: 'new', name: isPhone ? '' : typed, phone: isPhone ? typed : '' });
   };
 
-  const updateDraft = (patch: Partial<NewCustomer>) =>
-    setCustomer((c) => (c.kind === 'new' ? { ...c, draft: { ...c.draft, ...patch } } : c));
-
   const addProduct = (product: Product) => {
-    setLines((current) => {
-      const existing = current.find((l) => l.product.id === product.id);
-      if (existing) {
-        return current.map((l) =>
-          l.product.id === product.id ? { ...l, quantity: l.quantity + 1 } : l,
-        );
-      }
-      return [...current, { product, quantity: 1 }];
-    });
+    setLines((current) =>
+      current.some((l) => l.product.id === product.id)
+        ? current.map((l) => (l.product.id === product.id ? { ...l, quantity: l.quantity + 1 } : l))
+        : [...current, { product, quantity: 1 }],
+    );
     setProductSearch('');
   };
 
@@ -102,10 +133,11 @@ export default function NewOrderScreen() {
   const submit = async () => {
     setFormError(undefined);
     if (lines.length === 0) return setFormError('Ajoutez au moins un produit.');
-    if (customer.kind === 'new' && !customer.draft.name.trim()) {
+    if (customer.kind === 'new' && !customer.name.trim()) {
       return setFormError('Indiquez le nom du nouveau client.');
     }
-    if (deliveryFee.trim() && toInt(deliveryFee) === null) {
+    if (!scheduledDate) return setFormError('Indiquez une date valide (JJ/MM/AAAA).');
+    if (isDelivery && deliveryFee.trim() && toInt(deliveryFee) === null) {
       return setFormError('Frais de livraison : montant en Ariary, sans virgule.');
     }
 
@@ -114,16 +146,20 @@ export default function NewOrderScreen() {
         customerId: customer.kind === 'existing' ? customer.customer.id : null,
         customer:
           customer.kind === 'new'
-            ? {
-                name: customer.draft.name.trim(),
-                phone: customer.draft.phone.trim() || null,
-                address: customer.draft.address.trim() || address.trim() || null,
-              }
+            ? { name: customer.name.trim(), phone: customer.phone.trim() || null }
             : null,
         items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
-        deliveryFee: fee,
+        source: source || null,
+        scheduledDate,
+        delivery: isDelivery
+          ? {
+              place: deliveryPlace.trim() || null,
+              address: deliveryAddress.trim() || null,
+              note: deliveryNote.trim() || null,
+              fee,
+            }
+          : null,
         paymentMethod: paymentMethod || null,
-        address: address.trim() || null,
         status: confirmNow ? 'CONFIRMEE' : 'EN_ATTENTE',
       });
       router.replace(`/orders/${order.id}`);
@@ -158,42 +194,50 @@ export default function NewOrderScreen() {
         />
       }
     >
-      {/* Client */}
-      <View style={styles.section}>
-        <AppText variant="heading">Client</AppText>
+      <Section title="Source">
+        <FilterChips
+          options={sourceOptions}
+          value={source}
+          onChange={(value) => setSource(value as OrderSource | '')}
+        />
+      </Section>
+
+      <Section title="Client">
         {customer.kind === 'existing' && (
-          <View style={styles.card}>
-            <View style={styles.flex}>
-              <AppText style={styles.strong}>{customer.customer.name}</AppText>
-              <AppText variant="caption" color="inkMuted">
-                {customer.customer.phone
-                  ? formatPhone(customer.customer.phone)
-                  : 'Pas de téléphone'}
-              </AppText>
-            </View>
-            <Button label="Changer" variant="ghost" onPress={() => setCustomer({ kind: 'none' })} />
-          </View>
+          <ListGroup>
+            <ListRow
+              leading={<Avatar name={customer.customer.name} />}
+              title={customer.customer.name}
+              subtitle={
+                customer.customer.phones[0]
+                  ? formatPhone(customer.customer.phones[0])
+                  : 'Pas de téléphone'
+              }
+              trailing={<Button label="Changer" variant="ghost" compact onPress={resetCustomer} />}
+            />
+          </ListGroup>
         )}
         {customer.kind === 'new' && (
           <View style={styles.section}>
             <TextField
               label="Nom du client"
-              value={customer.draft.name}
-              onChangeText={(name) => updateDraft({ name })}
+              value={customer.name}
+              onChangeText={(name) => setChoice({ ...customer, name })}
               autoCapitalize="words"
             />
             <TextField
               label="Téléphone"
-              hint="Le client est retrouvé automatiquement par son numéro."
-              value={customer.draft.phone}
-              onChangeText={(phone) => updateDraft({ phone })}
+              hint="Si ce numéro est déjà connu, la fiche du client est réutilisée."
+              value={customer.phone}
+              onChangeText={(phone) => setChoice({ ...customer, phone })}
               keyboardType="phone-pad"
             />
             <Button
               label="Annuler le nouveau client"
               icon={X}
               variant="ghost"
-              onPress={() => setCustomer({ kind: 'none' })}
+              compact
+              onPress={resetCustomer}
             />
           </View>
         )}
@@ -202,77 +246,78 @@ export default function NewOrderScreen() {
             <SearchBar
               value={customerSearch}
               onChangeText={setCustomerSearch}
-              placeholder="Nom ou téléphone du client"
+              placeholder="Nom, téléphone ou profil du client"
             />
-            {customerQuery.length >= 2 &&
-              customerMatches.data?.slice(0, 5).map((c) => (
-                <Pressable
-                  key={c.id}
-                  onPress={() => selectCustomer(c)}
-                  style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-                >
-                  <View style={styles.flex}>
-                    <AppText style={styles.strong}>{c.name}</AppText>
-                    <AppText variant="caption" color="inkMuted">
-                      {c.phone ? formatPhone(c.phone) : 'Pas de téléphone'}
-                    </AppText>
-                  </View>
-                </Pressable>
-              ))}
+            {customerQuery.length >= 2 && !!customerMatches.data?.length && (
+              <ListGroup>
+                {customerMatches.data.slice(0, 5).map((c) => (
+                  <ListRow
+                    key={c.id}
+                    leading={<Avatar name={c.name} />}
+                    title={c.name}
+                    subtitle={
+                      c.phones[0] ? formatPhone(c.phones[0]) : (c.socialProfile ?? undefined)
+                    }
+                    onPress={() => setChoice({ kind: 'existing', customer: c })}
+                  />
+                ))}
+              </ListGroup>
+            )}
             <Button
               label="Nouveau client"
               icon={UserPlus}
               variant="ghost"
+              compact
               onPress={startNewCustomer}
             />
           </View>
         )}
-      </View>
+      </Section>
 
-      {/* Produits */}
-      <View style={styles.section}>
-        <AppText variant="heading">Produits</AppText>
-        {lines.map((line) => {
-          const overStock = line.quantity > line.product.stockQuantity;
-          return (
-            <View key={line.product.id} style={styles.card}>
-              <View style={styles.flex}>
-                <AppText style={styles.strong} numberOfLines={1}>
-                  {line.product.name}
-                </AppText>
-                <AppText variant="caption" color={overStock ? 'statusCancelledFg' : 'inkMuted'}>
-                  {formatAr(line.product.sellingPrice)} ·{' '}
-                  {overStock
-                    ? `Stock : ${line.product.stockQuantity} seulement`
-                    : `${line.product.stockQuantity} en stock`}
-                </AppText>
-              </View>
-              <QuantityStepper
-                value={line.quantity}
-                onChange={(q) => setQuantity(line.product.id, q)}
-              />
-            </View>
-          );
-        })}
+      <Section title="Produits">
+        {lines.length > 0 && (
+          <ListGroup>
+            {lines.map((line) => {
+              const overStock = line.quantity > line.product.stockQuantity;
+              return (
+                <ListRow
+                  key={line.product.id}
+                  leading={<Avatar name={line.product.name} imageUri={line.product.image} />}
+                  title={line.product.name}
+                  subtitle={`${formatAr(line.product.sellingPrice)} · ${
+                    overStock
+                      ? `stock : ${line.product.stockQuantity} seulement`
+                      : `${line.product.stockQuantity} en stock`
+                  }`}
+                  trailing={
+                    <QuantityStepper
+                      value={line.quantity}
+                      onChange={(q) => setQuantity(line.product.id, q)}
+                    />
+                  }
+                />
+              );
+            })}
+          </ListGroup>
+        )}
         <SearchBar
           value={productSearch}
           onChangeText={setProductSearch}
           placeholder="Ajouter un produit"
         />
-        {suggestions.map((p) => (
-          <Pressable
-            key={p.id}
-            onPress={() => addProduct(p)}
-            style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}
-          >
-            <AppText style={styles.flex} numberOfLines={1}>
-              {p.name}
-            </AppText>
-            <AppText variant="caption" color="inkMuted">
-              {formatAr(p.sellingPrice)} · {p.stockQuantity} en stock
-            </AppText>
-          </Pressable>
-        ))}
+        {suggestions.length > 0 && (
+          <ListGroup>
+            {suggestions.map((p) => (
+              <ListRow
+                key={p.id}
+                leading={<Avatar name={p.name} imageUri={p.image} />}
+                title={p.name}
+                subtitle={`${formatAr(p.sellingPrice)} · ${p.stockQuantity} en stock`}
+                onPress={() => addProduct(p)}
+              />
+            ))}
+          </ListGroup>
+        )}
         {products.data?.length === 0 && (
           <AppText color="inkMuted">
             {productQuery
@@ -280,26 +325,66 @@ export default function NewOrderScreen() {
               : "Ajoutez d'abord des produits dans l'onglet Stock."}
           </AppText>
         )}
-      </View>
+      </Section>
 
-      {/* Livraison & paiement */}
-      <View style={styles.section}>
-        <AppText variant="heading">Livraison et paiement</AppText>
-        <TextField
-          label="Frais de livraison (Ar)"
-          value={deliveryFee}
-          onChangeText={setDeliveryFee}
-          placeholder="0"
-          keyboardType="number-pad"
-        />
-        <TextField
-          label="Adresse de livraison"
-          value={address}
-          onChangeText={setAddress}
-          placeholder="Quartier, repère…"
-          multiline
-        />
-        <AppText variant="label">Paiement</AppText>
+      <Section title="Date prévue">
+        <DateChoice value={scheduledDate} onChange={setScheduledDate} />
+      </Section>
+
+      <Section title="Livraison">
+        <View style={styles.switchRow}>
+          <View style={styles.flex}>
+            <AppText style={styles.strong}>À livrer</AppText>
+            <AppText variant="caption" color="inkMuted">
+              {isDelivery
+                ? 'Lieu, adresse et frais de livraison.'
+                : 'Retrait ou remise en main propre.'}
+            </AppText>
+          </View>
+          <Switch
+            value={isDelivery}
+            onValueChange={setIsDelivery}
+            trackColor={{ true: theme.colors.blue, false: theme.colors.line }}
+            accessibilityLabel="À livrer"
+          />
+        </View>
+        {isDelivery && (
+          <View style={styles.section}>
+            <TextField
+              label="Lieu de livraison"
+              value={deliveryPlace}
+              onChangeText={setDeliveryPlace}
+              placeholder="Ex. Analakely, Ivandry…"
+              maxLength={150}
+            />
+            <TextField
+              label="Adresse de livraison"
+              value={deliveryAddress}
+              onChangeText={setDeliveryAddress}
+              placeholder="Lot, rue, repère…"
+              multiline
+              maxLength={1000}
+            />
+            <TextField
+              label="Précisions (facultatif)"
+              value={deliveryNote}
+              onChangeText={setDeliveryNote}
+              placeholder="Ex. appeler avant, portail bleu…"
+              multiline
+              maxLength={1000}
+            />
+            <TextField
+              label="Frais de livraison (Ar)"
+              value={deliveryFee}
+              onChangeText={setDeliveryFee}
+              placeholder="0"
+              keyboardType="number-pad"
+            />
+          </View>
+        )}
+      </Section>
+
+      <Section title="Paiement">
         <FilterChips
           options={[
             { value: '', label: 'Non précisé' },
@@ -308,16 +393,15 @@ export default function NewOrderScreen() {
           value={paymentMethod}
           onChange={setPaymentMethod}
         />
-      </View>
+      </Section>
 
-      {/* Récapitulatif */}
-      <View style={[styles.card, styles.summary]}>
+      <View style={styles.summary}>
         <SummaryLine label="Articles" value={formatAr(itemsAmount)} />
-        <SummaryLine label="Livraison" value={formatAr(fee)} />
+        {isDelivery && <SummaryLine label="Livraison" value={formatAr(fee)} />}
         <SummaryLine label="Total à payer" value={formatAr(itemsAmount + fee)} strong />
       </View>
 
-      <View style={styles.card}>
+      <View style={styles.switchRow}>
         <View style={styles.flex}>
           <AppText style={styles.strong}>Commande confirmée</AppText>
           <AppText variant="caption" color="inkMuted">
@@ -348,27 +432,35 @@ function SummaryLine({ label, value, strong }: { label: string; value: string; s
   );
 }
 
+function insufficientStockMessage(error: ApiError, lines: Line[]): string {
+  const name = lines.find((l) => l.product.id === error.body.productId)?.product.name;
+  return `Stock insuffisant${name ? ` pour « ${name} »` : ''} : il en reste ${String(error.body.available)}.`;
+}
+
 const styles = StyleSheet.create({
   section: {
     gap: theme.spacing[3],
   },
-  card: {
+  switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing[3],
-    padding: theme.spacing[3],
+    minHeight: theme.layout.rowMinHeight,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
     backgroundColor: theme.colors.surfaceRaised,
     borderRadius: theme.radius.md,
   },
-  suggestion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing[3],
-    minHeight: theme.sizes.tapMin,
-    paddingHorizontal: theme.spacing[3],
+  summary: {
+    gap: theme.spacing[2],
+    padding: theme.spacing[4],
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.line,
+  },
+  summaryLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   flex: {
     flex: 1,
@@ -376,28 +468,10 @@ const styles = StyleSheet.create({
   strong: {
     fontFamily: theme.typography.heading.fontFamily,
   },
-  summary: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    gap: theme.spacing[2],
-  },
-  summaryLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   amount: {
     fontVariant: ['tabular-nums'],
   },
   total: {
     ...textStyles.amountMd,
   },
-  pressed: {
-    opacity: 0.85,
-  },
 });
-
-function insufficientStockMessage(error: ApiError, lines: Line[]): string {
-  const name = lines.find((l) => l.product.id === error.body.productId)?.product.name;
-  return `Stock insuffisant${name ? ` pour « ${name} »` : ''} : il en reste ${String(error.body.available)}.`;
-}

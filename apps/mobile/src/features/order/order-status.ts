@@ -1,5 +1,7 @@
 import type { OrderStatus } from '@/components/ui';
 
+import type { OrderSource } from './order-api';
+
 /** Mirrors the API's TRANSITIONS table (apps/api/src/modules/order/order-status.ts). */
 export const TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   EN_ATTENTE: ['CONFIRMEE', 'ANNULEE'],
@@ -22,7 +24,26 @@ export const actionLabels: Record<OrderStatus, string> = {
   RETOUR: 'Enregistrer un retour',
 };
 
+/** Orders still to be handled (not delivered, cancelled or returned). */
+export const OPEN_STATUSES: readonly OrderStatus[] = [
+  'EN_ATTENTE',
+  'CONFIRMEE',
+  'EN_PREPARATION',
+  'EN_LIVRAISON',
+];
+
 /** Cancelling / returning gives the stock back: always confirmed by the user. */
 export const destructiveStatuses: readonly OrderStatus[] = ['ANNULEE', 'RETOUR'];
 
 export const PAYMENT_METHODS = ['Espèces', 'MVola', 'Orange Money', 'Airtel Money'] as const;
+
+export const SOURCE_LABELS: Record<OrderSource, string> = {
+  FACEBOOK: 'Facebook',
+  MESSENGER: 'Messenger',
+  WHATSAPP: 'WhatsApp',
+  INSTAGRAM: 'Instagram',
+  TIKTOK: 'TikTok',
+  APPEL: 'Appel',
+  BOUTIQUE: 'En boutique',
+  AUTRE: 'Autre',
+};

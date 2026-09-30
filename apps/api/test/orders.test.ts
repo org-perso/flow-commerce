@@ -40,7 +40,7 @@ async function createOrder(body: Record<string, unknown> = {}) {
         { productId: soap.id, quantity: 2 },
         { productId: tea.id, quantity: 3 },
       ],
-      deliveryFee: 3000,
+      delivery: { place: 'Analakely', fee: 3000 },
       ...body,
     });
   expect(res.status).toBe(201);
@@ -53,6 +53,7 @@ describe('creating orders', () => {
     expect(order).toMatchObject({
       status: 'EN_ATTENTE',
       itemsAmount: 2 * 9000 + 3 * 15000,
+      delivery: { place: 'Analakely', address: null, note: null },
       deliveryFee: 3000,
       totalAmount: 63000 + 3000,
     });
@@ -95,15 +96,6 @@ describe('creating orders', () => {
     await createOrder({ status: 'CONFIRMEE' });
     expect(await stockOf(alice, shopId, soap.id)).toBe(8);
     expect(await stockOf(alice, shopId, tea.id)).toBe(2);
-  });
-
-  it('uses the customer address by default', async () => {
-    const customer = await request
-      .post(`/api/v1/shops/${shopId}/customers`)
-      .set(alice)
-      .send({ name: 'Rakoto', address: 'Analakely' });
-    const order = await createOrder({ customerId: customer.body.id });
-    expect(order).toMatchObject({ address: 'Analakely', customer: { name: 'Rakoto' } });
   });
 
   it('rejects archived products, products and customers of another shop', async () => {
@@ -225,7 +217,7 @@ describe('editing orders', () => {
     const res = await request
       .patch(url(`/${order.id}`))
       .set(alice)
-      .send({ items: [{ productId: soap.id, quantity: 1 }], deliveryFee: 0 });
+      .send({ items: [{ productId: soap.id, quantity: 1 }], delivery: null });
     expect(res.body).toMatchObject({ itemsAmount: 9000, deliveryFee: 0, totalAmount: 9000 });
   });
 
@@ -240,7 +232,7 @@ describe('editing orders', () => {
     const fee = await request
       .patch(url(`/${order.id}`))
       .set(alice)
-      .send({ deliveryFee: 5000, paymentMethod: 'MVola' });
+      .send({ delivery: { place: 'Ivandry', fee: 5000 }, paymentMethod: 'MVola' });
     expect(fee.body).toMatchObject({
       deliveryFee: 5000,
       totalAmount: 63000 + 5000,

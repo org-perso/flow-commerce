@@ -120,3 +120,25 @@ export function groupByDay<T>(
   }
   return sections.map(({ title, data }) => ({ title, data }));
 }
+
+/** YYYY-MM-DD shifted by `days`. */
+export function addDays(iso: string, days: number): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+const weekdayFormat = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'UTC',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+
+/** Planned day for humans: "Aujourd'hui", "Demain", "Hier", else "mer. 1 oct.". */
+export function formatDayLabel(iso: string, today = businessToday()): string {
+  if (iso === today) return "Aujourd'hui";
+  if (iso === addDays(today, 1)) return 'Demain';
+  if (iso === addDays(today, -1)) return 'Hier';
+  return weekdayFormat.format(new Date(`${iso}T00:00:00Z`));
+}

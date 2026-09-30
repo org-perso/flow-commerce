@@ -1,17 +1,59 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { MessageCircle, Pencil, Phone } from 'lucide-react-native';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { MessageCircle, Pencil, Phone, Plus, type LucideIcon } from 'lucide-react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { AlertBanner, AppText, Button, KpiCard, Screen } from '@/components/ui';
-import { callPhone, formatPhone, openWhatsApp } from '@/features/customer/contact';
+import {
+  AppText,
+  Avatar,
+  Button,
+  EmptyState,
+  InlineBanner,
+  KpiCard,
+  ListGroup,
+  ListRow,
+  Screen,
+  SectionHeader,
+} from '@/components/ui';
+import { callPhone, openWhatsApp } from '@/features/customer/contact';
 import { useCustomer, useDeleteCustomer } from '@/features/customer/use-customers';
 import { OrderRow } from '@/features/order/order-row';
 import { useOrders } from '@/features/order/use-orders';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
-import { theme } from '@/theme';
-import { formatAr } from '@/utils/format';
+import { hitSlopFor, theme } from '@/theme';
+import { formatAr, formatPhone } from '@/utils/format';
 
 const SOLD = ['CONFIRMEE', 'EN_PREPARATION', 'EN_LIVRAISON', 'LIVREE'];
+
+function QuickAction({
+  icon: Icon,
+  label,
+  onPress,
+  disabled,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      style={({ pressed }) => [
+        styles.quick,
+        disabled && styles.disabled,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Icon size={theme.layout.iconMd} color={theme.colors.blue} strokeWidth={2} />
+      <AppText variant="label" color="ink" numberOfLines={1}>
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
 
 export default function CustomerScreen() {
   const { customerId } = useLocalSearchParams<{ customerId: string }>();
@@ -23,7 +65,7 @@ export default function CustomerScreen() {
     return (
       <Screen edges={[]}>
         {customer.isError ? (
-          <AlertBanner tone="danger" message={apiErrorMessage(customer.error)} />
+          <InlineBanner tone="danger" message={apiErrorMessage(customer.error)} />
         ) : (
           <ActivityIndicator color={theme.colors.ink} />
         )}
@@ -32,6 +74,7 @@ export default function CustomerScreen() {
   }
 
   const c = customer.data;
+  const mainPhone = c.phones[0];
   const list = orders.data ?? [];
   const spent = list
     .filter((o) => SOLD.includes(o.status))
@@ -56,27 +99,92 @@ export default function CustomerScreen() {
 
   return (
     <Screen edges={[]}>
-      <Stack.Screen options={{ title: c.name }} />
+      <Stack.Screen
+        options={{
+          title: c.name,
+          headerRight: () => (
+            <Button
+              label="Modifier"
+              icon={Pencil}
+              compact
+              onPress={() =>
+                router.push({ pathname: '/customers/[customerId]/edit', params: { customerId } })
+              }
+            />
+          ),
+        }}
+      />
 
-      <View style={styles.card}>
-        <AppText variant="title">{c.name}</AppText>
-        <AppText color="inkMuted">{c.phone ? formatPhone(c.phone) : 'Pas de téléphone'}</AppText>
-        {c.address && <AppText>{c.address}</AppText>}
+      <View style={styles.identity}>
+        <Avatar name={c.name} />
+        <View style={styles.flex}>
+          <AppText variant="heading" numberOfLines={1}>
+            {c.name}
+          </AppText>
+          {c.socialProfile && (
+            <AppText variant="caption" color="inkMuted" numberOfLines={1}>
+              {c.socialProfile}
+            </AppText>
+          )}
+        </View>
       </View>
 
-      {c.phone && (
-        <View style={styles.row}>
-          <View style={styles.cell}>
-            <Button label="Appeler" icon={Phone} fullWidth onPress={() => callPhone(c.phone!)} />
-          </View>
-          <View style={styles.cell}>
-            <Button
-              label="WhatsApp"
-              icon={MessageCircle}
-              fullWidth
-              onPress={() => openWhatsApp(c.phone!)}
-            />
-          </View>
+      <View style={styles.quickRow}>
+        <QuickAction
+          icon={Phone}
+          label="Appeler"
+          disabled={!mainPhone}
+          onPress={() => mainPhone && callPhone(mainPhone)}
+        />
+        <QuickAction
+          icon={MessageCircle}
+          label="WhatsApp"
+          disabled={!mainPhone}
+          onPress={() => mainPhone && openWhatsApp(mainPhone)}
+        />
+        <QuickAction
+          icon={Plus}
+          label="Commande"
+          onPress={() => router.push({ pathname: '/orders/new', params: { customerId } })}
+        />
+      </View>
+
+      {c.phones.length > 0 && (
+        <View style={styles.section}>
+          <SectionHeader title={c.phones.length > 1 ? 'Numéros' : 'Numéro'} />
+          <ListGroup>
+            {c.phones.map((phone, index) => (
+              <ListRow
+                key={phone}
+                title={formatPhone(phone)}
+                subtitle={index === 0 ? 'Principal' : undefined}
+                trailing={
+                  <View style={styles.phoneActions}>
+                    <Pressable
+                      onPress={() => callPhone(phone)}
+                      accessibilityLabel={`Appeler le ${formatPhone(phone)}`}
+                      hitSlop={hitSlopFor(theme.layout.controlHeight)}
+                      style={styles.iconButton}
+                    >
+                      <Phone size={theme.layout.iconMd} color={theme.colors.blue} strokeWidth={2} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => openWhatsApp(phone)}
+                      accessibilityLabel={`WhatsApp ${formatPhone(phone)}`}
+                      hitSlop={hitSlopFor(theme.layout.controlHeight)}
+                      style={styles.iconButton}
+                    >
+                      <MessageCircle
+                        size={theme.layout.iconMd}
+                        color={theme.colors.blue}
+                        strokeWidth={2}
+                      />
+                    </Pressable>
+                  </View>
+                }
+              />
+            ))}
+          </ListGroup>
         </View>
       )}
 
@@ -86,10 +194,10 @@ export default function CustomerScreen() {
       </View>
 
       <View style={styles.section}>
-        <AppText variant="heading">Commandes</AppText>
+        <SectionHeader title="Commandes" />
         {orders.isPending && <ActivityIndicator color={theme.colors.ink} />}
-        {orders.data?.length === 0 && (
-          <AppText color="inkMuted">Aucune commande pour ce client.</AppText>
+        {orders.isSuccess && list.length === 0 && (
+          <EmptyState message="Aucune commande pour ce client." />
         )}
         {list.map((order) => (
           <OrderRow
@@ -101,36 +209,39 @@ export default function CustomerScreen() {
         ))}
       </View>
 
-      <View style={styles.section}>
-        {deleteError && <AlertBanner tone="danger" message={deleteError} />}
+      {deleteError && <InlineBanner tone="danger" message={deleteError} />}
+      {list.length === 0 && orders.isSuccess && (
         <Button
-          label="Modifier le client"
-          icon={Pencil}
+          label="Supprimer le client"
+          variant="danger"
           fullWidth
-          onPress={() =>
-            router.push({ pathname: '/customers/[customerId]/edit', params: { customerId } })
-          }
+          loading={deleteCustomer.isPending}
+          onPress={confirmDelete}
         />
-        {list.length === 0 && (
-          <Button
-            label="Supprimer le client"
-            variant="danger"
-            fullWidth
-            loading={deleteCustomer.isPending}
-            onPress={confirmDelete}
-          />
-        )}
-      </View>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  identity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[3],
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: theme.spacing[2],
+  },
+  quick: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: theme.spacing[1],
-    backgroundColor: theme.colors.surfaceRaised,
+    minHeight: theme.layout.rowMinHeight,
+    paddingVertical: theme.spacing[2],
     borderRadius: theme.radius.md,
-    padding: theme.spacing[4],
+    backgroundColor: theme.colors.surfaceRaised,
   },
   section: {
     gap: theme.spacing[2],
@@ -139,7 +250,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing[3],
   },
-  cell: {
+  phoneActions: {
+    flexDirection: 'row',
+    gap: theme.spacing[2],
+  },
+  iconButton: {
+    width: theme.layout.controlHeight,
+    height: theme.layout.controlHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.navySoft,
+  },
+  flex: {
     flex: 1,
+  },
+  disabled: {
+    opacity: theme.layout.pressedOpacity / 2,
+  },
+  pressed: {
+    opacity: theme.layout.pressedOpacity,
   },
 });
