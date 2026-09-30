@@ -1,14 +1,15 @@
+import { Mail } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { AlertBanner, Button } from '@/components/ui';
+import { AppText, Button } from '@/components/ui';
 import { theme } from '@/theme';
 
 import { authErrorMessage } from './auth-errors';
 import { refreshEmailVerified, resendVerificationEmail } from './auth-service';
 import { useAuthStore } from './auth-store';
 
-/** Non-blocking reminder shown while the email is not verified. */
+/** Non-blocking reminder shown while the email is not verified (account screen). */
 export function EmailVerificationBanner() {
   const user = useAuthStore((s) => s.user);
   useAuthStore((s) => s.version);
@@ -36,16 +37,38 @@ export function EmailVerificationBanner() {
 
   return (
     <View style={styles.root}>
-      <AlertBanner message={`Vérifiez votre email : un lien a été envoyé à ${user.email}.`} />
-      {feedback && <AlertBanner tone={feedback.tone} message={feedback.message} />}
+      <View style={styles.message}>
+        <Mail size={theme.layout.iconMd} color={theme.colors.goldInk} strokeWidth={2} />
+        <AppText color="goldInk" style={styles.flex}>
+          Confirmez votre email avec le lien envoyé pour sécuriser votre compte.
+        </AppText>
+      </View>
+      {feedback && (
+        <AppText
+          variant="caption"
+          color={feedback.tone === 'success' ? 'statusDeliveredFg' : 'statusCancelledFg'}
+        >
+          {feedback.message}
+        </AppText>
+      )}
       <View style={styles.actions}>
-        <Button label="J'ai vérifié" loading={pending === 'check'} onPress={() => run('check')} />
-        <Button
-          label="Renvoyer l'email"
-          variant="ghost"
-          loading={pending === 'resend'}
-          onPress={() => run('resend')}
-        />
+        <View style={styles.flex}>
+          <Button
+            label="J'ai vérifié"
+            fullWidth
+            loading={pending === 'check'}
+            onPress={() => run('check')}
+          />
+        </View>
+        <View style={styles.flex}>
+          <Button
+            label="Renvoyer"
+            variant="ghost"
+            fullWidth
+            loading={pending === 'resend'}
+            onPress={() => run('resend')}
+          />
+        </View>
       </View>
     </View>
   );
@@ -53,11 +76,20 @@ export function EmailVerificationBanner() {
 
 const styles = StyleSheet.create({
   root: {
+    gap: theme.spacing[3],
+    padding: theme.spacing[4],
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.goldSoft,
+  },
+  message: {
+    flexDirection: 'row',
     gap: theme.spacing[2],
   },
   actions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing[2],
+    gap: theme.spacing[3],
+  },
+  flex: {
+    flex: 1,
   },
 });

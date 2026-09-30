@@ -1,11 +1,11 @@
 import type { LucideIcon } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 
-import { theme } from '@/theme';
+import { hitSlopFor, theme } from '@/theme';
 
 import { AppText } from './app-text';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'dark' | 'secondary' | 'ghost' | 'danger';
 
 type ButtonProps = {
   label: string;
@@ -14,10 +14,14 @@ type ButtonProps = {
   icon?: LucideIcon;
   loading?: boolean;
   fullWidth?: boolean;
+  /** Smaller visual size (header actions); the touch area stays ≥ tapMin via hitSlop. */
+  compact?: boolean;
 };
 
 const variantColors = {
   primary: { bg: theme.colors.gold, fg: theme.colors.onGold },
+  /** Strong action that is not the gold one (e.g. an order's next step). */
+  dark: { bg: theme.colors.navy, fg: theme.colors.onNavy },
   secondary: { bg: theme.colors.surfaceRaised, fg: theme.colors.ink },
   ghost: { bg: 'transparent', fg: theme.colors.blue },
   danger: { bg: theme.colors.statusCancelledBg, fg: theme.colors.statusCancelledFg },
@@ -30,8 +34,10 @@ export function Button({
   icon: Icon,
   loading = false,
   fullWidth = false,
+  compact = false,
 }: ButtonProps) {
   const { bg, fg } = variantColors[variant];
+  const iconSize = compact ? theme.layout.iconSm : theme.layout.iconMd;
 
   return (
     <Pressable
@@ -40,11 +46,13 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ busy: loading, disabled: loading }}
+      hitSlop={compact ? hitSlopFor(theme.layout.controlHeight) : undefined}
       style={({ pressed }) => [
         styles.base,
         { backgroundColor: bg },
         variant === 'primary' && styles.primary,
         variant === 'secondary' && styles.secondary,
+        compact && styles.compact,
         fullWidth && styles.fullWidth,
         pressed && styles.pressed,
       ]}
@@ -52,9 +60,11 @@ export function Button({
       {loading ? (
         <ActivityIndicator size="small" color={fg} />
       ) : (
-        Icon && <Icon size={20} color={fg} strokeWidth={2} />
+        Icon && <Icon size={iconSize} color={fg} strokeWidth={2} />
       )}
-      <AppText style={[styles.label, { color: fg }]}>{label}</AppText>
+      <AppText style={[compact ? styles.labelCompact : styles.label, { color: fg }]}>
+        {label}
+      </AppText>
     </Pressable>
   );
 }
@@ -62,7 +72,7 @@ export function Button({
 const styles = StyleSheet.create({
   base: {
     minHeight: theme.sizes.tapMin,
-    paddingHorizontal: 20,
+    paddingHorizontal: theme.spacing[4] + theme.spacing[1],
     borderRadius: theme.radius.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -78,14 +88,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.line,
   },
+  compact: {
+    minHeight: theme.layout.controlHeight,
+    paddingHorizontal: theme.spacing[3],
+    gap: theme.spacing[1],
+  },
   fullWidth: {
     alignSelf: 'stretch',
   },
   pressed: {
-    opacity: 0.85,
+    opacity: theme.layout.pressedOpacity,
   },
   label: {
     ...theme.typography.body,
+    fontFamily: theme.typography.heading.fontFamily,
+  },
+  labelCompact: {
+    ...theme.typography.label,
     fontFamily: theme.typography.heading.fontFamily,
   },
 });

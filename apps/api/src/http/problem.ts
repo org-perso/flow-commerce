@@ -25,6 +25,15 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     problem = new ProblemError(400, 'Validation Failed', 'The request is invalid.', {
       errors: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
     });
+  } else if (err?.code === '23505') {
+    problem = new ProblemError(409, 'Conflict', 'This resource already exists.');
+  } else if (err?.code === '23503' || err?.code === '23514') {
+    // FK / CHECK violation: the data breaks a business rule enforced by the database.
+    problem = new ProblemError(
+      422,
+      'Unprocessable Content',
+      'The request violates a data constraint.',
+    );
   } else if (err?.type === 'entity.parse.failed') {
     problem = new ProblemError(400, 'Bad Request', 'Malformed JSON body.');
   } else {
