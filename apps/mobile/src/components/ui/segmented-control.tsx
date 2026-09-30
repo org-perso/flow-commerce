@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { hitSlopFor, theme } from '@/theme';
 
@@ -29,7 +29,10 @@ export function SegmentedControl<K extends string>({
           return (
             <Pressable
               key={option.key}
-              onPress={() => onChange(option.key)}
+              onPress={() => {
+                Keyboard.dismiss();
+                onChange(option.key);
+              }}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               hitSlop={hitSlopFor(theme.layout.controlHeight)}

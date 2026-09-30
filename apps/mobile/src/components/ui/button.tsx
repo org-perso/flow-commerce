@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, StyleSheet } from 'react-native';
 
 import { hitSlopFor, theme } from '@/theme';
 
@@ -41,7 +41,10 @@ export function Button({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        Keyboard.dismiss();
+        onPress();
+      }}
       disabled={loading}
       accessibilityRole="button"
       accessibilityLabel={label}

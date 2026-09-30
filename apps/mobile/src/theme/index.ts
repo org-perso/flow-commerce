@@ -21,6 +21,8 @@ export const theme = {
   layout: {
     /** Avatar / product thumbnail in lists. */
     avatar: 40,
+    /** FlowCommerce logo on the sign-in screens. */
+    appLogo: 56,
     /** Shop logo and account avatar in the navy header. */
     shopLogo: 32,
     /** Central "new order" button of the tab bar. */

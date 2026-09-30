@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui';
@@ -18,11 +18,22 @@ export function AuthScaffold({ title, subtitle, children }: AuthScaffoldProps) {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
           <View style={styles.brand}>
-            <AppText variant="title" color="onNavy">
-              FlowCommerce
-            </AppText>
+            <View style={styles.brandRow}>
+              <Image
+                source={require('@/assets/images/logo.png')}
+                style={styles.logo}
+                accessibilityIgnoresInvertColors
+              />
+              <AppText variant="title" color="onNavy">
+                FlowCommerce
+              </AppText>
+            </View>
             <AppText variant="label" color="onNavyMuted">
               De la commande au bénéfice, directement depuis votre téléphone.
             </AppText>
@@ -63,6 +74,16 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: theme.radius.lg,
     borderTopRightRadius: theme.radius.lg,
     padding: theme.spacing[6],
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[3],
+  },
+  logo: {
+    width: theme.layout.appLogo,
+    height: theme.layout.appLogo,
+    borderRadius: theme.radius.md,
   },
   heading: {
     gap: theme.spacing[1],

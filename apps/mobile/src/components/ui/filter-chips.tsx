@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Keyboard, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { theme } from '@/theme';
 
@@ -23,7 +23,10 @@ export function FilterChips<T extends string>({ options, value, onChange }: Filt
         return (
           <Pressable
             key={option.value}
-            onPress={() => onChange(option.value)}
+            onPress={() => {
+              Keyboard.dismiss();
+              onChange(option.value);
+            }}
             accessibilityRole="button"
             accessibilityState={{ selected }}
             hitSlop={{ top: 6, bottom: 6 }}

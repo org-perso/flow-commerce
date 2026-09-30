@@ -1,6 +1,6 @@
 import { Check, ChevronDown, type LucideIcon } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Keyboard, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { hitSlopFor, theme } from '@/theme';
@@ -34,7 +34,10 @@ export function Dropdown<V extends string>({
   return (
     <>
       <Pressable
-        onPress={() => setOpen(true)}
+        onPress={() => {
+          Keyboard.dismiss();
+          setOpen(true);
+        }}
         accessibilityRole="button"
         accessibilityLabel={`${title} : ${current?.label ?? ''}`}
         hitSlop={hitSlopFor(theme.layout.controlHeight)}

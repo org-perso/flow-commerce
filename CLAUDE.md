@@ -97,11 +97,26 @@ docker compose up -d --build       # Postgres + API (migrations au démarrage)
 - ⏳ Modifier les lignes d'une commande en attente (l'API le permet déjà)
 
 **Avant la mise en production**
-- ⏳ Déploiement Render (API + Postgres) et variables EAS pour les builds `preview` / `production`
-- ⏳ Photos produits : activer Firebase Storage (plan Blaze requis), renseigner `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET`, publier les règles — en attendant, produits sans photo
-- ⏳ Règles Firebase Storage à durcir, limite de requêtes (rate limiting) sur l'API
+- ✅ API déployée sur Render (Docker, Frankfurt), base Postgres Neon ; APK `preview` construit avec EAS
+- ⏳ Passer Render en Starter (7 $/mois, plus de mise en veille) ; Neon payant dès les premiers clients payants (sauvegardes)
+- ⏳ SHA-1 de la clé EAS dans Firebase (connexion Google dans l'APK)
+- ⏳ Limite de requêtes (rate limiting) sur l'API
+- ⏳ Photos produits : activer Firebase Storage (plan Blaze), `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET`, règles (à durcir) — en attendant, produits sans photo
+- ⏳ Nom et logo : icône « F doré + flèche montante » sur fond bleu marine (voir docs/lancement.md), écran de démarrage, logo sur la connexion
+- ⏳ Publication Play Store (compte 25 $, fichier `.aab`, empreinte SHA-1 de Google Play dans Firebase)
 - ⏳ Notifications push (FCM) — définir d'abord quand notifier le vendeur
 - ⏳ Logo de la boutique (emplacement déjà prévu dans l'en-tête)
+
+**Versions suivantes**
+- ⏳ 1.0.1 — retours de test de l'APK (à lister)
+- ⏳ 1.1.0 — Hors ligne niveau A : cache persistant (ouverture instantanée), réveil de l'API au lancement, bandeau « Hors ligne »
+- ⏳ 1.2.0 — Équipe et rôles : Propriétaire, Gérant (?), Community Manager, Livreur ; `shop_members`, invitations, `orders.assigned_to` (hors périmètre MVP 1, décision à prendre)
+- ⏳ Hors ligne niveau B : actions en file d'attente synchronisées (id de commande généré par le téléphone, conflits de stock)
+- ⏳ Filtres Commandes « non payées » (`?isPaid=false`) et « sans client » (`?withoutCustomer=true`)
+- ⏳ Réduire la taille de l'APK : architectures `arm64-v8a` + `armeabi-v7a`, R8
+- ⏳ Mises à jour sans Play Store (EAS Update / `expo-updates`)
+
+**Gestion des versions** : `version` de `app.json` changée à la main (1.0.x corrections, 1.x.0 fonctionnalités) + tag Git `vX.Y.Z` ; le numéro de build Android est incrémenté par EAS (`autoIncrement`). L'API ne doit jamais casser les anciennes versions de l'app encore installées.
 
 ## Hors périmètre MVP 1 — ne pas implémenter
 

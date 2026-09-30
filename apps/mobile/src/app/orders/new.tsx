@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useDeferredValue, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import {
   AlertBanner,
@@ -546,7 +546,10 @@ function ChoiceCard({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        Keyboard.dismiss();
+        onPress();
+      }}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       style={({ pressed }) => [
@@ -590,7 +593,10 @@ function ChipGroup<T extends string>({
         return (
           <Pressable
             key={o.value}
-            onPress={() => onChange(o.value)}
+            onPress={() => {
+              Keyboard.dismiss();
+              onChange(o.value);
+            }}
             accessibilityRole="button"
             accessibilityState={{ selected }}
             hitSlop={hitSlopFor(theme.layout.controlHeight)}

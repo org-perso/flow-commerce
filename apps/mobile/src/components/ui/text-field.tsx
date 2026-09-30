@@ -57,13 +57,13 @@ const styles = StyleSheet.create({
     minHeight: theme.sizes.tapMin,
     paddingHorizontal: theme.spacing[3],
     backgroundColor: theme.colors.surfaceRaised,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.line,
     borderRadius: theme.radius.md,
   },
   focused: {
     borderColor: theme.colors.focus,
-    borderWidth: 2,
+    borderWidth: 1,
   },
   invalid: {
     borderColor: theme.colors.statusCancelledFg,
