@@ -1,123 +1,280 @@
-import { Plus } from 'lucide-react-native';
-import { StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   AlertBanner,
   AppText,
-  Button,
-  KpiCard,
   Screen,
-  StatusBadge,
+  ScreenHeader,
+  SegmentedControl,
   type OrderStatus,
 } from '@/components/ui';
+import type { Dashboard, DashboardPeriod } from '@/features/dashboard/dashboard-api';
+import { GettingStarted } from '@/features/dashboard/getting-started';
+import { RevenueCard } from '@/features/dashboard/revenue-card';
+import { TodoCard } from '@/features/dashboard/todo-card';
+import { useDashboard } from '@/features/dashboard/use-dashboard';
+import { useExpenses } from '@/features/expense/use-expenses';
+import { useProducts } from '@/features/product/use-products';
+import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
-import { EmailVerificationBanner } from '@/features/auth/email-verification-banner';
-import { useMyShop } from '@/features/shop/use-shop';
 import { formatAr } from '@/utils/format';
 
-// Static data until the dashboard API exists.
-const recentOrders: {
-  id: string;
-  customer: string;
-  summary: string;
-  total: number;
-  status: OrderStatus;
-}[] = [
-  {
-    id: '1',
-    customer: 'Rakoto Jean',
-    summary: 'Thé Hibiscus × 3',
-    total: 45000,
-    status: 'EN_LIVRAISON',
-  },
-  {
-    id: '2',
-    customer: 'Rasoa Hanta',
-    summary: 'Savon coco × 2',
-    total: 18000,
-    status: 'EN_ATTENTE',
-  },
+const periods = [
+  { key: 'today', label: "Aujourd'hui" },
+  { key: '7d', label: '7 jours' },
+  { key: '30d', label: '30 jours' },
+] as const;
+
+const statusCounters: { status: OrderStatus; label: string }[] = [
+  { status: 'EN_ATTENTE', label: 'En attente' },
+  { status: 'CONFIRMEE', label: 'Confirmée' },
+  { status: 'EN_LIVRAISON', label: 'En livraison' },
+  { status: 'LIVREE', label: 'Livrée' },
 ];
 
 export default function DashboardScreen() {
-  const { data: shop } = useMyShop();
+  const [period, setPeriod] = useState<DashboardPeriod>('today');
+  const dashboard = useDashboard(period);
+  const d = dashboard.data;
+  const products = useProducts({});
+  const expenses = useExpenses({});
+
+  const hasProducts = (products.data?.length ?? 0) > 0;
+  const hasOrders = (d?.recentOrders.length ?? 0) > 0;
+  const hasExpenses = (expenses.data?.items.length ?? 0) > 0;
+  // Brand-new shop: only the first steps, no wall of zeros.
+  const isEmptyShop = !!d && products.isSuccess && !hasProducts && !hasOrders;
 
   return (
     <Screen
-      footer={
-        <Button
-          label="Nouvelle commande"
-          icon={Plus}
-          variant="primary"
-          fullWidth
-          onPress={() => {}}
-        />
-      }
+      header={<ScreenHeader />}
+      onRefresh={() => dashboard.refetch()}
+      refreshing={dashboard.isRefetching}
     >
-      <EmailVerificationBanner />
-      <View style={styles.section}>
-        <AppText variant="caption" color="inkMuted">
-          Bonjour, {shop?.name}
-        </AppText>
-        <KpiCard
-          variant="hero"
-          label="CA aujourd'hui"
-          value={formatAr(450000)}
-          caption={`Bénéfice estimé · ${formatAr(126000)}`}
-        />
-        <View style={styles.kpiRow}>
-          <KpiCard label="En attente" value="5" onPress={() => {}} />
-          <KpiCard label="En livraison" value="12" onPress={() => {}} />
-          <KpiCard label="Livrées" value="4" onPress={() => {}} />
-        </View>
-        <AlertBanner message="3 produits ont un stock faible" onPress={() => {}} />
-      </View>
+      {d && !hasOrders && (
+        <GettingStarted hasProducts={hasProducts} hasOrders={hasOrders} hasExpenses={hasExpenses} />
+      )}
 
-      <View style={styles.list}>
-        <AppText variant="heading">Dernières commandes</AppText>
-        {recentOrders.map((order) => (
-          <View key={order.id} style={styles.orderRow}>
-            <View style={styles.orderInfo}>
-              <AppText variant="heading" numberOfLines={1} style={styles.customer}>
-                {order.customer}
-              </AppText>
-              <AppText variant="caption" color="inkMuted" numberOfLines={1}>
-                {order.summary} · {formatAr(order.total)}
-              </AppText>
+      {!isEmptyShop && (
+        <View style={styles.periods}>
+          <SegmentedControl options={periods} value={period} onChange={setPeriod} />
+        </View>
+      )}
+
+      {dashboard.isError && (
+        <AlertBanner
+          tone="danger"
+          message={apiErrorMessage(dashboard.error)}
+          onPress={() => dashboard.refetch()}
+        />
+      )}
+      {dashboard.isPending && <ActivityIndicator color={theme.colors.ink} />}
+
+      {d && !isEmptyShop && (
+        <>
+          <View style={styles.block}>
+            <RevenueCard dashboard={d} />
+            <View style={styles.counters}>
+              {statusCounters.map(({ status, label }) => (
+                <StatusCounter
+                  key={status}
+                  status={status}
+                  label={label}
+                  count={d.ordersByStatus[status] ?? 0}
+                />
+              ))}
             </View>
-            <StatusBadge status={order.status} />
           </View>
-        ))}
-      </View>
+          <TodoCard dashboard={d} />
+          <ProfitDetail dashboard={d} />
+        </>
+      )}
     </Screen>
   );
 }
 
+function StatusCounter({
+  status,
+  label,
+  count,
+}: {
+  status: OrderStatus;
+  label: string;
+  count: number;
+}) {
+  return (
+    <Pressable
+      onPress={() => router.navigate({ pathname: '/orders', params: { status, when: 'all' } })}
+      accessibilityRole="button"
+      accessibilityLabel={`${count} ${label}`}
+      style={({ pressed }) => [styles.counter, pressed && styles.pressed]}
+    >
+      <AppText variant="heading" style={styles.counterValue}>
+        {count}
+      </AppText>
+      <View style={styles.counterLabel}>
+        <View style={[styles.dot, { backgroundColor: theme.statusColors[status].fg }]} />
+        <AppText
+          variant="caption"
+          color="inkMuted"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={theme.layout.minFontScale}
+          style={styles.flex}
+        >
+          {label}
+        </AppText>
+      </View>
+    </Pressable>
+  );
+}
+
+/** One-line profit formula; a tap shows the detailed lines. */
+function ProfitDetail({ dashboard: d }: { dashboard: Dashboard }) {
+  const [open, setOpen] = useState(false);
+  const Chevron = open ? ChevronUp : ChevronDown;
+  return (
+    <View style={styles.card}>
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={({ pressed }) => [styles.detailHead, pressed && styles.pressed]}
+      >
+        <View style={styles.flex}>
+          <AppText style={styles.strong}>Détail du bénéfice</AppText>
+          <AppText variant="caption" color="inkMuted" numberOfLines={1}>
+            CA {formatAr(d.revenue)} − coûts {formatAr(d.costOfGoodsSold)} − dépenses{' '}
+            {formatAr(d.expenses)}
+          </AppText>
+        </View>
+        <Chevron size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
+      </Pressable>
+      {open && (
+        <View style={styles.detail}>
+          <Line
+            label={`Chiffre d'affaires (${d.salesCount} vente${d.salesCount > 1 ? 's' : ''})`}
+            value={d.revenue}
+          />
+          <Line label="Coût des produits vendus" value={-d.costOfGoodsSold} />
+          <Line label="Dépenses" value={-d.expenses} onPress={() => router.push('/expenses')} />
+          <Line label="Bénéfice estimé" value={d.estimatedProfit} strong />
+          <AppText variant="caption" color="inkMuted">
+            Livraison exclue du CA. Les achats de produits ({formatAr(d.productPurchases)}) sont
+            déjà comptés dans le coût des produits vendus.
+          </AppText>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function Line({
+  label,
+  value,
+  strong,
+  onPress,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [styles.line, strong && styles.lineTotal, pressed && styles.pressed]}
+    >
+      <AppText color={strong ? 'ink' : 'inkMuted'} style={[styles.flex, strong && styles.strong]}>
+        {label}
+      </AppText>
+      <AppText style={[styles.amount, strong && styles.strong]}>{formatAr(value)}</AppText>
+      {onPress && (
+        <ChevronRight size={theme.layout.iconSm} color={theme.colors.inkMuted} strokeWidth={2} />
+      )}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  section: {
+  periods: {
+    alignSelf: 'flex-start',
+    marginBottom: -theme.spacing[3],
+  },
+  block: {
     gap: theme.spacing[3],
   },
-  kpiRow: {
+  counters: {
     flexDirection: 'row',
-    gap: theme.spacing[3],
-  },
-  list: {
     gap: theme.spacing[2],
   },
-  orderRow: {
+  counter: {
+    flex: 1,
+    gap: theme.spacing[1],
+    padding: theme.spacing[2],
+    borderRadius: theme.radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.line,
+    backgroundColor: theme.colors.surfaceRaised,
+  },
+  counterValue: {
+    fontVariant: ['tabular-nums'],
+  },
+  counterLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing[3],
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing[3],
+    gap: theme.spacing[1],
   },
-  customer: {
-    ...theme.typography.body,
+  dot: {
+    width: theme.layout.dot,
+    height: theme.layout.dot,
+    borderRadius: theme.radius.pill,
+  },
+  card: {
+    paddingHorizontal: theme.spacing[4],
+    borderRadius: theme.radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.line,
+    backgroundColor: theme.colors.surfaceRaised,
+  },
+  detailHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[2],
+    minHeight: theme.layout.rowMinHeight,
+    paddingVertical: theme.spacing[3],
+  },
+  detail: {
+    gap: theme.spacing[1],
+    paddingBottom: theme.spacing[3],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.line,
+    paddingTop: theme.spacing[2],
+  },
+  line: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[2],
+    minHeight: theme.sizes.tapMin - theme.spacing[2],
+  },
+  lineTotal: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.line,
+  },
+  flex: {
+    flex: 1,
+  },
+  strong: {
     fontFamily: theme.typography.heading.fontFamily,
   },
-  orderInfo: {
-    flex: 1,
+  amount: {
+    fontVariant: ['tabular-nums'],
+  },
+  pressed: {
+    opacity: theme.layout.pressedOpacity,
   },
 });

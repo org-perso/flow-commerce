@@ -3,19 +3,20 @@ import type { ComponentProps } from 'react';
 
 import { TextField } from '@/components/ui';
 
-type FormTextFieldProps<T extends FieldValues> = Omit<
+type FormTextFieldProps<T extends FieldValues, TContext, TOutput extends FieldValues> = Omit<
   ComponentProps<typeof TextField>,
   'value' | 'onChangeText' | 'onBlur' | 'error'
 > & {
-  control: Control<T>;
+  /** Also accepts forms whose resolver transforms the values (e.g. text → number). */
+  control: Control<T, TContext, TOutput>;
   name: Path<T>;
 };
 
-export function FormTextField<T extends FieldValues>({
+export function FormTextField<T extends FieldValues, TContext, TOutput extends FieldValues>({
   control,
   name,
   ...rest
-}: FormTextFieldProps<T>) {
+}: FormTextFieldProps<T, TContext, TOutput>) {
   return (
     <Controller
       control={control}
