@@ -38,6 +38,8 @@ export type Order = {
   /** What the customer pays: itemsAmount + deliveryFee. */
   totalAmount: number;
   paymentMethod: string | null;
+  isPaid: boolean;
+  paidAt: string | null;
   createdAt: string;
   updatedAt: string;
   items: OrderItem[];
@@ -61,8 +63,11 @@ export type CreateOrderInput = {
   /** null: not delivered, so no delivery fee. */
   delivery: (OrderDelivery & { fee: number }) | null;
   paymentMethod: string | null;
+  isPaid: boolean;
   status: 'EN_ATTENTE' | 'CONFIRMEE';
 };
+
+export type OrderPatch = { scheduledDate?: string; isPaid?: boolean };
 
 const base = (shopId: string) => `/shops/${shopId}/orders`;
 
@@ -82,11 +87,7 @@ export function createOrder(shopId: string, input: CreateOrderInput): Promise<Or
   return apiFetch(base(shopId), { method: 'POST', body: JSON.stringify(input) });
 }
 
-export function updateOrder(
-  shopId: string,
-  orderId: string,
-  patch: { scheduledDate?: string },
-): Promise<Order> {
+export function updateOrder(shopId: string, orderId: string, patch: OrderPatch): Promise<Order> {
   return apiFetch(`${base(shopId)}/${orderId}`, {
     method: 'PATCH',
     body: JSON.stringify(patch),

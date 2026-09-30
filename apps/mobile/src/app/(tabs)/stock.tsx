@@ -7,6 +7,7 @@ import {
   EmptyState,
   InlineBanner,
   Screen,
+  PageTitle,
   ScreenHeader,
   SearchBar,
   SegmentedControl,
@@ -39,12 +40,8 @@ export default function StockScreen() {
   const isFiltered = q !== '' || filter !== 'all';
 
   return (
-    <Screen
-      scroll={false}
-      header={
-        <ScreenHeader title="Stock" action={{ label: 'Ajouter', icon: Plus, onPress: openNew }} />
-      }
-    >
+    <Screen scroll={false} header={<ScreenHeader />}>
+      <PageTitle title="Stock" action={{ label: 'Ajouter', icon: Plus, onPress: openNew }} />
       <View style={styles.controls}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Rechercher un produit" />
         <SegmentedControl

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import {
+  PageTitle,
   ScreenHeader,
   AlertBanner,
   AppText,
@@ -13,7 +14,6 @@ import {
   Screen,
   type OrderStatus,
 } from '@/components/ui';
-import { EmailVerificationBanner } from '@/features/auth/email-verification-banner';
 import type { DashboardPeriod } from '@/features/dashboard/dashboard-api';
 import { GettingStarted } from '@/features/dashboard/getting-started';
 import { useDashboard } from '@/features/dashboard/use-dashboard';
@@ -75,7 +75,7 @@ export default function DashboardScreen() {
         ) : undefined
       }
     >
-      <EmailVerificationBanner />
+      <PageTitle title="Accueil" />
 
       {d && !hasOrders && (
         <GettingStarted hasProducts={hasProducts} hasOrders={hasOrders} hasExpenses={hasExpenses} />

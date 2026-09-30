@@ -6,6 +6,7 @@ import { idParam, notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
 import { optionalText, requiredText } from '../../http/schemas.js';
 import {
+  countUnlinkedOrders,
   deleteCustomer,
   findCustomer,
   insertCustomer,
@@ -39,6 +40,11 @@ export const customersRouter = Router();
 customersRouter.get('/', async (req, res) => {
   const { q } = listQuery.parse(req.query);
   res.json(await listCustomers(currentShopId(req), q || undefined));
+});
+
+/** Orders to link to a customer file (banner on the customer list). Before /:customerId. */
+customersRouter.get('/unlinked-orders-count', async (req, res) => {
+  res.json({ count: await countUnlinkedOrders(currentShopId(req)) });
 });
 
 customersRouter.post('/', async (req, res) => {

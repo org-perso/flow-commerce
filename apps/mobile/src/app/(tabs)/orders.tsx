@@ -10,6 +10,7 @@ import {
   EmptyState,
   InlineBanner,
   Screen,
+  PageTitle,
   ScreenHeader,
   SegmentedControl,
   type OrderStatus,
@@ -23,13 +24,20 @@ import { businessToday, formatDayLabel } from '@/utils/format';
 
 type When = 'today' | 'upcoming' | 'all';
 
+// Defined before statusOptions, which is built at module load (styles below does not exist yet).
+const dotStyle = {
+  width: theme.layout.dot * 2,
+  height: theme.layout.dot * 2,
+  borderRadius: theme.radius.pill,
+};
+
 const statusOptions: { value: OrderStatus | 'ALL'; label: string; leading?: ReactNode }[] = [
   { value: 'ALL', label: 'Tous les statuts' },
   ...(Object.entries(theme.statusColors) as [OrderStatus, { label: string; fg: string }][]).map(
     ([value, { label, fg }]) => ({
       value,
       label,
-      leading: <View style={[styles.dot, { backgroundColor: fg }]} />,
+      leading: <View style={[dotStyle, { backgroundColor: fg }]} />,
     }),
   ),
 ];
@@ -71,7 +79,7 @@ export default function OrdersScreen() {
   return (
     <Screen
       scroll={false}
-      header={<ScreenHeader title="Commandes" />}
+      header={<ScreenHeader />}
       footer={
         <Button
           label="Nouvelle commande"
@@ -82,6 +90,7 @@ export default function OrdersScreen() {
         />
       }
     >
+      <PageTitle title="Commandes" />
       <View style={styles.controls}>
         <SegmentedControl
           options={[
@@ -160,11 +169,6 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: theme.spacing[2],
-  },
-  dot: {
-    width: theme.layout.dot * 2,
-    height: theme.layout.dot * 2,
-    borderRadius: theme.radius.pill,
   },
   loader: {
     marginTop: theme.spacing[8],

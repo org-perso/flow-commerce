@@ -8,7 +8,7 @@ import { theme } from '@/theme';
 import { AppText } from './app-text';
 
 /**
- * Active shop name, large, with a chevron: a tap opens the switcher
+ * Active shop name, large, white (drawn on the navy header), with a chevron: a tap opens the switcher
  * (other shops, or create one). The round slot on the right will hold the shop logo.
  */
 export function ShopSwitcher() {
@@ -22,14 +22,14 @@ export function ShopSwitcher() {
         accessibilityLabel={`Boutique ${shop.name}. Changer de boutique`}
         style={({ pressed }) => [styles.nameButton, pressed && styles.pressed]}
       >
-        <AppText variant="title" numberOfLines={1} style={styles.name}>
+        <AppText variant="title" color="onNavy" numberOfLines={1} style={styles.name}>
           {shop.name}
         </AppText>
-        <ChevronDown size={theme.layout.iconLg} color={theme.colors.ink} strokeWidth={2} />
+        <ChevronDown size={theme.layout.iconLg} color={theme.colors.onNavy} strokeWidth={2} />
       </Pressable>
       {/* Placeholder for the shop logo. */}
       <View style={styles.logo} accessible={false}>
-        <Store size={theme.layout.iconMd} color={theme.colors.ink} strokeWidth={2} />
+        <Store size={theme.layout.iconMd} color={theme.colors.onGold} strokeWidth={2} />
       </View>
     </View>
   );
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.navySoft,
+    backgroundColor: theme.colors.gold,
   },
   pressed: {
     opacity: theme.layout.pressedOpacity,

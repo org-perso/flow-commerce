@@ -11,8 +11,17 @@ import {
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { AppText, InlineBanner, ListGroup, ListRow, Screen, ScreenHeader } from '@/components/ui';
+import {
+  AppText,
+  InlineBanner,
+  ListGroup,
+  ListRow,
+  PageTitle,
+  Screen,
+  ScreenHeader,
+} from '@/components/ui';
 import { authErrorMessage } from '@/features/auth/auth-errors';
+import { EmailVerificationBanner } from '@/features/auth/email-verification-banner';
 import { signOut } from '@/features/auth/auth-service';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { theme } from '@/theme';
@@ -54,7 +63,9 @@ export default function MoreScreen() {
     ]);
 
   return (
-    <Screen header={<ScreenHeader title="Plus" />}>
+    <Screen header={<ScreenHeader />}>
+      <PageTitle title="Plus" />
+      <EmailVerificationBanner />
       <View style={styles.section}>
         <AppText variant="label" color="inkMuted">
           Boutique

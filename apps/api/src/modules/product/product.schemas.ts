@@ -49,6 +49,7 @@ export const listProductsQuery = z.object({
   q: z.string().trim().max(150).optional(),
   categoryId: z.uuid().optional(),
   lowStock: queryBoolean,
+  outOfStock: queryBoolean,
   archived: queryBoolean,
 });
 

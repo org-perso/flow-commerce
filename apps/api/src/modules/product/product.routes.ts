@@ -9,6 +9,7 @@ import {
   insertProduct,
   listProducts,
   setArchived,
+  stockSummary,
   updateProduct,
 } from './product.repository.js';
 import {
@@ -25,6 +26,11 @@ export const productsRouter = Router();
 productsRouter.get('/', async (req, res) => {
   const filters = listProductsQuery.parse(req.query);
   res.json(await listProducts(currentShopId(req), filters));
+});
+
+/** Counts and stock value for the list header and filter chips. Before /:productId. */
+productsRouter.get('/summary', async (req, res) => {
+  res.json(await stockSummary(currentShopId(req)));
 });
 
 productsRouter.post('/', async (req, res) => {

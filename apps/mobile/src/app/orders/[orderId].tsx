@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { ArrowRight, CalendarDays, MessageCircle, Phone } from 'lucide-react-native';
+import { ArrowRight, CalendarDays, Check, MessageCircle, Phone } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +23,7 @@ import {
 } from '@/features/order/order-status';
 import { DateChoice } from '@/features/order/date-choice';
 import { isOverdue } from '@/features/order/order-row';
+import { PaymentBadge } from '@/features/order/payment-badge';
 import { useChangeOrderStatus, useOrder, useUpdateOrder } from '@/features/order/use-orders';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
 import { textStyles, theme } from '@/theme';
@@ -171,6 +172,27 @@ export default function OrderScreen() {
         </View>
       </View>
 
+      <View style={[styles.card, styles.dateCard]}>
+        <View style={styles.flex}>
+          <AppText variant="caption" color="inkMuted">
+            Paiement{o.paymentMethod ? ` · ${o.paymentMethod}` : ''}
+          </AppText>
+          <PaymentBadge isPaid={o.isPaid} />
+        </View>
+        {TRANSITIONS[o.status].length > 0 && (
+          <Button
+            label={o.isPaid ? 'Marquer non payée' : 'Marquer comme payée'}
+            icon={o.isPaid ? undefined : Check}
+            compact
+            loading={updateOrder.isPending && !dateOpen}
+            onPress={() => updateOrder.mutate({ isPaid: !o.isPaid })}
+          />
+        )}
+      </View>
+      {updateOrder.isError && !dateOpen && (
+        <AlertBanner tone="danger" message={apiErrorMessage(updateOrder.error)} />
+      )}
+
       <View style={[styles.card, styles.details]}>
         <Detail
           label="Livraison"
@@ -180,7 +202,6 @@ export default function OrderScreen() {
         {o.delivery?.address && <Detail label="Adresse" value={o.delivery.address} />}
         {o.delivery?.note && <Detail label="Précisions" value={o.delivery.note} />}
         {o.source && <Detail label="Source" value={SOURCE_LABELS[o.source]} />}
-        {o.paymentMethod && <Detail label="Paiement" value={o.paymentMethod} />}
       </View>
 
       {next.length > 0 && (

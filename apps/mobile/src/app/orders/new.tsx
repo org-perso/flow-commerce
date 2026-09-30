@@ -97,6 +97,7 @@ export default function NewOrderScreen() {
 
   const [paymentMethod, setPaymentMethod] = useState('');
   const [confirmNow, setConfirmNow] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
   const [formError, setFormError] = useState<string>();
 
   const itemsAmount = lines.reduce((sum, l) => sum + l.quantity * l.product.sellingPrice, 0);
@@ -160,6 +161,7 @@ export default function NewOrderScreen() {
             }
           : null,
         paymentMethod: paymentMethod || null,
+        isPaid,
         status: confirmNow ? 'CONFIRMEE' : 'EN_ATTENTE',
       });
       router.replace(`/orders/${order.id}`);
@@ -393,6 +395,15 @@ export default function NewOrderScreen() {
           value={paymentMethod}
           onChange={setPaymentMethod}
         />
+        <View style={styles.switchRow}>
+          <AppText style={[styles.flex, styles.strong]}>Déjà payée</AppText>
+          <Switch
+            value={isPaid}
+            onValueChange={setIsPaid}
+            trackColor={{ true: theme.colors.blue, false: theme.colors.line }}
+            accessibilityLabel="Déjà payée"
+          />
+        </View>
       </Section>
 
       <View style={styles.summary}>

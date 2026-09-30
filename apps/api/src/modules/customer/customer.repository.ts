@@ -11,6 +11,11 @@ export type Customer = {
   phones: string[];
   /** Facebook name, profile link, @handle… */
   socialProfile: string | null;
+  /** Orders not cancelled nor returned. */
+  orderCount: number;
+  /** Sum of those orders' totals (delivery included), in Ariary. */
+  totalSpent: number;
+  lastOrderAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -24,8 +29,27 @@ export type CustomerInput = {
 const select = `SELECT c.id, c.name,
   COALESCE((SELECT json_agg(cp.phone ORDER BY cp.position, cp.created_at)
             FROM customer_phones cp WHERE cp.customer_id = c.id), '[]') AS phones,
-  c.social_profile AS "socialProfile", c.created_at AS "createdAt", c.updated_at AS "updatedAt"
-  FROM customers c`;
+  c.social_profile AS "socialProfile",
+  COALESCE(st.order_count, 0) AS "orderCount", COALESCE(st.total_spent, 0) AS "totalSpent",
+  st.last_order_at AS "lastOrderAt",
+  c.created_at AS "createdAt", c.updated_at AS "updatedAt"
+  FROM customers c
+  LEFT JOIN LATERAL (
+    SELECT count(*)::int AS order_count, sum(o.total_amount)::bigint AS total_spent,
+           max(o.created_at) AS last_order_at
+    FROM orders o
+    WHERE o.customer_id = c.id AND o.status NOT IN ('ANNULEE', 'RETOUR')
+  ) st ON true`;
+
+/** Live orders (not cancelled nor returned) without a customer file. */
+export async function countUnlinkedOrders(shopId: string): Promise<number> {
+  const { rows } = await pool.query<{ count: number }>(
+    `SELECT count(*)::int AS count FROM orders
+     WHERE shop_id = $1 AND customer_id IS NULL AND status NOT IN ('ANNULEE', 'RETOUR')`,
+    [shopId],
+  );
+  return rows[0]!.count;
+}
 
 /** Matches the name, the social profile, or any phone ("034 12" finds 0341234567). */
 export async function listCustomers(shopId: string, q?: string): Promise<Customer[]> {

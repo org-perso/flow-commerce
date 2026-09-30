@@ -118,7 +118,7 @@ describe('database guarantees', () => {
       [shopB.id],
     );
     await expect(
-      pool.query(`INSERT INTO orders (shop_id, customer_id) VALUES ($1, $2)`, [
+      pool.query(`INSERT INTO orders (shop_id, customer_id, number) VALUES ($1, $2, 1)`, [
         shopA.id,
         rows[0].id,
       ]),

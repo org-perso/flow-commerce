@@ -29,6 +29,8 @@ export type CreateOrderInput = {
   /** null: not delivered (pickup, hand delivery), so no delivery fee. */
   delivery: DeliveryInput | null;
   paymentMethod: string | null;
+  /** Already paid by the customer. */
+  isPaid: boolean;
   status: 'EN_ATTENTE' | 'CONFIRMEE';
 };
 
@@ -165,12 +167,19 @@ export function createOrder(shopId: string, input: CreateOrderInput): Promise<Or
       customerId = (await findOrCreateCustomer(client, shopId, input.customer)).id;
     }
 
+    // Next number of the shop; the row lock serializes concurrent orders.
+    const { rows: counter } = await client.query<{ number: number }>(
+      `UPDATE shops SET last_order_number = last_order_number + 1
+       WHERE id = $1 RETURNING last_order_number AS number`,
+      [shopId],
+    );
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO orders (shop_id, customer_id, status, source, payment_method,
          is_delivery, delivery_place, delivery_address, delivery_note, delivery_fee,
-         scheduled_date)
+         scheduled_date, paid_at, number)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-         COALESCE($11::date, (now() AT TIME ZONE 'Indian/Antananarivo')::date))
+         COALESCE($11::date, (now() AT TIME ZONE 'Indian/Antananarivo')::date),
+         CASE WHEN $12::boolean THEN now() END, $13)
        RETURNING id`,
       [
         shopId,
@@ -180,6 +189,8 @@ export function createOrder(shopId: string, input: CreateOrderInput): Promise<Or
         input.paymentMethod,
         ...deliveryColumns(input.delivery),
         input.scheduledDate,
+        input.isPaid,
+        counter[0]!.number,
       ],
     );
     const orderId = rows[0]!.id;
@@ -241,6 +252,8 @@ export function updateOrder(
          payment_method = CASE WHEN $5::boolean THEN $6 ELSE payment_method END,
          source         = CASE WHEN $7::boolean THEN $8 ELSE source END,
          scheduled_date = COALESCE($10::date, scheduled_date),
+         paid_at        = CASE WHEN $11::boolean IS NULL THEN paid_at
+                               WHEN $11 THEN COALESCE(paid_at, now()) END,
          total_amount   = $9
        WHERE id = $1 AND shop_id = $2`,
       [
@@ -254,6 +267,7 @@ export function updateOrder(
         patch.source ?? null,
         itemsAmount + deliveryFee,
         patch.scheduledDate ?? null,
+        patch.isPaid ?? null,
       ],
     );
     return (await findOrder(shopId, orderId, client))!;

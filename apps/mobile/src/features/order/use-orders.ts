@@ -11,6 +11,7 @@ import {
   updateOrder,
   type CreateOrderInput,
   type OrderFilters,
+  type OrderPatch,
 } from './order-api';
 
 const ordersKey = (shopId: string) => ['shops', shopId, 'orders'] as const;
@@ -48,9 +49,7 @@ export function useCreateOrder() {
 }
 
 export function useUpdateOrder(orderId: string) {
-  return useShopMutation((shopId, patch: { scheduledDate?: string }) =>
-    updateOrder(shopId, orderId, patch),
-  );
+  return useShopMutation((shopId, patch: OrderPatch) => updateOrder(shopId, orderId, patch));
 }
 
 export function useChangeOrderStatus(orderId: string) {

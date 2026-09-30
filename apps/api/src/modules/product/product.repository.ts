@@ -49,8 +49,40 @@ export type ProductFilters = {
   q?: string;
   categoryId?: string;
   lowStock?: boolean;
+  outOfStock?: boolean;
   archived?: boolean;
 };
+
+export type StockSummary = {
+  /** Active (not archived) products. */
+  productCount: number;
+  /** Units in stock, all active products. */
+  units: number;
+  /** Stock valued at purchase price / at selling price, in Ariary. */
+  stockValue: number;
+  stockSaleValue: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  archivedCount: number;
+};
+
+export async function stockSummary(shopId: string): Promise<StockSummary> {
+  const { rows } = await pool.query<StockSummary>(
+    `SELECT count(*) FILTER (WHERE archived_at IS NULL)::int AS "productCount",
+       COALESCE(sum(stock_quantity) FILTER (WHERE archived_at IS NULL), 0)::bigint AS units,
+       COALESCE(sum(stock_quantity * purchase_price) FILTER (WHERE archived_at IS NULL), 0)::bigint
+         AS "stockValue",
+       COALESCE(sum(stock_quantity * selling_price) FILTER (WHERE archived_at IS NULL), 0)::bigint
+         AS "stockSaleValue",
+       count(*) FILTER (WHERE archived_at IS NULL AND stock_quantity <= low_stock_threshold)::int
+         AS "lowStockCount",
+       count(*) FILTER (WHERE archived_at IS NULL AND stock_quantity = 0)::int AS "outOfStockCount",
+       count(*) FILTER (WHERE archived_at IS NOT NULL)::int AS "archivedCount"
+     FROM products WHERE shop_id = $1`,
+    [shopId],
+  );
+  return rows[0]!;
+}
 
 export async function listProducts(shopId: string, filters: ProductFilters): Promise<Product[]> {
   const conditions = ['p.shop_id = $1'];
@@ -64,6 +96,7 @@ export async function listProducts(shopId: string, filters: ProductFilters): Pro
   if (filters.q) add('p.name ILIKE ?', `%${filters.q}%`);
   if (filters.categoryId) add('p.category_id = ?', filters.categoryId);
   if (filters.lowStock) conditions.push('p.stock_quantity <= p.low_stock_threshold');
+  if (filters.outOfStock) conditions.push('p.stock_quantity = 0');
 
   const { rows } = await pool.query<Product>(
     `${select} WHERE ${conditions.join(' AND ')} ORDER BY p.name, p.id`,

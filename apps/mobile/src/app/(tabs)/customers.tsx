@@ -9,6 +9,7 @@ import {
   InlineBanner,
   ListRow,
   Screen,
+  PageTitle,
   ScreenHeader,
   SearchBar,
 } from '@/components/ui';
@@ -32,12 +33,8 @@ export default function CustomersScreen() {
   const openNew = () => router.push('/customers/new');
 
   return (
-    <Screen
-      scroll={false}
-      header={
-        <ScreenHeader title="Clients" action={{ label: 'Ajouter', icon: Plus, onPress: openNew }} />
-      }
-    >
+    <Screen scroll={false} header={<ScreenHeader />}>
+      <PageTitle title="Clients" action={{ label: 'Ajouter', icon: Plus, onPress: openNew }} />
       <SearchBar value={search} onChangeText={setSearch} placeholder="Nom, téléphone ou profil" />
 
       {customers.isError && (

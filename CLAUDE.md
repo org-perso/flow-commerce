@@ -61,6 +61,9 @@ docker compose up -d --build       # Postgres + API (migrations au démarrage)
 - **Commande avec client saisi** : `POST /orders` accepte `customer: { name, phone }` ; si le numéro existe dans la boutique, la fiche existante est réutilisée (sans être modifiée).
 - **Livraison par commande** : facultative. `delivery: { place, address, note, fee }` ou `null` (retrait / remise en main propre, pas de frais — garanti par une contrainte BDD). **Source** de la commande : `FACEBOOK`, `MESSENGER`, `INSTAGRAM`, `WHATSAPP`, `TIKTOK`, `APPEL`, `BOUTIQUE`, `AUTRE`.
 - **Date prévue** (`scheduledDate`) : jour de livraison ou de remise, par défaut aujourd'hui (Madagascar). La vue « Aujourd'hui » = prévues aujourd'hui + commandes **en retard** encore ouvertes (prévues avant, statut `EN_ATTENTE` → `EN_LIVRAISON`) ; « À venir » = prévues après aujourd'hui (`GET /orders?when=today|upcoming`). Le CA reste basé sur la date de création.
+- **Paiement** : `paidAt` (null = non payée), exposé en `isPaid` ; indépendant du statut et du moyen de paiement. `PATCH /orders/:id { isPaid }` (garde la première date de paiement).
+- **Numéro de commande** : `number` par boutique (#001…), compteur `shops.last_order_number` incrémenté sous verrou de ligne à la création.
+- **Stats client** (`orderCount`, `totalSpent`, `lastOrderAt`) et **« à encaisser »** du dashboard : commandes hors `ANNULEE` / `RETOUR`. Valeur du stock : `stockValue` au prix d'achat, `stockSaleValue` au prix de vente.
 - **Images produits** : compressées côté mobile (1024 px, JPEG 0,7), envoyées dans Firebase Storage sous `shops/{shopId}/products/`, l'URL est stockée dans `products.image`.
 - Les schémas de création de l'API sont **stricts** : un champ inconnu (ancien contrat) renvoie 400 au lieu d'être ignoré.
 
@@ -81,9 +84,11 @@ docker compose up -d --build       # Postgres + API (migrations au démarrage)
 - ✅ Clients : plusieurs numéros, profil Facebook/réseau, plus d'adresse ; fiche avec Appeler / WhatsApp / Nouvelle commande
 - ✅ Commandes : source, livraison facultative (lieu, adresse, précisions, frais), client prérempli depuis sa fiche
 - ✅ Commandes : date prévue ; liste « Aujourd'hui / À venir / Toutes » (retards en tête, regroupement par jour), statut en liste déroulante ; fiche : changer la date, étape suivante + « Changer le statut »
+- ✅ Commandes : statut payée / non payée (création, fiche, liste) ; carte de liste = client + numéro, statut, produits sans prix, lieu de livraison, date, paiement, total
+- ✅ En-tête des onglets : bandeau bleu marine avec la boutique seule ; le titre de l'onglet (+ action) est dans le contenu (`PageTitle`)
 - 🚧 Refonte UX (spec du 29/09) : étapes 0–4 faites ; restent Commandes (étape 5) et Accueil (étape 6)
-- ⏳ Liste Commandes : recherche par client / téléphone — besoin API : `GET /orders?q=`
-- ⏳ Liste Clients : nombre de commandes et total dépensé par ligne — besoin API : `orderCount`, `totalSpent`
+- ✅ API refonte UI (30/09) : `orders.number`, `GET /orders?q=`, `GET /orders/counts`, dashboard `7d`/`30d` + `grossMarginRate` + `unpaid` + `overdueOrders`, stats client + `GET /customers/unlinked-orders-count`, `GET /products?outOfStock=` + `GET /products/summary`
+- 🚧 Refonte UI (maquettes du 30/09) : 1. en-tête + onglets avec « + » + « Compte et boutique » · 2. Commandes · 3. Accueil · 4. Stock · 5. Clients
 - ⏳ Modifier les lignes d'une commande en attente (l'API le permet déjà)
 
 **Avant la mise en production**

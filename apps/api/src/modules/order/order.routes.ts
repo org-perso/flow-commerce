@@ -7,7 +7,7 @@ import { amount, isoDate, optionalText, pagination, requiredText } from '../../h
 import { phoneField } from '../customer/phone.js';
 import { ORDER_SOURCES } from './order-source.js';
 import { ORDER_STATUSES } from './order-status.js';
-import { findOrder, listOrders } from './order.repository.js';
+import { countOrdersByStatus, findOrder, listOrders } from './order.repository.js';
 import { changeOrderStatus, createOrder, updateOrder } from './order.service.js';
 
 const items = z
@@ -39,6 +39,7 @@ const createOrderSchema = z
     scheduledDate: isoDate.nullable().default(null),
     delivery: delivery.default(null),
     paymentMethod: optionalText(30).default(null),
+    isPaid: z.boolean().default(false),
     /** Create directly as confirmed to take stock right away. */
     status: z.enum(['EN_ATTENTE', 'CONFIRMEE']).default('EN_ATTENTE'),
   })
@@ -56,18 +57,23 @@ const updateOrderSchema = z
     scheduledDate: isoDate,
     delivery,
     paymentMethod: optionalText(30),
+    isPaid: z.boolean(),
   })
   .partial()
   .strict();
 
 const statusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
 
-const listQuery = z.object({
+const filtersQuery = z.object({
   when: z.enum(['today', 'upcoming']).optional(),
-  status: z.enum(ORDER_STATUSES).optional(),
+  q: z.string().trim().max(150).optional(),
   customerId: z.uuid().optional(),
   from: isoDate.optional(),
   to: isoDate.optional(),
+});
+
+const listQuery = filtersQuery.extend({
+  status: z.enum(ORDER_STATUSES).optional(),
   ...pagination,
 });
 
@@ -76,6 +82,11 @@ export const ordersRouter = Router();
 
 ordersRouter.get('/', async (req, res) => {
   res.json(await listOrders(currentShopId(req), listQuery.parse(req.query)));
+});
+
+/** Counts per status for the list filters: { total, byStatus }. Before /:orderId. */
+ordersRouter.get('/counts', async (req, res) => {
+  res.json(await countOrdersByStatus(currentShopId(req), filtersQuery.parse(req.query)));
 });
 
 ordersRouter.post('/', async (req, res) => {

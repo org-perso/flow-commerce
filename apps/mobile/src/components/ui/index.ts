@@ -9,6 +9,7 @@ export { InlineBanner } from './inline-banner';
 export { KpiCard } from './kpi-card';
 export { ListGroup } from './list-group';
 export { ListRow } from './list-row';
+export { PageTitle } from './page-title';
 export { Screen } from './screen';
 export { ScreenHeader } from './screen-header';
 export { SearchBar } from './search-bar';
