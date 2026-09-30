@@ -1,6 +1,6 @@
-import { Tabs } from 'expo-router';
-import { Ellipsis, House, Package, Receipt, Users, type LucideIcon } from 'lucide-react-native';
-import { StyleSheet, View } from 'react-native';
+import { router, Tabs } from 'expo-router';
+import { House, Package, Plus, Receipt, Users, type LucideIcon } from 'lucide-react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui';
 import { theme } from '@/theme';
@@ -28,13 +28,42 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
   );
 }
 
+/** Gold button in the middle of the tab bar: the app's main action, a new order. */
+function NewOrderButton() {
+  return (
+    <View style={styles.actionSlot}>
+      <Pressable
+        onPress={() => router.push('/orders/new')}
+        accessibilityRole="button"
+        accessibilityLabel="Nouvelle commande"
+        style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+      >
+        <Plus size={theme.layout.iconLg} color={theme.colors.onGold} strokeWidth={2.5} />
+      </Pressable>
+    </View>
+  );
+}
+
 const tabs = [
   { name: 'index', label: 'Accueil', Icon: House },
   { name: 'orders', label: 'Commandes', Icon: Receipt },
   { name: 'stock', label: 'Stock', Icon: Package },
   { name: 'customers', label: 'Clients', Icon: Users },
-  { name: 'more', label: 'Plus', Icon: Ellipsis },
 ] as const;
+
+function tabScreen({ name, label, Icon }: (typeof tabs)[number]) {
+  return (
+    <Tabs.Screen
+      key={name}
+      name={name}
+      options={{
+        title: label,
+        tabBarIcon: ({ focused }) => <TabIcon Icon={Icon} focused={focused} />,
+        tabBarLabel: ({ focused }) => <TabLabel label={label} focused={focused} />,
+      }}
+    />
+  );
+}
 
 export default function TabsLayout() {
   return (
@@ -45,17 +74,10 @@ export default function TabsLayout() {
         tabBarStyle: styles.tabBar,
       }}
     >
-      {tabs.map(({ name, label, Icon }) => (
-        <Tabs.Screen
-          key={name}
-          name={name}
-          options={{
-            title: label,
-            tabBarIcon: ({ focused }) => <TabIcon Icon={Icon} focused={focused} />,
-            tabBarLabel: ({ focused }) => <TabLabel label={label} focused={focused} />,
-          }}
-        />
-      ))}
+      {tabs.slice(0, 2).map(tabScreen)}
+      {/* Placeholder route: the button opens the order form instead of a tab. */}
+      <Tabs.Screen name="new" options={{ tabBarButton: () => <NewOrderButton /> }} />
+      {tabs.slice(2).map(tabScreen)}
     </Tabs>
   );
 }
@@ -75,6 +97,22 @@ const styles = StyleSheet.create({
   },
   iconPillActive: {
     backgroundColor: theme.colors.navySoft,
+  },
+  actionSlot: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  action: {
+    width: theme.layout.tabAction,
+    height: theme.layout.tabAction,
+    marginTop: -theme.spacing[4],
+    borderRadius: theme.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.gold,
+  },
+  pressed: {
+    opacity: theme.layout.pressedOpacity,
   },
   labelActive: {
     fontFamily: theme.typography.heading.fontFamily,

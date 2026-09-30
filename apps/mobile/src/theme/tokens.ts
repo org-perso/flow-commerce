@@ -7,6 +7,8 @@ export const colors = {
   inkMuted: '#5B6474',
   navy: '#16325C',
   navySoft: '#E6ECF6',
+  /** Raised element on navy (header avatar, hero cards). */
+  navyRaised: '#2B4A78',
   onNavy: '#FFFFFF',
   onNavyMuted: '#C9D6EE',
   blue: '#1F5BC4',

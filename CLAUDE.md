@@ -85,10 +85,11 @@ docker compose up -d --build       # Postgres + API (migrations au démarrage)
 - ✅ Commandes : source, livraison facultative (lieu, adresse, précisions, frais), client prérempli depuis sa fiche
 - ✅ Commandes : date prévue ; liste « Aujourd'hui / À venir / Toutes » (retards en tête, regroupement par jour), statut en liste déroulante ; fiche : changer la date, étape suivante + « Changer le statut »
 - ✅ Commandes : statut payée / non payée (création, fiche, liste) ; carte de liste = client + numéro, statut, produits sans prix, lieu de livraison, date, paiement, total
-- ✅ En-tête des onglets : bandeau bleu marine avec la boutique seule ; le titre de l'onglet (+ action) est dans le contenu (`PageTitle`)
+- ✅ En-tête des onglets : bandeau bleu marine (logo à initiales + boutique ▾, recherche, avatar du compte avec pastille si email non vérifié) ; titre de l'onglet dans le contenu (`PageTitle`)
+- ✅ Onglets : Accueil · Commandes · « + » doré (nouvelle commande) · Stock · Clients ; l'onglet Plus devient l'écran « Compte et boutique » (`/account`)
 - 🚧 Refonte UX (spec du 29/09) : étapes 0–4 faites ; restent Commandes (étape 5) et Accueil (étape 6)
 - ✅ API refonte UI (30/09) : `orders.number`, `GET /orders?q=`, `GET /orders/counts`, dashboard `7d`/`30d` + `grossMarginRate` + `unpaid` + `overdueOrders`, stats client + `GET /customers/unlinked-orders-count`, `GET /products?outOfStock=` + `GET /products/summary`
-- 🚧 Refonte UI (maquettes du 30/09) : 1. en-tête + onglets avec « + » + « Compte et boutique » · 2. Commandes · 3. Accueil · 4. Stock · 5. Clients
+- 🚧 Refonte UI (maquettes du 30/09) : ~~1. en-tête + onglets + compte~~ · 2. Commandes · 3. Accueil · 4. Stock · 5. Clients
 - ⏳ Modifier les lignes d'une commande en attente (l'API le permet déjà)
 
 **Avant la mise en production**

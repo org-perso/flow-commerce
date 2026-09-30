@@ -73,6 +73,10 @@ function RootNavigator() {
             }}
           />
           <Stack.Screen
+            name="account"
+            options={headerOptions('Compte et boutique', { showShop: false })}
+          />
+          <Stack.Screen
             name="shop-settings"
             options={headerOptions('Modifier la boutique', { showShop: false })}
           />

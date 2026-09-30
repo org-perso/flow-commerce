@@ -1,10 +1,9 @@
 import { router } from 'expo-router';
-import { ChevronRight, Plus } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import {
-  PageTitle,
   ScreenHeader,
   AlertBanner,
   AppText,
@@ -63,20 +62,7 @@ export default function DashboardScreen() {
       header={<ScreenHeader />}
       onRefresh={() => dashboard.refetch()}
       refreshing={dashboard.isRefetching}
-      footer={
-        hasProducts ? (
-          <Button
-            label="Nouvelle commande"
-            icon={Plus}
-            variant="primary"
-            fullWidth
-            onPress={() => router.push('/orders/new')}
-          />
-        ) : undefined
-      }
     >
-      <PageTitle title="Accueil" />
-
       {d && !hasOrders && (
         <GettingStarted hasProducts={hasProducts} hasOrders={hasOrders} hasExpenses={hasExpenses} />
       )}

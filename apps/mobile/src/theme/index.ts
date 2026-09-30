@@ -21,6 +21,10 @@ export const theme = {
   layout: {
     /** Avatar / product thumbnail in lists. */
     avatar: 40,
+    /** Shop logo and account avatar in the navy header. */
+    shopLogo: 32,
+    /** Central "new order" button of the tab bar. */
+    tabAction: 56,
     /** Product photo preview in forms and details. */
     thumbnail: 96,
     /** Minimum height of a list row. */

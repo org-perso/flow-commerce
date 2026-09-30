@@ -1,11 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Plus } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 
 import {
   AppText,
-  Button,
   Dropdown,
   EmptyState,
   InlineBanner,
@@ -77,19 +75,7 @@ export default function OrdersScreen() {
   const sections = toSections(orders.data ?? [], when);
 
   return (
-    <Screen
-      scroll={false}
-      header={<ScreenHeader />}
-      footer={
-        <Button
-          label="Nouvelle commande"
-          icon={Plus}
-          variant="primary"
-          fullWidth
-          onPress={() => router.push('/orders/new')}
-        />
-      }
-    >
+    <Screen scroll={false} header={<ScreenHeader />}>
       <PageTitle title="Commandes" />
       <View style={styles.controls}>
         <SegmentedControl
