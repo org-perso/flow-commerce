@@ -92,7 +92,7 @@ export const typography = {
     lineHeight: 26,
     fontVariant: ['tabular-nums'] as const,
   },
-  title: { fontFamily: fam[700], fontSize: 22, lineHeight: 28 },
+  title: { fontFamily: fam[700], fontSize: 20, lineHeight: 26 },
   heading: { fontFamily: fam[600], fontSize: 17, lineHeight: 24 },
   body: { fontFamily: fam[400], fontSize: 15, lineHeight: 22 },
   label: { fontFamily: fam[500], fontSize: 13, lineHeight: 18 },

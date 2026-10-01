@@ -103,8 +103,8 @@ export function TodoCard({ dashboard: d }: { dashboard: Dashboard }) {
 
 const styles = StyleSheet.create({
   card: {
-    paddingHorizontal: theme.spacing[4],
-    paddingTop: theme.spacing[3],
+    paddingHorizontal: theme.spacing[3],
+    paddingTop: theme.spacing[2],
     borderRadius: theme.radius.md,
     borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing[3],
     minHeight: theme.layout.rowMinHeight,
-    paddingVertical: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
     borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
   },

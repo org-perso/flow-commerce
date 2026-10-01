@@ -44,6 +44,8 @@ const delivery = z
     address: optionalText(1000).default(null),
     note: optionalText(1000).default(null),
     fee: amount.default(0),
+    /** Walk-in customer: the number the driver calls (optional for older apps). */
+    phone: phoneField.default(null),
   })
   .nullable();
 

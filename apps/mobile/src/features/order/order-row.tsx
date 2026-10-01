@@ -1,4 +1,4 @@
-import { ArrowRight, Bike, MapPin, Phone, Store, Wallet } from 'lucide-react-native';
+import { ArrowRight, Bike, Clock, MapPin, Phone, Store, Wallet } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, StatusBadge } from '@/components/ui';
@@ -82,7 +82,7 @@ export function OrderRow({
 }: OrderRowProps) {
   const today = businessToday();
   const overdue = isOverdue(order, today);
-  const phone = hideCustomer ? null : order.customer?.phone;
+  const phone = hideCustomer ? null : (order.customer?.phone ?? order.delivery?.phone);
   const place = order.delivery
     ? (order.delivery.place ?? order.delivery.address ?? 'À livrer')
     : 'Retrait';
@@ -95,6 +95,15 @@ export function OrderRow({
       ? formatDayLabel(order.scheduledDate, today).toLowerCase()
       : null;
 
+  // A delivery: the place leads, then when, status, customer and driver (all readable).
+  const deliveryLayout = !!order.delivery && !hideCustomer;
+  const when = [
+    showDate || overdue ? formatDayLabel(order.scheduledDate, today) : null,
+    slot ?? (showDate || overdue ? null : 'Toute la journée'),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <View style={styles.card}>
       <Pressable
@@ -102,31 +111,72 @@ export function OrderRow({
         accessibilityRole="button"
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
       >
-        <View style={styles.flex}>
-          <View style={styles.line}>
-            <AppText style={[styles.flex, styles.strong]} numberOfLines={1}>
-              {title}
-            </AppText>
-            <AppText style={styles.total}>{formatAr(order.totalAmount)}</AppText>
-          </View>
-          <View style={styles.line}>
+        {deliveryLayout ? (
+          <View style={[styles.flex, styles.stack]}>
+            <View style={styles.line}>
+              <View style={styles.place}>
+                <MapPin size={theme.layout.iconSm} color={theme.colors.ink} strokeWidth={2} />
+                <AppText style={[styles.flex, styles.strong]} numberOfLines={1}>
+                  {place}
+                </AppText>
+              </View>
+              <AppText style={styles.total}>{formatAr(order.totalAmount)}</AppText>
+            </View>
             <View style={styles.place}>
-              {order.delivery ? (
-                <MapPin size={theme.layout.iconSm} color={theme.colors.inkMuted} strokeWidth={2} />
-              ) : (
-                <Store size={theme.layout.iconSm} color={theme.colors.inkMuted} strokeWidth={2} />
-              )}
-              <AppText variant="caption" color="inkMuted" numberOfLines={1} style={styles.flex}>
-                {place}
-                {showDate && date ? ` · ${date}` : ''}
-                {slot ? ` · ${slot}` : ''}
+              <Clock
+                size={theme.layout.iconSm}
+                color={overdue ? theme.colors.statusCancelledFg : theme.colors.inkMuted}
+                strokeWidth={2}
+              />
+              <AppText
+                variant="caption"
+                color={overdue ? 'statusCancelledFg' : 'inkMuted'}
+                numberOfLines={1}
+                style={styles.flex}
+              >
+                {when}
               </AppText>
             </View>
-            <StatusBadge status={order.status} size="sm" />
-            <PaymentBadge isPaid={order.isPaid} />
+            <View style={styles.line}>
+              <StatusBadge status={order.status} size="sm" />
+              <PaymentBadge isPaid={order.isPaid} />
+              <AppText variant="caption" color="inkMuted" numberOfLines={1} style={styles.flex}>
+                {order.customer?.name ?? 'Client de passage'}
+              </AppText>
+            </View>
+            <DriverLine order={order} />
           </View>
-          <DriverLine order={order} />
-        </View>
+        ) : (
+          <View style={styles.flex}>
+            <View style={styles.line}>
+              <AppText style={[styles.flex, styles.strong]} numberOfLines={1}>
+                {title}
+              </AppText>
+              <AppText style={styles.total}>{formatAr(order.totalAmount)}</AppText>
+            </View>
+            <View style={styles.line}>
+              <View style={styles.place}>
+                {order.delivery ? (
+                  <MapPin
+                    size={theme.layout.iconSm}
+                    color={theme.colors.inkMuted}
+                    strokeWidth={2}
+                  />
+                ) : (
+                  <Store size={theme.layout.iconSm} color={theme.colors.inkMuted} strokeWidth={2} />
+                )}
+                <AppText variant="caption" color="inkMuted" numberOfLines={1} style={styles.flex}>
+                  {place}
+                  {showDate && date ? ` · ${date}` : ''}
+                  {slot ? ` · ${slot}` : ''}
+                </AppText>
+              </View>
+              <StatusBadge status={order.status} size="sm" />
+              <PaymentBadge isPaid={order.isPaid} />
+            </View>
+            <DriverLine order={order} />
+          </View>
+        )}
         {phone && (
           <Pressable
             onPress={() => callPhone(phone)}
@@ -227,6 +277,10 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  stack: {
+    gap: theme.spacing[1],
+    paddingVertical: theme.spacing[1],
   },
   strong: {
     fontFamily: theme.typography.heading.fontFamily,

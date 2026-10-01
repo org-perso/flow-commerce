@@ -31,7 +31,7 @@ export function DeliveryCard({
 }) {
   const [open, setOpen] = useState(false);
   const today = businessToday();
-  const phone = order.customer?.phone;
+  const phone = order.customer?.phone ?? order.delivery?.phone;
   const place = order.delivery?.place ?? order.delivery?.address ?? 'À livrer';
   const toggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

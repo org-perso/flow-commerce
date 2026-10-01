@@ -24,6 +24,8 @@ export type OrderDelivery = {
   address: string | null;
   /** Extra instructions for the delivery person. */
   note: string | null;
+  /** Number to call for a walk-in customer (no customer card); older orders: absent. */
+  phone?: string | null;
 };
 
 export type Order = {

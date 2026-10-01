@@ -135,6 +135,9 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
   const [deliveryPlace, setDeliveryPlace] = useState(order?.delivery?.place ?? '');
   const [deliveryAddress, setDeliveryAddress] = useState(order?.delivery?.address ?? '');
   const [deliveryNote, setDeliveryNote] = useState(order?.delivery?.note ?? '');
+  const [deliveryPhone, setDeliveryPhone] = useState(order?.delivery?.phone ?? '');
+  const [deliveryMore, setDeliveryMore] = useState(false);
+  const showDeliveryMore = deliveryMore || !!deliveryAddress || !!deliveryNote;
   const [deliveryFee, setDeliveryFee] = useState(
     order?.deliveryFee ? String(order.deliveryFee) : '',
   );
@@ -147,6 +150,10 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
 
   const itemsAmount = lines.reduce((sum, l) => sum + l.quantity * l.product.sellingPrice, 0);
   const fee = isDelivery ? (toInt(deliveryFee) ?? 0) : 0;
+  // The driver must be able to call: a delivery always needs a number. A known customer
+  // without one, or a walk-in customer, gets a number field on the delivery itself.
+  const customerPhone = customer.kind === 'existing' ? (customer.customer.phones[0] ?? null) : null;
+  const needsDeliveryPhone = isDelivery && customer.kind !== 'new' && !customerPhone;
 
   const resetCustomer = () => {
     setPrefillDismissed(true);
@@ -183,6 +190,12 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
       return setFormError('Indiquez le nom du nouveau client.');
     }
     if (!scheduledDate) return setFormError('Indiquez une date valide (JJ/MM/AAAA).');
+    if (isDelivery && customer.kind === 'new' && !customer.phone.trim()) {
+      return setFormError('Indiquez le téléphone du client : le livreur doit pouvoir appeler.');
+    }
+    if (needsDeliveryPhone && !deliveryPhone.trim()) {
+      return setFormError('Indiquez un numéro à appeler pour la livraison.');
+    }
     if (isDelivery && deliveryFee.trim() && toInt(deliveryFee) === null) {
       return setFormError('Frais de livraison : montant en Ariary, sans virgule.');
     }
@@ -193,6 +206,7 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
           address: deliveryAddress.trim() || null,
           note: deliveryNote.trim() || null,
           fee,
+          phone: needsDeliveryPhone ? deliveryPhone.trim() : null,
         }
       : null;
 
@@ -352,8 +366,8 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
               autoCapitalize="words"
             />
             <TextField
-              label="Téléphone"
-              hint="Si ce numéro est déjà connu, la fiche du client est réutilisée."
+              label={isDelivery ? 'Téléphone (obligatoire pour livrer)' : 'Téléphone'}
+              hint="Numéro déjà connu : sa fiche est reprise."
               value={customer.phone}
               onChangeText={(phone) => setChoice({ ...customer, phone })}
               keyboardType="phone-pad"
@@ -482,36 +496,71 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
         </View>
         {isDelivery && (
           <>
-            <TextField
-              label="Lieu de livraison"
-              value={deliveryPlace}
-              onChangeText={setDeliveryPlace}
-              placeholder="Quartier : Analakely, Ivandry…"
-              maxLength={150}
-            />
-            <TextField
-              label="Adresse de livraison"
-              value={deliveryAddress}
-              onChangeText={setDeliveryAddress}
-              placeholder="Rue, lot, repère…"
-              multiline
-              maxLength={1000}
-            />
-            <TextField
-              label="Précisions (facultatif)"
-              value={deliveryNote}
-              onChangeText={setDeliveryNote}
-              placeholder="Ex. appeler avant, portail bleu…"
-              multiline
-              maxLength={1000}
-            />
-            <TextField
-              label="Frais de livraison (Ar)"
-              value={deliveryFee}
-              onChangeText={setDeliveryFee}
-              placeholder="0"
-              keyboardType="number-pad"
-            />
+            <View style={styles.fieldsRow}>
+              <View style={styles.wide}>
+                <TextField
+                  label="Lieu de livraison"
+                  value={deliveryPlace}
+                  onChangeText={setDeliveryPlace}
+                  placeholder="Analakely, Ivandry…"
+                  maxLength={150}
+                />
+              </View>
+              <View style={styles.flex}>
+                <TextField
+                  label="Frais (Ar)"
+                  value={deliveryFee}
+                  onChangeText={setDeliveryFee}
+                  placeholder="0"
+                  keyboardType="number-pad"
+                />
+              </View>
+            </View>
+            {needsDeliveryPhone && (
+              <TextField
+                label="Téléphone pour la livraison"
+                value={deliveryPhone}
+                onChangeText={setDeliveryPhone}
+                placeholder="034 00 000 00"
+                keyboardType="phone-pad"
+                hint={
+                  customer.kind === 'existing'
+                    ? 'Ce client n’a pas de numéro : celui que le livreur appellera.'
+                    : 'Client de passage : le numéro que le livreur appellera.'
+                }
+              />
+            )}
+            {/* Rarely needed: folded, unless already filled. */}
+            {showDeliveryMore ? (
+              <>
+                <TextField
+                  label="Adresse (facultatif)"
+                  value={deliveryAddress}
+                  onChangeText={setDeliveryAddress}
+                  placeholder="Rue, lot, repère…"
+                  multiline
+                  maxLength={1000}
+                />
+                <TextField
+                  label="Précisions (facultatif)"
+                  value={deliveryNote}
+                  onChangeText={setDeliveryNote}
+                  placeholder="Ex. appeler avant, portail bleu…"
+                  multiline
+                  maxLength={1000}
+                />
+              </>
+            ) : (
+              <View style={styles.links}>
+                <Button
+                  label="Adresse et précisions"
+                  icon={Plus}
+                  variant="ghost"
+                  compact
+                  onPress={() => setDeliveryMore(true)}
+                />
+              </View>
+            )}
           </>
         )}
         <AppText variant="label">Date prévue</AppText>
@@ -810,6 +859,14 @@ const styles = StyleSheet.create({
     borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
+  },
+  fieldsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing[3],
+  },
+  wide: {
+    flex: 2,
   },
   links: {
     flexDirection: 'row',

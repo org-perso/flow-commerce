@@ -19,6 +19,8 @@ export type OrderDelivery = {
   address: string | null;
   /** Extra instructions for the delivery. */
   note: string | null;
+  /** Number to call when there is no customer card (walk-in). */
+  phone: string | null;
 };
 
 export type Order = {
@@ -92,7 +94,7 @@ const orderColumns = `o.id, o.number, o.status, o.source,
           ORDER BY cp.position, cp.created_at LIMIT 1)) END AS customer,
   CASE WHEN o.is_delivery
        THEN json_build_object('place', o.delivery_place, 'address', o.delivery_address,
-                              'note', o.delivery_note)
+                              'note', o.delivery_note, 'phone', o.delivery_phone)
        ELSE NULL END AS delivery,
   o.total_amount - o.delivery_fee AS "itemsAmount", o.delivery_fee AS "deliveryFee",
   o.total_amount AS "totalAmount", o.payment_method AS "paymentMethod",

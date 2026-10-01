@@ -152,7 +152,7 @@ export default function DeliveriesScreen() {
 const styles = StyleSheet.create({
   list: {
     flex: 1,
-    marginTop: -theme.spacing[3],
+    marginTop: -theme.spacing[1],
   },
   strong: {
     fontFamily: theme.typography.heading.fontFamily,

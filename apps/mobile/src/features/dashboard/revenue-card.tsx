@@ -49,8 +49,8 @@ function Tile({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   card: {
-    gap: theme.spacing[3],
-    padding: theme.spacing[4],
+    gap: theme.spacing[2],
+    padding: theme.spacing[3],
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.navy,
   },
@@ -67,12 +67,13 @@ const styles = StyleSheet.create({
   },
   tiles: {
     flexDirection: 'row',
-    gap: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   tile: {
     flex: 1,
     gap: theme.spacing[1] / 2,
-    padding: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.navyRaised,
   },

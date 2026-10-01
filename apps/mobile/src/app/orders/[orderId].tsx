@@ -3,14 +3,16 @@ import {
   ArrowRight,
   CalendarDays,
   Check,
+  MapPin,
   MessageCircle,
   Pencil,
   Phone,
   Store,
-  Truck,
+  User,
   Wallet,
+  type LucideIcon,
 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,7 +26,7 @@ import {
   type OrderStatus,
 } from '@/components/ui';
 import { callPhone, formatPhone, openWhatsApp } from '@/features/customer/contact';
-import { parcelLabel, type Order } from '@/features/order/order-api';
+import { parcelLabel, parcelNumber, type Order } from '@/features/order/order-api';
 import {
   actionLabels,
   destructiveStatuses,
@@ -47,7 +49,7 @@ import {
 } from '@/features/order/use-orders';
 import { useCan } from '@/features/shop/use-shop';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
-import { textStyles, theme } from '@/theme';
+import { hitSlopFor, textStyles, theme } from '@/theme';
 import { formatAr, formatDateTime, formatDayLabel } from '@/utils/format';
 
 const confirmTexts: Partial<Record<OrderStatus, { title: string; message: string }>> = {
@@ -126,33 +128,25 @@ export default function OrderScreen() {
           }}
         />
       )}
-      {/* Summary: what the customer pays, where the order stands. */}
+      {/* Summary: number, where the order stands, what the customer pays. */}
       <View style={[styles.card, styles.summary]}>
-        {/* Written on the parcel by the seller; the driver's only reference (RG-61). */}
-        {o.delivery && (
-          <AppText variant="heading" color="blue">
-            {parcelLabel(o)}
+        <View style={styles.headRow}>
+          {/* Written on the parcel by the seller; the driver's only reference (RG-61). */}
+          <AppText variant="label" color="blue" style={styles.strong}>
+            {o.delivery ? parcelLabel(o) : `Commande ${parcelNumber(o)}`}
           </AppText>
-        )}
-        <View style={styles.row}>
-          <AppText style={[styles.total, styles.flex]}>{formatAr(o.totalAmount)}</AppText>
-          {o.source && (
-            <AppText variant="caption" color="inkMuted">
-              {SOURCE_LABELS[o.source]}
-            </AppText>
-          )}
-        </View>
-        <View style={styles.row}>
           <StatusBadge status={o.status} size="sm" />
           <PaymentBadge isPaid={o.isPaid} />
-          {o.paymentMethod && (
-            <AppText variant="caption" color="inkMuted">
-              {o.paymentMethod}
-            </AppText>
-          )}
         </View>
+        <AppText style={styles.total}>{formatAr(o.totalAmount)}</AppText>
         <AppText variant="caption" color="inkMuted">
-          Créée le {formatDateTime(o.createdAt)}
+          {[
+            o.paymentMethod,
+            o.source ? SOURCE_LABELS[o.source] : null,
+            `créée le ${formatDateTime(o.createdAt)}`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </AppText>
       </View>
 
@@ -219,59 +213,41 @@ export default function OrderScreen() {
 
       {!isDriver && <DriverSection order={o} />}
 
-      <CustomerCard order={o} pressable={canOpenCustomer} />
-
-      {/* Hand-over: planned day, pickup or delivery. */}
-      <View style={styles.section}>
-        <AppText variant="heading">Remise et date</AppText>
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <CalendarDays
-              size={theme.layout.iconMd}
-              color={overdue ? theme.colors.statusCancelledFg : theme.colors.inkMuted}
-              strokeWidth={2}
-            />
-            <View style={styles.flex}>
-              <AppText style={styles.strong} color={overdue ? 'statusCancelledFg' : 'ink'}>
-                {formatDayLabel(o.scheduledDate)}
-                {slotLabel(o.timeSlot) ? ` · ${slotLabel(o.timeSlot)}` : ''}
-                {overdue ? ' · en retard' : ''}
-              </AppText>
-              <AppText variant="caption" color="inkMuted">
-                {o.timeSlot ? 'Date et heure prévues' : 'Date prévue · toute la journée'}
-              </AppText>
-            </View>
-            {editable && (
-              <Button
-                label="Changer"
-                variant="ghost"
-                compact
-                onPress={() => {
-                  setNewDate(o.scheduledDate);
-                  setNewSlot(o.timeSlot);
-                  setDateOpen(true);
-                }}
-              />
-            )}
-          </View>
-          <View style={[styles.row, styles.lineBorder, styles.block]}>
-            {o.delivery ? (
-              <Truck size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
-            ) : (
-              <Store size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
-            )}
-            <View style={styles.flex}>
-              <AppText style={styles.strong}>
-                {o.delivery ? (o.delivery.place ?? 'Livraison') : 'Retrait'}
-              </AppText>
-              <AppText variant="caption" color="inkMuted">
-                {o.delivery
-                  ? [o.delivery.address, o.delivery.note].filter(Boolean).join(' · ') ||
-                    'À une adresse'
-                  : 'En main propre'}
-              </AppText>
-            </View>
-          </View>
+      {/* Where, when, who: one card, one line each. */}
+      <View style={styles.group}>
+        <SectionLabel>{o.delivery ? 'Livraison' : 'Retrait'}</SectionLabel>
+        <View style={[styles.card, styles.list]}>
+          <InfoLine
+            icon={o.delivery ? MapPin : Store}
+            title={o.delivery ? (o.delivery.place ?? 'Lieu non précisé') : 'Retrait en main propre'}
+            subtitle={
+              o.delivery
+                ? [o.delivery.address, o.delivery.note].filter(Boolean).join(' · ') || undefined
+                : undefined
+            }
+          />
+          <InfoLine
+            divider
+            icon={CalendarDays}
+            danger={overdue}
+            title={`${formatDayLabel(o.scheduledDate)}${overdue ? ' · en retard' : ''}`}
+            subtitle={slotLabel(o.timeSlot) ?? 'Toute la journée'}
+            trailing={
+              editable ? (
+                <Button
+                  label="Changer"
+                  variant="ghost"
+                  compact
+                  onPress={() => {
+                    setNewDate(o.scheduledDate);
+                    setNewSlot(o.timeSlot);
+                    setDateOpen(true);
+                  }}
+                />
+              ) : undefined
+            }
+          />
+          <CustomerLine order={o} pressable={canOpenCustomer} />
         </View>
       </View>
 
@@ -300,35 +276,46 @@ export default function OrderScreen() {
         </View>
       </Modal>
 
-      <View style={styles.section}>
-        <AppText variant="heading">{o.items ? 'Produits' : 'Montants'}</AppText>
-        <View style={styles.card}>
+      <View style={styles.group}>
+        <SectionLabel>{o.items ? 'Produits' : 'Montants'}</SectionLabel>
+        <View style={[styles.card, styles.list]}>
           {/* Drivers get no items (RG-61): only the amount of the articles. */}
           {!o.items && (
             <View style={styles.line}>
-              <AppText color="inkMuted" style={styles.flex}>
+              <AppText variant="label" color="inkMuted" style={styles.flex}>
                 Articles
               </AppText>
-              <AppText style={styles.amount}>{formatAr(o.itemsAmount)}</AppText>
+              <AppText variant="label" style={styles.amount}>
+                {formatAr(o.itemsAmount)}
+              </AppText>
             </View>
           )}
           {o.items?.map((item, index) => (
             <View key={item.id} style={[styles.line, index > 0 && styles.lineBorder]}>
+              <AppText variant="label" style={styles.qty}>
+                {item.quantity} ×
+              </AppText>
               <View style={styles.flex}>
-                <AppText style={styles.strong}>{item.productName}</AppText>
+                <AppText variant="label" style={styles.strong} numberOfLines={2}>
+                  {item.productName}
+                </AppText>
                 <AppText variant="caption" color="inkMuted">
-                  {item.quantity} × {formatAr(item.unitSellingPrice)}
+                  {formatAr(item.unitSellingPrice)} l’unité
                 </AppText>
               </View>
-              <AppText style={styles.amount}>{formatAr(item.subtotal)}</AppText>
+              <AppText variant="label" style={styles.amount}>
+                {formatAr(item.subtotal)}
+              </AppText>
             </View>
           ))}
           {o.delivery && (
             <View style={[styles.line, styles.lineBorder]}>
-              <AppText color="inkMuted" style={styles.flex}>
+              <AppText variant="label" color="inkMuted" style={styles.flex}>
                 Frais de livraison
               </AppText>
-              <AppText style={styles.amount}>{formatAr(o.deliveryFee)}</AppText>
+              <AppText variant="label" style={styles.amount}>
+                {formatAr(o.deliveryFee)}
+              </AppText>
             </View>
           )}
           <View style={[styles.line, styles.lineBorder]}>
@@ -354,48 +341,111 @@ export default function OrderScreen() {
   );
 }
 
-function CustomerCard({ order, pressable }: { order: Order; pressable: boolean }) {
-  const customer = order.customer;
-  if (!customer) {
-    return (
-      <View style={styles.card}>
-        <AppText color="inkMuted">Client non renseigné</AppText>
-      </View>
-    );
-  }
+function SectionLabel({ children }: { children: string }) {
   return (
-    <View style={styles.section}>
+    <AppText variant="caption" color="inkMuted" style={styles.sectionLabel}>
+      {children.toUpperCase()}
+    </AppText>
+  );
+}
+
+/** A line of the info card: icon, bold title, small subtitle, optional action on the right. */
+function InfoLine({
+  icon: Icon,
+  title,
+  subtitle,
+  trailing,
+  danger,
+  divider,
+  onPress,
+}: {
+  icon: LucideIcon;
+  title: string;
+  subtitle?: string;
+  trailing?: ReactNode;
+  danger?: boolean;
+  divider?: boolean;
+  onPress?: () => void;
+}) {
+  return (
+    <View style={[styles.line, divider && styles.lineBorder]}>
       <Pressable
-        onPress={pressable ? () => router.push(`/customers/${customer.id}`) : undefined}
-        style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+        onPress={onPress}
+        disabled={!onPress}
+        style={({ pressed }) => [styles.lineMain, pressed && styles.pressed]}
       >
-        <AppText variant="caption" color="inkMuted">
-          Client
-        </AppText>
-        <AppText variant="heading">{customer.name}</AppText>
-        {customer.phone && <AppText color="inkMuted">{formatPhone(customer.phone)}</AppText>}
-      </Pressable>
-      {customer.phone && (
-        <View style={styles.row}>
-          <View style={styles.flex}>
-            <Button
-              label="Appeler"
-              icon={Phone}
-              fullWidth
-              onPress={() => callPhone(customer.phone!)}
-            />
-          </View>
-          <View style={styles.flex}>
-            <Button
-              label="WhatsApp"
-              icon={MessageCircle}
-              fullWidth
-              onPress={() => openWhatsApp(customer.phone!)}
-            />
-          </View>
+        <Icon
+          size={theme.layout.iconMd}
+          color={danger ? theme.colors.statusCancelledFg : theme.colors.inkMuted}
+          strokeWidth={2}
+        />
+        <View style={styles.flex}>
+          <AppText style={styles.strong} color={danger ? 'statusCancelledFg' : 'ink'}>
+            {title}
+          </AppText>
+          {subtitle && (
+            <AppText variant="caption" color="inkMuted">
+              {subtitle}
+            </AppText>
+          )}
         </View>
-      )}
+      </Pressable>
+      {trailing}
     </View>
+  );
+}
+
+/** Round call / WhatsApp button, same as on the order cards. */
+function RoundAction({
+  icon: Icon,
+  label,
+  onPress,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={hitSlopFor(theme.layout.controlHeight)}
+      style={({ pressed }) => [styles.round, pressed && styles.pressed]}
+    >
+      <Icon size={theme.layout.iconSm} color={theme.colors.blue} strokeWidth={2} />
+    </Pressable>
+  );
+}
+
+function CustomerLine({ order, pressable }: { order: Order; pressable: boolean }) {
+  const customer = order.customer;
+  // A walk-in customer has no card: the delivery keeps the number to call.
+  const phone = customer?.phone ?? order.delivery?.phone ?? null;
+  return (
+    <InfoLine
+      divider
+      icon={User}
+      title={customer?.name ?? 'Client de passage'}
+      subtitle={phone ? formatPhone(phone) : 'Pas de numéro'}
+      onPress={customer && pressable ? () => router.push(`/customers/${customer.id}`) : undefined}
+      trailing={
+        phone ? (
+          <View style={styles.actions}>
+            <RoundAction
+              icon={MessageCircle}
+              label="WhatsApp"
+              onPress={() => openWhatsApp(phone)}
+            />
+            <RoundAction
+              icon={Phone}
+              label={`Appeler ${formatPhone(phone)}`}
+              onPress={() => callPhone(phone)}
+            />
+          </View>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -409,14 +459,23 @@ function statusErrorMessage(error: unknown, order: Order): string {
 
 const styles = StyleSheet.create({
   summary: {
+    gap: theme.spacing[1],
+  },
+  headRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: theme.spacing[2],
   },
-  block: {
-    marginTop: theme.spacing[3],
-    paddingTop: theme.spacing[3],
-  },
   section: {
-    gap: theme.spacing[3],
+    gap: theme.spacing[2],
+  },
+  group: {
+    gap: theme.spacing[2],
+  },
+  sectionLabel: {
+    fontFamily: theme.typography.heading.fontFamily,
+    paddingHorizontal: theme.spacing[1],
   },
   modal: {
     flex: 1,
@@ -432,28 +491,56 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surfaceRaised,
     borderRadius: theme.radius.md,
-    padding: theme.spacing[4],
-    gap: theme.spacing[1],
+    borderWidth: theme.layout.border,
+    borderColor: theme.colors.line,
+    padding: theme.spacing[3],
+  },
+  list: {
+    paddingVertical: theme.spacing[1],
   },
   row: {
     flexDirection: 'row',
-    gap: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   line: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing[3],
+    minHeight: theme.layout.controlHeight,
     paddingVertical: theme.spacing[2],
+  },
+  lineMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[3],
   },
   lineBorder: {
     borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: theme.spacing[2],
+  },
+  round: {
+    width: theme.layout.controlHeight,
+    height: theme.layout.controlHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.navySoft,
   },
   flex: {
     flex: 1,
   },
   strong: {
     fontFamily: theme.typography.heading.fontFamily,
+  },
+  qty: {
+    fontFamily: theme.typography.heading.fontFamily,
+    fontVariant: ['tabular-nums'],
+    color: theme.colors.inkMuted,
   },
   amount: {
     fontVariant: ['tabular-nums'],
@@ -462,6 +549,6 @@ const styles = StyleSheet.create({
     ...textStyles.amountMd,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: theme.layout.pressedOpacity,
   },
 });

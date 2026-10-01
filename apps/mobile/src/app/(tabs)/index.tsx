@@ -121,22 +121,20 @@ function StatusCounter({
       accessibilityLabel={`${count} ${label}`}
       style={({ pressed }) => [styles.counter, pressed && styles.pressed]}
     >
+      <View style={[styles.dot, { backgroundColor: theme.statusColors[status].fg }]} />
+      <AppText
+        variant="label"
+        color="inkMuted"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={theme.layout.minFontScale}
+        style={styles.flex}
+      >
+        {label}
+      </AppText>
       <AppText variant="heading" style={styles.counterValue}>
         {count}
       </AppText>
-      <View style={styles.counterLabel}>
-        <View style={[styles.dot, { backgroundColor: theme.statusColors[status].fg }]} />
-        <AppText
-          variant="caption"
-          color="inkMuted"
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={theme.layout.minFontScale}
-          style={styles.flex}
-        >
-          {label}
-        </AppText>
-      </View>
     </Pressable>
   );
 }
@@ -215,16 +213,22 @@ const styles = StyleSheet.create({
     marginBottom: -theme.spacing[3],
   },
   block: {
-    gap: theme.spacing[3],
+    gap: theme.spacing[2],
   },
+  // 2 × 2: label and count on one line each, wide enough to read.
   counters: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.spacing[2],
   },
   counter: {
-    flex: 1,
-    gap: theme.spacing[1],
-    padding: theme.spacing[2],
+    flexBasis: '48%',
+    flexGrow: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[2],
+    paddingVertical: theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
     borderRadius: theme.radius.md,
     borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
@@ -233,18 +237,13 @@ const styles = StyleSheet.create({
   counterValue: {
     fontVariant: ['tabular-nums'],
   },
-  counterLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing[1],
-  },
   dot: {
     width: theme.layout.dot,
     height: theme.layout.dot,
     borderRadius: theme.radius.pill,
   },
   card: {
-    paddingHorizontal: theme.spacing[4],
+    paddingHorizontal: theme.spacing[3],
     borderRadius: theme.radius.md,
     borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
@@ -255,7 +254,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing[2],
     minHeight: theme.layout.rowMinHeight,
-    paddingVertical: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
   },
   detail: {
     gap: theme.spacing[1],
