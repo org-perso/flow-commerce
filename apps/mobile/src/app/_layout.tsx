@@ -127,6 +127,15 @@ function RootNavigator({ ready }: { ready: boolean }) {
             name="my-nickname"
             options={headerOptions('Mon pseudo', { showShop: false })}
           />
+          <Stack.Screen name="round" options={headerOptions('Ma tournée', { showShop: false })} />
+          <Stack.Screen
+            name="account-settings"
+            options={headerOptions('Paramètres du compte', { showShop: false })}
+          />
+          <Stack.Screen
+            name="delete-account"
+            options={headerOptions('Supprimer mon compte', { showShop: false })}
+          />
           <Stack.Screen
             name="join-shop"
             options={headerOptions('Rejoindre une boutique', { showShop: false })}

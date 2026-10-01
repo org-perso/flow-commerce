@@ -112,7 +112,7 @@ export function changeMemberRole(
 }
 
 /** RG-56: the member loses access at once; their open deliveries become unassigned. */
-async function deleteMember(client: pg.PoolClient, shopId: string, userId: string) {
+export async function deleteMember(client: pg.PoolClient, shopId: string, userId: string) {
   await unassignOpenDeliveries(client, shopId, userId);
   await client.query('DELETE FROM shop_members WHERE shop_id = $1 AND user_id = $2', [
     shopId,
@@ -122,7 +122,8 @@ async function deleteMember(client: pg.PoolClient, shopId: string, userId: strin
 
 async function unassignOpenDeliveries(client: pg.PoolClient, shopId: string, userId: string) {
   await client.query(
-    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL, delivery_notified_at = NULL
+    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL, delivery_notified_at = NULL,
+         route_position = NULL
      WHERE shop_id = $1 AND assigned_to = $2
        AND status NOT IN ('LIVREE', 'ANNULEE', 'RETOUR')`,
     [shopId, userId],

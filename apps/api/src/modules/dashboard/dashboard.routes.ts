@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { BUSINESS_TZ, businessToday } from '../../config/time.js';
+import { OPEN_STATUSES } from '../order/order-status.js';
+import type { Order } from '../order/order.repository.js';
+import { BUSINESS_TZ, businessNow, businessToday } from '../../config/time.js';
 import { pool } from '../../db/pool.js';
 import { currentShopId } from '../../http/context.js';
 import { STOCK_TAKEN_STATUSES } from '../order/order-status.js';
@@ -38,6 +40,17 @@ const query = z.object({
  */
 
 /** /shops/:shopId/dashboard?period=today|7d|30d (week|month kept for older apps) */
+/**
+ * RG-27: an open order is late after its planned day, or today once its slot has ended
+ * ("avant 11h" still open at 11:00).
+ */
+function isOverdue(o: Order): boolean {
+  if (!OPEN_STATUSES.includes(o.status)) return false;
+  const today = businessToday();
+  if (o.scheduledDate < today) return true;
+  return o.scheduledDate === today && !!o.timeSlot?.to && o.timeSlot.to <= businessNow();
+}
+
 export const dashboardRouter = Router();
 
 dashboardRouter.get('/', async (req, res) => {
@@ -113,9 +126,9 @@ dashboardRouter.get('/', async (req, res) => {
     ordersByStatus,
     lowStockProducts: lowStock.rows,
     unpaid: unpaid.rows[0]!,
-    /** Planned before today and still open, oldest first. */
+    /** Still open after their planned day, or after the end of today's slot; oldest first. */
     overdueOrders: (await listOrders(shopId, { when: 'today', limit: 100, offset: 0 })).filter(
-      (o) => o.scheduledDate < businessToday(),
+      (o) => isOverdue(o),
     ),
     recentOrders: await listOrders(shopId, { limit: 5, offset: 0 }),
   });

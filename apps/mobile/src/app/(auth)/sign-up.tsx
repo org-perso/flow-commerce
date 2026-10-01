@@ -11,10 +11,13 @@ import { signUp } from '@/features/auth/auth-service';
 import { FormTextField } from '@/components/form-text-field';
 import { GoogleSignInButton } from '@/features/auth/google-sign-in-button';
 import { signUpSchema, type SignUpValues } from '@/features/auth/schemas';
+import { TermsConsent, TermsNotice } from '@/features/auth/terms-consent';
 import { theme } from '@/theme';
 
 export default function SignUpScreen() {
   const [error, setError] = useState<string>();
+  const [accepted, setAccepted] = useState(false);
+  const [consentError, setConsentError] = useState<string>();
   const { control, handleSubmit, formState } = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: { email: '', password: '', confirmPassword: '' },
@@ -22,6 +25,10 @@ export default function SignUpScreen() {
 
   const onSubmit = handleSubmit(async ({ email, password }) => {
     setError(undefined);
+    if (!accepted) {
+      setConsentError('Acceptez la politique de confidentialité pour créer votre compte.');
+      return;
+    }
     try {
       await signUp(email, password);
     } catch (e) {
@@ -60,6 +67,14 @@ export default function SignUpScreen() {
         textContentType="newPassword"
         onSubmitEditing={onSubmit}
       />
+      <TermsConsent
+        accepted={accepted}
+        onChange={(next) => {
+          setAccepted(next);
+          if (next) setConsentError(undefined);
+        }}
+        error={consentError}
+      />
       <Button
         label="Créer mon compte"
         variant="primary"
@@ -68,6 +83,7 @@ export default function SignUpScreen() {
         onPress={onSubmit}
       />
       <GoogleSignInButton />
+      <TermsNotice />
       <View style={styles.footer}>
         <AppText color="inkMuted">Déjà un compte ?</AppText>
         <Button label="Se connecter" variant="ghost" onPress={() => router.replace('/sign-in')} />

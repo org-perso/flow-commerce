@@ -21,7 +21,7 @@ export const SECTION_TITLES: Record<Role, string> = {
 /** Message shared with the person invited. */
 export function invitationMessage(shopName: string, role: Role, code: string): string {
   return (
-    `Rejoins la boutique ${shopName} sur FlowCommerce en tant que ` +
+    `Rejoins la boutique ${shopName} sur Flow.Co en tant que ` +
     `${ROLE_LABELS[role].toLowerCase()}. Code : ${code} (valable 7 jours).`
   );
 }

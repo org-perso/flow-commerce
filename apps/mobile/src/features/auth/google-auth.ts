@@ -1,5 +1,9 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import {
+  GoogleAuthProvider,
+  reauthenticateWithCredential,
+  signInWithCredential,
+} from 'firebase/auth';
 import { Platform } from 'react-native';
 
 import { auth } from '@/lib/firebase';
@@ -49,4 +53,17 @@ export function isGoogleSignInInProgress(error: unknown) {
     google.isErrorWithCode(error) &&
     error.code === google.statusCodes.IN_PROGRESS
   );
+}
+
+/** Asks the Google account again (Firebase wants a recent sign-in to delete an account). */
+export async function reauthenticateWithGoogle(): Promise<boolean> {
+  if (!google || !auth.currentUser) return false;
+  const { GoogleSignin, isSuccessResponse } = google;
+  const response = await GoogleSignin.signIn();
+  if (!isSuccessResponse(response) || !response.data.idToken) return false;
+  await reauthenticateWithCredential(
+    auth.currentUser,
+    GoogleAuthProvider.credential(response.data.idToken),
+  );
+  return true;
 }

@@ -38,7 +38,7 @@ function Choice({
 /** First launch without a shop: create one, or join one with a code (F-11). */
 export default function OnboardingChoiceScreen() {
   return (
-    <AuthScaffold title="Bienvenue !" subtitle="Comment voulez-vous utiliser FlowCommerce ?">
+    <AuthScaffold title="Bienvenue !" subtitle="Comment voulez-vous utiliser Flow.Co ?">
       <Choice
         icon={Store}
         title="Créer ma boutique"

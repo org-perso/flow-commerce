@@ -42,6 +42,10 @@ export type Order = {
   isPaid: boolean;
   /** When the order was marked as paid; null if not paid. */
   paidAt: Date | null;
+  /** Hours of the planned day (HH:MM); null: any time of the day. */
+  timeSlot: { from: string | null; to: string | null } | null;
+  /** Rank in the driver's round (1, 2…) once they organise it; null: automatic order. */
+  routePosition: number | null;
   /** Delivery driver, when assigned; `name` is their pseudo in the shop, never their email. */
   driver: { userId: string; name: string | null } | null;
   createdAt: Date;
@@ -78,6 +82,10 @@ const AVAILABLE = `(o.assigned_to IS NULL AND o.is_delivery AND o.status = ANY($
 
 const orderColumns = `o.id, o.number, o.status, o.source,
   to_char(o.scheduled_date, 'YYYY-MM-DD') AS "scheduledDate",
+  CASE WHEN o.slot_from IS NULL AND o.slot_to IS NULL THEN NULL
+       ELSE json_build_object('from', to_char(o.slot_from, 'HH24:MI'),
+                              'to', to_char(o.slot_to, 'HH24:MI')) END AS "timeSlot",
+  o.route_position AS "routePosition",
   CASE WHEN c.id IS NULL THEN NULL
        ELSE json_build_object('id', c.id, 'name', c.name, 'phone',
          (SELECT cp.phone FROM customer_phones cp WHERE cp.customer_id = c.id
@@ -183,6 +191,9 @@ export async function listOrders(shopId: string, filters: OrderFilters): Promise
      WHERE ${where.sql} AND ($13::text IS NULL OR o.status = $13)
      ORDER BY
        CASE WHEN $2::text IS NULL THEN NULL ELSE o.scheduled_date END,
+       -- Within a day: the slot ending first; "any time" last.
+       CASE WHEN $2::text IS NULL THEN NULL ELSE o.slot_to END NULLS LAST,
+       CASE WHEN $2::text IS NULL THEN NULL ELSE o.slot_from END NULLS LAST,
        o.created_at DESC, o.id
      LIMIT $14 OFFSET $15`,
     [...where.values, filters.status ?? null, filters.limit, filters.offset],

@@ -4,11 +4,18 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText, Button, StatusBadge } from '@/components/ui';
 import { callPhone, formatPhone } from '@/features/customer/contact';
 import { hitSlopFor, theme } from '@/theme';
-import { businessToday, formatAr, formatDateTime, formatDayLabel } from '@/utils/format';
+import {
+  businessNow,
+  businessToday,
+  formatAr,
+  formatDateTime,
+  formatDayLabel,
+} from '@/utils/format';
 
 import { parcelLabel, type Order } from './order-api';
 import { destructiveStatuses, OPEN_STATUSES, quickActionLabels, TRANSITIONS } from './order-status';
 import { PaymentBadge } from './payment-badge';
+import { slotLabel } from './time-slot';
 import { useChangeOrderStatus, useUpdateOrder } from './use-orders';
 
 /** "2 × Savon coco, 3 × Thé" — no prices. */
@@ -44,9 +51,15 @@ function DriverLine({ order }: { order: Order }) {
   );
 }
 
-/** Planned before today and not handled yet. */
+/**
+ * Not handled yet after its planned day, or today once its slot has ended ("avant 11h" still
+ * open at 11h) — RG-27.
+ */
 export function isOverdue(order: Order, today = businessToday()): boolean {
-  return order.scheduledDate < today && OPEN_STATUSES.includes(order.status);
+  if (!OPEN_STATUSES.includes(order.status)) return false;
+  if (order.scheduledDate < today) return true;
+  const end = order.timeSlot?.to;
+  return order.scheduledDate === today && !!end && end <= businessNow();
 }
 
 type OrderRowProps = {
@@ -76,6 +89,7 @@ export function OrderRow({
   const title = hideCustomer
     ? formatDateTime(order.createdAt)
     : (order.customer?.name ?? 'Client de passage');
+  const slot = slotLabel(order.timeSlot);
   const date =
     overdue || order.scheduledDate !== today
       ? formatDayLabel(order.scheduledDate, today).toLowerCase()
@@ -105,6 +119,7 @@ export function OrderRow({
               <AppText variant="caption" color="inkMuted" numberOfLines={1} style={styles.flex}>
                 {place}
                 {showDate && date ? ` · ${date}` : ''}
+                {slot ? ` · ${slot}` : ''}
               </AppText>
             </View>
             <StatusBadge status={order.status} size="sm" />

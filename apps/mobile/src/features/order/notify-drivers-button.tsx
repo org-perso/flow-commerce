@@ -1,5 +1,5 @@
 import { BellRing } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button, InlineBanner } from '@/components/ui';
 import { apiErrorMessage } from '@/lib/api-client';
@@ -15,14 +15,28 @@ export function NotifyDriversButton() {
   const notify = useNotifyDrivers();
   const [sent, setSent] = useState<number>();
 
+  // The confirmation goes away by itself after a few seconds (or with its cross).
+  useEffect(() => {
+    if (sent === undefined) return;
+    const timer = setTimeout(() => setSent(undefined), CONFIRMATION_MS);
+    return () => clearTimeout(timer);
+  }, [sent]);
+
   if (notify.isError) {
-    return <InlineBanner tone="danger" message={apiErrorMessage(notify.error)} />;
+    return (
+      <InlineBanner
+        tone="danger"
+        message={apiErrorMessage(notify.error)}
+        onDismiss={() => notify.reset()}
+      />
+    );
   }
   if (sent !== undefined && !toNotify.data?.orders) {
     return (
       <InlineBanner
         tone="success"
         message={`✓ ${sent} livreur${sent > 1 ? 's' : ''} prévenu${sent > 1 ? 's' : ''}`}
+        onDismiss={() => setSent(undefined)}
       />
     );
   }
@@ -39,3 +53,5 @@ export function NotifyDriversButton() {
     />
   );
 }
+
+const CONFIRMATION_MS = 4000;

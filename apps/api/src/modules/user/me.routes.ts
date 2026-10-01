@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { pool } from '../../db/pool.js';
 import { currentUser } from '../../http/context.js';
+import { deleteAccount } from './account.service.js';
 import { updateUser } from './user.repository.js';
 
 const optionalText = (max: number) =>
@@ -28,6 +29,14 @@ meRouter.get('/', (req, res) => {
 meRouter.patch('/', async (req, res) => {
   const patch = updateMeSchema.parse(req.body);
   res.json(await updateUser(currentUser(req).id, patch));
+});
+
+/**
+ * Deletes the account and its data (Play Store requirement). The app then removes the returned
+ * photos from Firebase Storage and deletes the Firebase account itself.
+ */
+meRouter.delete('/', async (req, res) => {
+  res.json(await deleteAccount(currentUser(req).id));
 });
 
 const pushTokenSchema = z

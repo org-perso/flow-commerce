@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'r
 
 import { EmptyState, InlineBanner, PageTitle, Screen, ScreenHeader } from '@/components/ui';
 import { DeliveryCard } from '@/features/order/delivery-card';
+import { byPlannedTime } from '@/features/order/time-slot';
 import { useDriverOrders } from '@/features/order/use-orders';
 import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
@@ -10,7 +11,7 @@ import { theme } from '@/theme';
 /** Deliveries nobody has taken yet (F-13): first come, first served (RG-55). */
 export default function AvailableScreen() {
   const orders = useDriverOrders('available');
-  const list = [...orders.items].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+  const list = [...orders.items].sort(byPlannedTime);
 
   return (
     <Screen scroll={false} header={<ScreenHeader />}>

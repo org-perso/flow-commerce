@@ -6,7 +6,14 @@ import type { Request } from 'express';
 import { currentMember, currentShopId } from '../../http/context.js';
 import { idParam, notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
-import { amount, isoDate, optionalText, pagination, requiredText } from '../../http/schemas.js';
+import {
+  amount,
+  isoDate,
+  optionalText,
+  pagination,
+  requiredText,
+  timeSlot,
+} from '../../http/schemas.js';
 import { phoneField } from '../customer/phone.js';
 import { notifyDelivered, notifyPaid } from '../notification/notification.service.js';
 import { can, requirePermission } from '../shop/permissions.js';
@@ -17,6 +24,7 @@ import {
   driverCanSee,
   findOwnDelivery,
   releaseDelivery,
+  setRoute,
   unassignDriver,
 } from './delivery.service.js';
 import { ORDER_SOURCES } from './order-source.js';
@@ -51,6 +59,7 @@ const createOrderSchema = z
     source: z.enum(ORDER_SOURCES).nullable().default(null),
     /** Planned delivery / hand-over day; defaults to today (Madagascar). */
     scheduledDate: isoDate.nullable().default(null),
+    timeSlot: timeSlot.default(null),
     delivery: delivery.default(null),
     paymentMethod: optionalText(30).default(null),
     isPaid: z.boolean().default(false),
@@ -69,6 +78,7 @@ const updateOrderSchema = z
     items,
     source: z.enum(ORDER_SOURCES).nullable(),
     scheduledDate: isoDate,
+    timeSlot,
     delivery,
     paymentMethod: optionalText(30),
     isPaid: z.boolean(),
@@ -199,4 +209,18 @@ ordersRouter.post('/:orderId/claim', requirePermission('deliveries'), async (req
 ordersRouter.post('/:orderId/release', requirePermission('deliveries'), async (req, res) => {
   const orderId = idParam(req.params.orderId, 'Order');
   res.json(await releaseDelivery(currentShopId(req), orderId, currentMember(req).userId));
+});
+
+const routeSchema = z.object({ orderIds: z.array(z.uuid()).max(200) }).strict();
+
+/** /shops/:shopId/deliveries/route — a driver organises their round (empty: automatic). */
+export const driverRouteRouter = Router();
+
+driverRouteRouter.put('/route', requirePermission('deliveries'), async (req, res) => {
+  const { orderIds } = routeSchema.parse(req.body);
+  if (new Set(orderIds).size !== orderIds.length) {
+    throw new ProblemError(422, 'Unprocessable Content', 'An order appears twice.');
+  }
+  await setRoute(currentShopId(req), currentMember(req).userId, orderIds);
+  res.status(204).end();
 });

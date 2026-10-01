@@ -33,6 +33,8 @@ import {
   TRANSITIONS,
 } from '@/features/order/order-status';
 import { DateChoice } from '@/features/order/date-choice';
+import { slotLabel, type TimeSlot } from '@/features/order/time-slot';
+import { TimeSlotChoice } from '@/features/order/time-slot-choice';
 import { DriverActions } from '@/features/order/driver-actions';
 import { DriverSection } from '@/features/order/driver-picker';
 import { isOverdue } from '@/features/order/order-row';
@@ -68,6 +70,7 @@ export default function OrderScreen() {
   const insets = useSafeAreaInsets();
   const [dateOpen, setDateOpen] = useState(false);
   const [newDate, setNewDate] = useState<string | null>(null);
+  const [newSlot, setNewSlot] = useState<TimeSlot | null>(null);
   // Drivers get their own actions (F-13); the API limits them to their deliveries.
   const isDriver = !useCan('orders');
   const canOpenCustomer = useCan('customers');
@@ -231,10 +234,11 @@ export default function OrderScreen() {
             <View style={styles.flex}>
               <AppText style={styles.strong} color={overdue ? 'statusCancelledFg' : 'ink'}>
                 {formatDayLabel(o.scheduledDate)}
+                {slotLabel(o.timeSlot) ? ` · ${slotLabel(o.timeSlot)}` : ''}
                 {overdue ? ' · en retard' : ''}
               </AppText>
               <AppText variant="caption" color="inkMuted">
-                Date prévue
+                {o.timeSlot ? 'Date et heure prévues' : 'Date prévue · toute la journée'}
               </AppText>
             </View>
             {editable && (
@@ -244,6 +248,7 @@ export default function OrderScreen() {
                 compact
                 onPress={() => {
                   setNewDate(o.scheduledDate);
+                  setNewSlot(o.timeSlot);
                   setDateOpen(true);
                 }}
               />
@@ -274,17 +279,19 @@ export default function OrderScreen() {
         <View style={[styles.modal, { paddingTop: insets.top + theme.spacing[3] }]}>
           <AppText variant="heading">Date prévue</AppText>
           <DateChoice value={newDate} onChange={setNewDate} />
+          <AppText variant="label">Heure</AppText>
+          <TimeSlotChoice value={newSlot} onChange={setNewSlot} />
           {updateOrder.isError && (
             <AlertBanner tone="danger" message={apiErrorMessage(updateOrder.error)} />
           )}
           <Button
-            label="Enregistrer la date"
+            label="Enregistrer"
             fullWidth
             loading={updateOrder.isPending}
             onPress={() =>
               newDate &&
               updateOrder.mutate(
-                { scheduledDate: newDate },
+                { scheduledDate: newDate, timeSlot: newSlot },
                 { onSuccess: () => setDateOpen(false) },
               )
             }

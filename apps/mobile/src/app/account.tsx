@@ -99,7 +99,9 @@ export default function AccountScreen() {
           <ListRow
             leading={<Avatar name={name} />}
             title={user?.email ?? name}
-            subtitle={user?.emailVerified ? 'Email vérifié' : 'Email non vérifié'}
+            subtitle="Paramètres du compte"
+            trailing={chevron}
+            onPress={() => router.push('/account-settings')}
           />
         </ListGroup>
         <EmailVerificationBanner />
@@ -167,7 +169,7 @@ export default function AccountScreen() {
           />
         </ListGroup>
         <AppText variant="caption" color="inkMuted" style={styles.center}>
-          FlowCommerce {Constants.expoConfig?.version ?? ''}
+          Flow.Co {Constants.expoConfig?.version ?? ''}
         </AppText>
       </View>
     </Screen>

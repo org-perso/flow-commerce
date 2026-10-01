@@ -31,7 +31,7 @@ export function AuthScaffold({ title, subtitle, children }: AuthScaffoldProps) {
                 accessibilityIgnoresInvertColors
               />
               <AppText variant="title" color="onNavy">
-                FlowCommerce
+                Flow.Co
               </AppText>
             </View>
             <AppText variant="label" color="onNavyMuted">

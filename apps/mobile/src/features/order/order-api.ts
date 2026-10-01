@@ -2,6 +2,8 @@ import type { OrderStatus } from '@/components/ui';
 import { apiFetch } from '@/lib/api-client';
 import { setPage, type Page } from '@/lib/paging';
 
+import type { TimeSlot } from './time-slot';
+
 export type OrderItem = {
   id: string;
   productId: string;
@@ -32,6 +34,10 @@ export type Order = {
   source: OrderSource | null;
   /** Planned delivery / hand-over day (YYYY-MM-DD). */
   scheduledDate: string;
+  /** Hours of the planned day; null: any time. */
+  timeSlot: TimeSlot | null;
+  /** Rank in the driver's round once they organise it (1, 2…); null: automatic order. */
+  routePosition?: number | null;
   /** `phone` is the customer's main number. */
   customer: { id: string; name: string; phone: string | null } | null;
   /** null when the order is not delivered (pickup, hand delivery). */
@@ -52,9 +58,12 @@ export type Order = {
   items?: OrderItem[];
 };
 
-/** "Colis #042": the per-shop order number, written on the parcel. */
-export const parcelLabel = (order: Pick<Order, 'number'>) =>
-  `Colis #${String(order.number).padStart(3, '0')}`;
+/** "#042": the per-shop order number, written on the parcel. */
+export const parcelNumber = (order: Pick<Order, 'number'>) =>
+  `#${String(order.number).padStart(3, '0')}`;
+
+/** "Colis #042". */
+export const parcelLabel = (order: Pick<Order, 'number'>) => `Colis ${parcelNumber(order)}`;
 
 export type OrderFilters = {
   /** today: planned today + overdue open orders; upcoming: planned later. */
@@ -75,6 +84,7 @@ export type CreateOrderInput = {
   source: OrderSource | null;
   /** YYYY-MM-DD; null means today. */
   scheduledDate: string | null;
+  timeSlot: TimeSlot | null;
   /** null: not delivered, so no delivery fee. */
   delivery: (OrderDelivery & { fee: number }) | null;
   paymentMethod: string | null;
@@ -88,6 +98,7 @@ export type OrderPatch = Partial<{
   items: { productId: string; quantity: number }[];
   source: OrderSource | null;
   scheduledDate: string;
+  timeSlot: TimeSlot | null;
   delivery: (OrderDelivery & { fee: number }) | null;
   paymentMethod: string | null;
   isPaid: boolean;
@@ -182,4 +193,12 @@ export function getDeliveriesToNotify(shopId: string): Promise<DeliveriesToNotif
 /** "Notifier les livreurs": one grouped notification per driver. */
 export function notifyDrivers(shopId: string): Promise<DeliveriesToNotify> {
   return apiFetch(`/shops/${shopId}/deliveries/notify`, { method: 'POST' });
+}
+
+/** The driver's round, in order; an empty list goes back to the automatic order. */
+export function setDriverRoute(shopId: string, orderIds: string[]): Promise<void> {
+  return apiFetch(`/shops/${shopId}/deliveries/route`, {
+    method: 'PUT',
+    body: JSON.stringify({ orderIds }),
+  });
 }

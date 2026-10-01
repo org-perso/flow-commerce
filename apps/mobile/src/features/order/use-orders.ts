@@ -14,6 +14,7 @@ import {
   listDrivers,
   notifyDrivers,
   releaseDelivery,
+  setDriverRoute,
   unassignDriver,
   createOrder,
   getOrder,
@@ -109,6 +110,10 @@ export function useDeliveriesToNotify(enabled: boolean) {
     queryFn: () => getDeliveriesToNotify(shopId),
     enabled,
   });
+}
+
+export function useSetDriverRoute() {
+  return useShopMutation((shopId, orderIds: string[]) => setDriverRoute(shopId, orderIds));
 }
 
 export function useNotifyDrivers() {

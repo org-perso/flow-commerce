@@ -43,6 +43,8 @@ export const theme = {
     dot: 6,
     /** Opacity of a pressed element. */
     pressedOpacity: 0.85,
+    /** Opacity of an unavailable control (e.g. ↑ on the first row). */
+    disabledOpacity: 0.3,
     /** Tallest reasonable tab label scale-down on small screens. */
     minFontScale: 0.8,
   },

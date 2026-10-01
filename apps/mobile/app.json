@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FlowCommerce",
+    "name": "Flow.Co",
     "slug": "mobile",
     "version": "1.0.1",
     "orientation": "portrait",
@@ -61,8 +61,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "FlowCommerce accède à vos photos pour illustrer vos produits.",
-          "cameraPermission": "FlowCommerce utilise l’appareil photo pour photographier vos produits."
+          "photosPermission": "Flow.Co accède à vos photos pour illustrer vos produits.",
+          "cameraPermission": "Flow.Co utilise l’appareil photo pour photographier vos produits."
         }
       ]
     ],

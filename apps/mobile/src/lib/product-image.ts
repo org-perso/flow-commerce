@@ -101,3 +101,13 @@ export class ImageUploadError extends Error {}
 
 /** A picked image not uploaded yet (local file) vs an already stored URL. */
 export const isLocalImage = (uri: string) => !uri.startsWith('http');
+
+/** Removes a stored photo (account deletion). Best effort: a failure leaves the file. */
+export async function deleteStoredImage(url: string): Promise<void> {
+  if (!url.startsWith('https://firebasestorage.googleapis.com/')) return;
+  const token = await auth.currentUser?.getIdToken();
+  await fetch(url.split('?')[0]!, {
+    method: 'DELETE',
+    headers: token ? { Authorization: `Firebase ${token}` } : {},
+  }).catch(() => {});
+}

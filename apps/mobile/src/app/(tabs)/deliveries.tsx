@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { ChevronDown, ChevronUp, ListOrdered, RefreshCw } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,6 +12,7 @@ import {
 
 import {
   AppText,
+  Button,
   EmptyState,
   InlineBanner,
   PageTitle,
@@ -19,37 +21,37 @@ import {
 } from '@/components/ui';
 import { DeliveryCard } from '@/features/order/delivery-card';
 import type { Order } from '@/features/order/order-api';
-import { isOverdue } from '@/features/order/order-row';
+import { roundSections, type RoundSection } from '@/features/order/round';
+import { byPlannedTime } from '@/features/order/time-slot';
 import { useDriverOrders } from '@/features/order/use-orders';
 import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
 import { businessToday } from '@/utils/format';
 
-const OVERDUE = 'En retard';
 const DONE = 'Terminées';
 
 const isDone = (o: Order) =>
   o.status === 'ANNULEE' || o.status === 'RETOUR' || (o.status === 'LIVREE' && o.isPaid);
 
-type Section = { title: string; data: Order[]; count: number };
+type Section = RoundSection & { count: number };
 
-function toSections(orders: Order[], doneOpen: boolean): Section[] {
-  const today = businessToday();
-  const groups: Record<string, Order[]> = { [OVERDUE]: [], "Aujourd'hui": [], 'À venir': [] };
+/** Today's round (see roundSections), then the coming days, then the finished ones (folded). */
+function toSections(orders: Order[], today: string, doneOpen: boolean): Section[] {
+  const current: Order[] = [];
+  const coming: Order[] = [];
   const done: Order[] = [];
   for (const order of orders) {
     if (isDone(order)) done.push(order);
-    else if (isOverdue(order, today)) groups[OVERDUE]!.push(order);
-    else if (order.scheduledDate <= today) groups["Aujourd'hui"]!.push(order);
-    else groups['À venir']!.push(order);
+    else if (order.scheduledDate > today) coming.push(order);
+    else current.push(order);
   }
-  const sections = Object.entries(groups)
-    .filter(([, data]) => data.length > 0)
-    .map(([title, data]) => ({
-      title,
-      data: [...data].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)),
-      count: data.length,
-    }));
+  const sections: Section[] = roundSections(current, today).map((s) => ({
+    ...s,
+    count: s.data.length,
+  }));
+  if (coming.length) {
+    sections.push({ title: 'À venir', data: coming.sort(byPlannedTime), count: coming.length });
+  }
   if (done.length) sections.push({ title: DONE, data: doneOpen ? done : [], count: done.length });
   return sections;
 }
@@ -58,7 +60,10 @@ function toSections(orders: Order[], doneOpen: boolean): Section[] {
 export default function DeliveriesScreen() {
   const orders = useDriverOrders('mine');
   const [doneOpen, setDoneOpen] = useState(false);
-  const sections = toSections(orders.items, doneOpen);
+  const today = businessToday();
+  const sections = toSections(orders.items, today, doneOpen);
+  const toOrganise = sections.filter((s) => s.title !== DONE && s.title !== 'À venir');
+  const canOrganise = toOrganise.reduce((n, s) => n + s.count, 0) >= 2;
 
   return (
     <Screen scroll={false} header={<ScreenHeader />}>
@@ -77,10 +82,21 @@ export default function DeliveriesScreen() {
           action={{ label: 'Réessayer', onPress: () => orders.refetch() }}
         />
       )}
+      {canOrganise && (
+        <Button
+          label="Organiser ma tournée"
+          icon={ListOrdered}
+          variant="secondary"
+          fullWidth
+          onPress={() => router.push('/round')}
+        />
+      )}
       <SectionList
         sections={sections}
         keyExtractor={(o) => o.id}
-        renderItem={({ item }) => <DeliveryCard order={item} />}
+        renderItem={({ item, index, section }) => (
+          <DeliveryCard order={item} rank={section.numbered ? index + 1 : undefined} />
+        )}
         renderSectionHeader={({ section }) =>
           section.title === DONE ? (
             <Pressable
@@ -101,7 +117,7 @@ export default function DeliveriesScreen() {
           ) : (
             <AppText
               variant="caption"
-              color={section.title === OVERDUE ? 'statusCancelledFg' : 'inkMuted'}
+              color={section.tone === 'danger' ? 'statusCancelledFg' : 'inkMuted'}
               style={[styles.strong, styles.sectionTitle]}
             >
               {`${section.title.toUpperCase()} · ${section.count}`}

@@ -30,6 +30,8 @@ import type { Customer } from '@/features/customer/customer-api';
 import { useCustomer, useCustomers } from '@/features/customer/use-customers';
 import type { Order, OrderPatch, OrderSource } from '@/features/order/order-api';
 import { DateChoice } from '@/features/order/date-choice';
+import type { TimeSlot } from '@/features/order/time-slot';
+import { TimeSlotChoice } from '@/features/order/time-slot-choice';
 import { PAYMENT_METHODS, SOURCE_LABELS } from '@/features/order/order-status';
 import { QuantityStepper } from '@/features/order/quantity-stepper';
 import { useCreateOrder, useUpdateOrder } from '@/features/order/use-orders';
@@ -126,6 +128,7 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
   const [scheduledDate, setScheduledDate] = useState<string | null>(
     order?.scheduledDate ?? businessToday(),
   );
+  const [timeSlot, setTimeSlot] = useState<TimeSlot | null>(order?.timeSlot ?? null);
 
   // Delivery
   const [isDelivery, setIsDelivery] = useState(!!order?.delivery);
@@ -204,6 +207,7 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
               : null,
         source: source || null,
         scheduledDate,
+        timeSlot,
         delivery,
         paymentMethod: paymentMethod || null,
         isPaid,
@@ -230,6 +234,7 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
         items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
         source: source || null,
         scheduledDate,
+        timeSlot,
         delivery,
         paymentMethod: paymentMethod || null,
         isPaid,
@@ -511,6 +516,8 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
         )}
         <AppText variant="label">Date prévue</AppText>
         <DateChoice value={scheduledDate} onChange={setScheduledDate} />
+        <AppText variant="label">Heure</AppText>
+        <TimeSlotChoice value={timeSlot} onChange={setTimeSlot} />
       </View>
 
       {/* 4. Paiement */}

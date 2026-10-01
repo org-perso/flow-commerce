@@ -1,4 +1,4 @@
-import { pool } from '../../db/pool.js';
+import { pool, withTransaction } from '../../db/pool.js';
 import { notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
 import { OPEN_STATUSES, type OrderStatus } from './order-status.js';
@@ -55,7 +55,8 @@ export async function assignDriver(
     });
   }
   await pool.query(
-    `UPDATE orders SET assigned_to = $3, assigned_at = now(), delivery_notified_at = NULL
+    `UPDATE orders SET assigned_to = $3, assigned_at = now(), delivery_notified_at = NULL,
+         route_position = NULL
      WHERE id = $1 AND shop_id = $2`,
     [orderId, shopId, driverId],
   );
@@ -65,7 +66,8 @@ export async function assignDriver(
 export async function unassignDriver(shopId: string, orderId: string): Promise<Order> {
   await assertAssignable(shopId, orderId);
   await pool.query(
-    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL, delivery_notified_at = NULL
+    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL, delivery_notified_at = NULL,
+         route_position = NULL
      WHERE id = $1 AND shop_id = $2`,
     [orderId, shopId],
   );
@@ -109,9 +111,33 @@ export async function releaseDelivery(
     throw conflict('This order is already done.', 'ORDER_DONE');
   }
   await pool.query(
-    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL, delivery_notified_at = NULL
+    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL, delivery_notified_at = NULL,
+         route_position = NULL
      WHERE id = $1 AND shop_id = $2 AND assigned_to = $3`,
     [orderId, shopId, driverId],
   );
   return (await findOrder(shopId, orderId))!;
+}
+
+/**
+ * The driver's own order of their round: `orderIds` gets positions 1, 2, 3…, their other
+ * orders lose theirs. An empty list goes back to the automatic order (slot, then place).
+ * Only their open deliveries can be placed.
+ */
+export function setRoute(shopId: string, driverId: string, orderIds: string[]): Promise<void> {
+  return withTransaction(async (client) => {
+    await client.query(
+      `UPDATE orders SET route_position = NULL
+       WHERE shop_id = $1 AND assigned_to = $2 AND route_position IS NOT NULL`,
+      [shopId, driverId],
+    );
+    if (orderIds.length === 0) return;
+    const { rowCount } = await client.query(
+      `UPDATE orders o SET route_position = r.position
+       FROM unnest($3::uuid[]) WITH ORDINALITY AS r(id, position)
+       WHERE o.id = r.id AND o.shop_id = $1 AND o.assigned_to = $2 AND o.status = ANY($4)`,
+      [shopId, driverId, orderIds, OPEN_STATUSES],
+    );
+    if (rowCount !== orderIds.length) throw notFound('Order');
+  });
 }
