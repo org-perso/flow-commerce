@@ -22,6 +22,15 @@ export const pagination = {
   offset: z.coerce.number().int().min(0).default(0),
 };
 
+/**
+ * Paging for lists added after 1.0: without `limit`, the whole list (LIMIT NULL), as the
+ * 1.0.x apps still installed expect.
+ */
+export const optionalPagination = {
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).default(0),
+};
+
 /** Query-string boolean: "true" / "false". */
 export const queryBoolean = z
   .enum(['true', 'false'])

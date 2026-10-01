@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useActiveShop } from '@/features/shop/use-shop';
+import { asList, usePagedList } from '@/lib/paging';
 import { isLocalImage, uploadProductImage } from '@/lib/product-image';
 
 import {
@@ -48,11 +49,23 @@ export function useProduct(productId: string) {
   });
 }
 
+/** Stock history 30 by 30 (`items`, `loadMore`). */
 export function useStockMovements(productId: string) {
   const shopId = useActiveShop().id;
-  return useQuery({
+  return usePagedList({
     queryKey: [...productsKey(shopId), 'movements', productId],
-    queryFn: () => listStockMovements(shopId, productId),
+    fetchPage: (page) => listStockMovements(shopId, productId, page),
+    pageItems: asList,
+  });
+}
+
+/** Stock list 30 by 30 (`items`, `loadMore`). */
+export function usePagedProducts(filters: ProductFilters) {
+  const shopId = useActiveShop().id;
+  return usePagedList({
+    queryKey: [...productsKey(shopId), 'paged', filters],
+    fetchPage: (page) => listProducts(shopId, filters, page),
+    pageItems: asList,
   });
 }
 

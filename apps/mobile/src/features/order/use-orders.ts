@@ -1,10 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 import type { OrderStatus } from '@/components/ui';
 import { useActiveShop } from '@/features/shop/use-shop';
+import { asList, usePagedList } from '@/lib/paging';
 
 import {
+  assignDriver,
   changeOrderStatus,
+  claimDelivery,
+  getDeliveriesToNotify,
+  listDrivers,
+  notifyDrivers,
+  releaseDelivery,
+  unassignDriver,
   createOrder,
   getOrder,
   getOrderCounts,
@@ -17,11 +27,13 @@ import {
 
 const ordersKey = (shopId: string) => ['shops', shopId, 'orders'] as const;
 
+/** Orders 30 by 30 (`items`, `loadMore`). */
 export function useOrders(filters: OrderFilters) {
   const shopId = useActiveShop().id;
-  return useQuery({
+  return usePagedList({
     queryKey: [...ordersKey(shopId), 'list', filters],
-    queryFn: () => listOrders(shopId, filters),
+    fetchPage: (page) => listOrders(shopId, filters, page),
+    pageItems: asList,
   });
 }
 
@@ -65,4 +77,58 @@ export function useChangeOrderStatus(orderId: string) {
   return useShopMutation((shopId, status: OrderStatus) =>
     changeOrderStatus(shopId, orderId, status),
   );
+}
+
+export function useDrivers() {
+  const shopId = useActiveShop().id;
+  return useQuery({
+    queryKey: ['shops', shopId, 'drivers'],
+    queryFn: () => listDrivers(shopId),
+  });
+}
+
+/** Picks a driver (userId), or removes the driver (null). */
+export function useAssignDriver(orderId: string) {
+  return useShopMutation((shopId, userId: string | null) =>
+    userId ? assignDriver(shopId, orderId, userId) : unassignDriver(shopId, orderId),
+  );
+}
+
+export function useClaimDelivery(orderId: string) {
+  return useShopMutation((shopId, _: void) => claimDelivery(shopId, orderId));
+}
+
+export function useReleaseDelivery(orderId: string) {
+  return useShopMutation((shopId, _: void) => releaseDelivery(shopId, orderId));
+}
+
+export function useDeliveriesToNotify(enabled: boolean) {
+  const shopId = useActiveShop().id;
+  return useQuery({
+    queryKey: [...ordersKey(shopId), 'to-notify'],
+    queryFn: () => getDeliveriesToNotify(shopId),
+    enabled,
+  });
+}
+
+export function useNotifyDrivers() {
+  return useShopMutation((shopId, _: void) => notifyDrivers(shopId));
+}
+
+/** Refetches when the screen is shown again, then every 30 s while it stays open. */
+export function useLiveRefresh(refetch: () => unknown) {
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+      const timer = setInterval(refetch, 30_000);
+      return () => clearInterval(timer);
+    }, [refetch]),
+  );
+}
+
+/** Driver lists refresh on their own (see useLiveRefresh). */
+export function useDriverOrders(assignment: 'mine' | 'available') {
+  const orders = useOrders({ assignment });
+  useLiveRefresh(orders.refetch);
+  return orders;
 }

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { businessToday } from '../../config/time.js';
 import { currentShopId } from '../../http/context.js';
 import { idParam, notFound } from '../../http/params.js';
-import { amount, isoDate, optionalText } from '../../http/schemas.js';
+import { amount, isoDate, optionalPagination, optionalText } from '../../http/schemas.js';
 import {
   deleteExpense,
   EXPENSE_CATEGORIES,
@@ -36,6 +36,7 @@ const listQuery = z.object({
   from: isoDate.optional(),
   to: isoDate.optional(),
   category: category.optional(),
+  ...optionalPagination,
 });
 
 /** /shops/:shopId/expenses */

@@ -1,6 +1,6 @@
 import { AuthScaffold } from '@/features/auth/auth-scaffold';
 import { Button } from '@/components/ui';
-import { signOut } from '@/features/auth/auth-service';
+import { router } from 'expo-router';
 import { ShopForm } from '@/features/shop/shop-form';
 import { useCreateShop } from '@/features/shop/use-shop';
 
@@ -28,7 +28,7 @@ export default function CreateShopScreen() {
         loading={createShop.isPending && createShop.variables?.name === DEFAULT_SHOP_NAME}
         onPress={() => createShop.mutate({ name: DEFAULT_SHOP_NAME, description: null })}
       />
-      <Button label="Se déconnecter" variant="ghost" onPress={signOut} />
+      <Button label="Retour" variant="ghost" onPress={() => router.back()} />
     </AuthScaffold>
   );
 }

@@ -60,7 +60,9 @@ export function ProductForm({
       name: product?.name ?? '',
       image: product?.image ?? null,
       categoryId: product?.category?.id ?? null,
-      purchasePrice: product ? toFieldValue(product.purchasePrice) : '',
+      // Always sent to roles that can edit products.
+      purchasePrice:
+        product?.purchasePrice !== undefined ? toFieldValue(product.purchasePrice) : '',
       sellingPrice: product ? toFieldValue(product.sellingPrice) : '',
       lowStockThreshold: toFieldValue(product?.lowStockThreshold ?? 0),
       initialStock: '0',

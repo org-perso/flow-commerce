@@ -18,10 +18,12 @@ import {
 import { requireShop } from './modules/shop/shop.middleware.js';
 import { shopRouter, shopsRouter } from './modules/shop/shop.routes.js';
 import {
+  driversRouter,
   invitationsRouter,
   joinRouter,
   leaveRouter,
   membersRouter,
+  myMembershipRouter,
 } from './modules/team/team.routes.js';
 import { meRouter } from './modules/user/me.routes.js';
 import { requireUser } from './modules/user/user.middleware.js';
@@ -46,8 +48,10 @@ export function createApiRouter(verifyToken: TokenVerifier) {
   shopScoped.use(requireShop, hideCostsUnlessAllowed);
   shopScoped.use('/', shopRouter);
   shopScoped.use('/members', membersRouter);
+  shopScoped.use('/drivers', driversRouter);
   shopScoped.use('/invitations', invitationsRouter);
   shopScoped.use('/leave', leaveRouter);
+  shopScoped.use('/me', myMembershipRouter);
   const catalog = requireReadWrite('catalog.read', 'catalog.write');
   shopScoped.use('/categories', catalog, categoriesRouter);
   shopScoped.use('/products', catalog, productsRouter);

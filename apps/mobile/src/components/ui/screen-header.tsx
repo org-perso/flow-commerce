@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuthStore } from '@/features/auth/auth-store';
+import { useCan } from '@/features/shop/use-shop';
 import { hitSlopFor, theme } from '@/theme';
 
 import { AppText } from './app-text';
@@ -18,6 +19,8 @@ import { ShopSwitcher } from './shop-switcher';
 export function ScreenHeader() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
+  // Drivers have no order list to search.
+  const canSearch = useCan('orders');
   useAuthStore((s) => s.version);
   // Light status bar icons on navy; pushed screens (light header) get dark icons back.
   useFocusEffect(
@@ -34,15 +37,17 @@ export function ScreenHeader() {
     <View style={[styles.root, { paddingTop: insets.top + theme.spacing[1] }]}>
       <ShopSwitcher />
       <View style={styles.actions}>
-        <Pressable
-          onPress={() => router.navigate({ pathname: '/orders', params: { search: '1' } })}
-          accessibilityRole="button"
-          accessibilityLabel="Rechercher une commande"
-          hitSlop={hitSlopFor(theme.layout.shopLogo)}
-          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-        >
-          <Search size={theme.layout.iconMd} color={theme.colors.onNavy} strokeWidth={2} />
-        </Pressable>
+        {canSearch && (
+          <Pressable
+            onPress={() => router.navigate({ pathname: '/orders', params: { search: '1' } })}
+            accessibilityRole="button"
+            accessibilityLabel="Rechercher une commande"
+            hitSlop={hitSlopFor(theme.layout.shopLogo)}
+            style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+          >
+            <Search size={theme.layout.iconMd} color={theme.colors.onNavy} strokeWidth={2} />
+          </Pressable>
+        )}
         <Pressable
           onPress={() => router.push('/account')}
           accessibilityRole="button"

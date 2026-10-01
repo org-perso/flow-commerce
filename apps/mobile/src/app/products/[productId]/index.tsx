@@ -7,6 +7,7 @@ import { AlertBanner, AppText, Button, KpiCard, Screen } from '@/components/ui';
 import type { ManualMovementType } from '@/features/product/product-api';
 import { movementLabels } from '@/features/product/stock-movement-labels';
 import { useArchiveProduct, useProduct, useStockMovements } from '@/features/product/use-products';
+import { useCan } from '@/features/shop/use-shop';
 import { apiErrorMessage } from '@/lib/api-client';
 import { textStyles, theme } from '@/theme';
 import { formatAr, formatDateTime } from '@/utils/format';
@@ -16,6 +17,8 @@ export default function ProductScreen() {
   const product = useProduct(productId);
   const movements = useStockMovements(productId);
   const archive = useArchiveProduct(productId);
+  // A CM reads the stock only (no costs, no changes).
+  const canEdit = useCan('catalog.write');
 
   if (!product.data) {
     return (
@@ -49,16 +52,17 @@ export default function ProductScreen() {
       <Stack.Screen
         options={{
           title: p.name,
-          headerRight: () => (
-            <Button
-              label="Modifier"
-              icon={Pencil}
-              compact
-              onPress={() =>
-                router.push({ pathname: '/products/[productId]/edit', params: { productId } })
-              }
-            />
-          ),
+          headerRight: () =>
+            canEdit && (
+              <Button
+                label="Modifier"
+                icon={Pencil}
+                compact
+                onPress={() =>
+                  router.push({ pathname: '/products/[productId]/edit', params: { productId } })
+                }
+              />
+            ),
         }}
       />
 
@@ -72,9 +76,13 @@ export default function ProductScreen() {
         <KpiCard variant="hero" label="En stock" value={String(p.stockQuantity)} />
         <View style={styles.row}>
           <KpiCard label="Prix de vente" value={formatAr(p.sellingPrice)} />
-          <KpiCard label="Prix d'achat" value={formatAr(p.purchasePrice)} />
+          {p.purchasePrice !== undefined && (
+            <KpiCard label="Prix d'achat" value={formatAr(p.purchasePrice)} />
+          )}
         </View>
-        <KpiCard label="Marge par unité" value={formatAr(p.sellingPrice - p.purchasePrice)} />
+        {p.purchasePrice !== undefined && (
+          <KpiCard label="Marge par unité" value={formatAr(p.sellingPrice - p.purchasePrice)} />
+        )}
         {p.image && <Image source={{ uri: p.image }} style={styles.photo} contentFit="cover" />}
         {p.category || p.description ? (
           <View style={styles.card}>
@@ -88,7 +96,7 @@ export default function ProductScreen() {
         ) : null}
       </View>
 
-      {!archived && (
+      {!archived && canEdit && (
         <View style={styles.section}>
           <AppText variant="heading">Mouvement de stock</AppText>
           <View style={styles.row}>
@@ -120,12 +128,12 @@ export default function ProductScreen() {
 
       <View style={styles.section}>
         <AppText variant="heading">Historique</AppText>
-        {movements.data?.length === 0 && (
+        {movements.isSuccess && movements.items.length === 0 && (
           <AppText color="inkMuted">{"Aucun mouvement pour l'instant."}</AppText>
         )}
-        {movements.data && movements.data.length > 0 && (
+        {movements.items.length > 0 && (
           <View style={styles.card}>
-            {movements.data.map((m, index) => (
+            {movements.items.map((m, index) => (
               <View key={m.id} style={[styles.movement, index > 0 && styles.movementBorder]}>
                 <View style={styles.cell}>
                   <AppText style={styles.strong}>{movementLabels[m.type]}</AppText>
@@ -144,34 +152,44 @@ export default function ProductScreen() {
             ))}
           </View>
         )}
-      </View>
-
-      <View style={styles.section}>
-        <Button
-          label="Modifier le produit"
-          icon={Pencil}
-          fullWidth
-          onPress={() =>
-            router.push({ pathname: '/products/[productId]/edit', params: { productId } })
-          }
-        />
-        {archived ? (
+        {movements.hasNextPage && (
           <Button
-            label="Restaurer le produit"
+            label="Voir plus de mouvements"
             variant="ghost"
-            loading={archive.isPending}
-            onPress={() => archive.mutate(false)}
-          />
-        ) : (
-          <Button
-            label="Archiver le produit"
-            variant="danger"
-            fullWidth
-            loading={archive.isPending}
-            onPress={confirmArchive}
+            loading={movements.isFetchingNextPage}
+            onPress={movements.loadMore}
           />
         )}
       </View>
+
+      {canEdit && (
+        <View style={styles.section}>
+          <Button
+            label="Modifier le produit"
+            icon={Pencil}
+            fullWidth
+            onPress={() =>
+              router.push({ pathname: '/products/[productId]/edit', params: { productId } })
+            }
+          />
+          {archived ? (
+            <Button
+              label="Restaurer le produit"
+              variant="ghost"
+              loading={archive.isPending}
+              onPress={() => archive.mutate(false)}
+            />
+          ) : (
+            <Button
+              label="Archiver le produit"
+              variant="danger"
+              fullWidth
+              loading={archive.isPending}
+              onPress={confirmArchive}
+            />
+          )}
+        </View>
+      )}
     </Screen>
   );
 }

@@ -1,3 +1,4 @@
+import { unregisterPushNotifications } from '@/lib/push-notifications';
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -22,6 +23,7 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
+  await unregisterPushNotifications();
   try {
     await signOutFromGoogle();
   } finally {

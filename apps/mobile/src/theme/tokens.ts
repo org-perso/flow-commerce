@@ -32,6 +32,8 @@ export const colors = {
   statusReturnedFg: '#8E2657',
   link: '#1F5BC4',
   focus: '#1F5BC4',
+  /** Dimmed background behind a bottom sheet. */
+  overlay: 'rgba(22, 50, 92, 0.4)',
 } as const;
 
 export const statusColors = {

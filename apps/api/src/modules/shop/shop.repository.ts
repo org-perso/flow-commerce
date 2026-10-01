@@ -11,7 +11,8 @@ export type Shop = {
 };
 
 /** A shop as listed for a user: with their role in it. */
-export type ShopWithRole = Shop & { role: Role };
+/** `nickname`: the user's pseudo in the shop (null: their account name is shown). */
+export type ShopWithRole = Shop & { role: Role; nickname: string | null };
 
 export type Member = { userId: string; role: Role };
 
@@ -27,7 +28,7 @@ const shopColumns = `s.id, s.name, s.description, s.created_at AS "createdAt",
 /** Shops the user is a member of, with their role. */
 export async function listShopsForUser(userId: string): Promise<ShopWithRole[]> {
   const { rows } = await pool.query<ShopWithRole>(
-    `SELECT ${shopColumns}, m.role
+    `SELECT ${shopColumns}, m.role, m.nickname
      FROM shops s JOIN shop_members m ON m.shop_id = s.id
      WHERE m.user_id = $1 ORDER BY s.created_at`,
     [userId],
@@ -64,7 +65,7 @@ export function createShop(ownerId: string, input: ShopInput): Promise<ShopWithR
       [shop.id, ownerId],
     );
     await seedDefaultCategories(client, shop.id);
-    return { ...shop, role: 'OWNER' };
+    return { ...shop, role: 'OWNER', nickname: null };
   });
 }
 

@@ -8,7 +8,8 @@ import { AppText } from './app-text';
 import { Button } from './button';
 
 type PageTitleProps = {
-  title: string;
+  /** Without a title, `right` sits on the left and the action on the right. */
+  title?: string;
   action?: { label: string; icon?: LucideIcon; onPress: () => void };
   /** Any control on the right instead of an action button (e.g. a Dropdown). */
   right?: ReactNode;
@@ -18,10 +19,13 @@ type PageTitleProps = {
 export function PageTitle({ title, action, right }: PageTitleProps) {
   return (
     <View style={styles.root}>
-      <AppText variant="title" accessibilityRole="header" style={styles.title} numberOfLines={1}>
-        {title}
-      </AppText>
+      {title ? (
+        <AppText variant="title" accessibilityRole="header" style={styles.title} numberOfLines={1}>
+          {title}
+        </AppText>
+      ) : null}
       {right}
+      {!title && <View style={styles.title} />}
       {action && (
         <Button label={action.label} icon={action.icon} compact onPress={action.onPress} />
       )}

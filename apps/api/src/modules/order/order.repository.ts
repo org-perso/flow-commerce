@@ -42,7 +42,7 @@ export type Order = {
   isPaid: boolean;
   /** When the order was marked as paid; null if not paid. */
   paidAt: Date | null;
-  /** Delivery driver, when assigned. */
+  /** Delivery driver, when assigned; `name` is their pseudo in the shop, never their email. */
   driver: { userId: string; name: string | null } | null;
   createdAt: Date;
   updatedAt: Date;
@@ -90,8 +90,9 @@ const orderColumns = `o.id, o.number, o.status, o.source,
   o.total_amount AS "totalAmount", o.payment_method AS "paymentMethod",
   o.paid_at IS NOT NULL AS "isPaid", o.paid_at AS "paidAt",
   CASE WHEN o.assigned_to IS NULL THEN NULL
-       ELSE (SELECT json_build_object('userId', u.id, 'name', COALESCE(u.name, u.email))
-             FROM users u WHERE u.id = o.assigned_to) END AS driver,
+       ELSE (SELECT json_build_object('userId', u.id, 'name', COALESCE(m.nickname, u.name, 'Livreur'))
+             FROM shop_members m JOIN users u ON u.id = m.user_id
+             WHERE m.shop_id = o.shop_id AND m.user_id = o.assigned_to) END AS driver,
   o.created_at AS "createdAt", o.updated_at AS "updatedAt"`;
 
 async function attachItems(db: Db, orders: Omit<Order, 'items'>[]): Promise<Order[]> {

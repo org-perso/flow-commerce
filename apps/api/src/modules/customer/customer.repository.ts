@@ -52,7 +52,11 @@ export async function countUnlinkedOrders(shopId: string): Promise<number> {
 }
 
 /** Matches the name, the social profile, or any phone ("034 12" finds 0341234567). */
-export async function listCustomers(shopId: string, q?: string): Promise<Customer[]> {
+export async function listCustomers(
+  shopId: string,
+  q?: string,
+  page: { limit?: number; offset?: number } = {},
+): Promise<Customer[]> {
   const phoneQuery = q ? phoneSearchDigits(q) : null;
   const { rows } = await pool.query<Customer>(
     `${select}
@@ -63,8 +67,9 @@ export async function listCustomers(shopId: string, q?: string): Promise<Custome
             OR ($3::text IS NOT NULL AND EXISTS (
               SELECT 1 FROM customer_phones cp
               WHERE cp.customer_id = c.id AND cp.phone LIKE '%' || $3 || '%')))
-     ORDER BY c.name, c.id`,
-    [shopId, q ?? null, phoneQuery],
+     ORDER BY c.name, c.id
+     LIMIT $4::int OFFSET $5::int`,
+    [shopId, q ?? null, phoneQuery, page.limit ?? null, page.offset ?? 0],
   );
   return rows;
 }

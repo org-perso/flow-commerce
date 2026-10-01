@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api-client';
+import { setPage, type Page } from '@/lib/paging';
 
 export type Product = {
   id: string;
@@ -6,7 +7,8 @@ export type Product = {
   description: string | null;
   image: string | null;
   category: Category | null;
-  purchasePrice: number;
+  /** Absent for a CM (RG-60). */
+  purchasePrice?: number;
   sellingPrice: number;
   stockQuantity: number;
   lowStockThreshold: number;
@@ -39,8 +41,8 @@ export type StockSummary = {
   productCount: number;
   units: number;
   /** Stock valued at purchase / selling price. */
-  stockValue: number;
-  stockSaleValue: number;
+  stockValue?: number;
+  stockSaleValue?: number;
   lowStockCount: number;
   outOfStockCount: number;
   archivedCount: number;
@@ -61,12 +63,17 @@ export type StockMovement = {
 
 const base = (shopId: string) => `/shops/${shopId}/products`;
 
-export function listProducts(shopId: string, filters: ProductFilters): Promise<Product[]> {
+export function listProducts(
+  shopId: string,
+  filters: ProductFilters,
+  page?: Page,
+): Promise<Product[]> {
   const params = new URLSearchParams();
   if (filters.q) params.set('q', filters.q);
   if (filters.lowStock) params.set('lowStock', 'true');
   if (filters.outOfStock) params.set('outOfStock', 'true');
   if (filters.archived) params.set('archived', 'true');
+  setPage(params, page);
   const query = params.toString();
   return apiFetch(`${base(shopId)}${query ? `?${query}` : ''}`);
 }
@@ -105,8 +112,14 @@ export function restoreProduct(shopId: string, productId: string): Promise<Produ
   return apiFetch(`${base(shopId)}/${productId}/restore`, { method: 'POST' });
 }
 
-export function listStockMovements(shopId: string, productId: string): Promise<StockMovement[]> {
-  return apiFetch(`${base(shopId)}/${productId}/stock-movements?limit=50`);
+export function listStockMovements(
+  shopId: string,
+  productId: string,
+  page: Page,
+): Promise<StockMovement[]> {
+  const params = new URLSearchParams();
+  setPage(params, page);
+  return apiFetch(`${base(shopId)}/${productId}/stock-movements?${params}`);
 }
 
 export function createStockMovement(

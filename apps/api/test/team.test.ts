@@ -206,3 +206,35 @@ describe('members', () => {
     expect(customers.body).toHaveLength(1);
   });
 });
+
+describe('pseudo in a shop', () => {
+  const join = async (user: Headers, role: string, nickname?: string) => {
+    const { body } = await invite(owner, role);
+    return request.post('/api/v1/invitations/join').set(user).send({ code: body.code, nickname });
+  };
+
+  it('is chosen with the code and shown instead of the email', async () => {
+    const res = await join(newcomer, 'DRIVER', ' Rado moto ');
+    expect(res.body).toMatchObject({ role: 'DRIVER', nickname: 'Rado moto' });
+    const drivers = await request.get(api('/drivers')).set(owner);
+    expect(drivers.body.map((d: { name: string }) => d.name)).toContain('Rado moto');
+    expect(JSON.stringify(drivers.body)).not.toContain('@');
+  });
+
+  it('is unique in the shop, case-insensitive', async () => {
+    await join(newcomer, 'DRIVER', 'Rado');
+    const taken = await join(auth('other'), 'DRIVER', 'rado');
+    expect(taken.status).toBe(409);
+    expect(taken.body.code).toBe('NICKNAME_TAKEN');
+  });
+
+  it('a member changes their own pseudo, or goes back to their account name', async () => {
+    await join(newcomer, 'DRIVER', 'Rado');
+    const changed = await request.patch(api('/me')).set(newcomer).send({ nickname: 'Rado 2' });
+    expect(changed.body).toEqual({ nickname: 'Rado 2' });
+    const reset = await request.patch(api('/me')).set(newcomer).send({ nickname: '' });
+    expect(reset.body).toEqual({ nickname: null });
+    const shops = await request.get('/api/v1/shops').set(newcomer);
+    expect(shops.body[0]).toMatchObject({ nickname: null });
+  });
+});

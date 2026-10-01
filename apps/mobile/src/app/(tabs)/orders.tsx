@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { CalendarDays, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { useDeferredValue, useState } from 'react';
+import { CalendarDays, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react-native';
+import { useCallback, useDeferredValue, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -23,9 +23,11 @@ import {
   type OrderStatus,
 } from '@/components/ui';
 import type { Order } from '@/features/order/order-api';
+import { NotifyDriversButton } from '@/features/order/notify-drivers-button';
 import { isOverdue, OrderRow } from '@/features/order/order-row';
-import { useOrderCounts, useOrders } from '@/features/order/use-orders';
+import { useLiveRefresh, useOrderCounts, useOrders } from '@/features/order/use-orders';
 import { apiErrorMessage } from '@/lib/api-client';
+import { NewOrderFab } from '@/features/order/new-order-fab';
 import { theme } from '@/theme';
 import { businessToday, formatDayLabel } from '@/utils/format';
 
@@ -100,9 +102,17 @@ export default function OrdersScreen() {
   const filters = { when: when === 'all' ? undefined : when, q };
   const orders = useOrders({ ...filters, status: status === 'ALL' ? undefined : status });
   const counts = useOrderCounts(filters);
+  // Other members (CM, drivers) change orders too: keep the list fresh.
+  const { refetch: refetchOrders } = orders;
+  const { refetch: refetchCounts } = counts;
+  const refresh = useCallback(() => {
+    refetchOrders();
+    refetchCounts();
+  }, [refetchOrders, refetchCounts]);
+  useLiveRefresh(refresh);
   const [doneOpen, setDoneOpen] = useState(false);
   // With a status filter, the seller asked for those orders: nothing is folded.
-  const sections = toSections(orders.data ?? [], when, status === 'ALL', doneOpen);
+  const sections = toSections(orders.items, when, status === 'ALL', doneOpen);
   const hasOrders = sections.some((sec) => sec.count > 0);
 
   const chips = [
@@ -124,7 +134,11 @@ export default function OrdersScreen() {
   return (
     <Screen scroll={false} header={<ScreenHeader />}>
       <PageTitle
-        title="Commandes"
+        action={{
+          label: orders.isFetching ? '…' : 'Actualiser',
+          icon: RefreshCw,
+          onPress: refresh,
+        }}
         right={
           <Dropdown
             title="Date prévue"
@@ -148,6 +162,8 @@ export default function OrdersScreen() {
           onChange={(value) => router.setParams({ status: value === 'ALL' ? undefined : value })}
         />
       </View>
+
+      <NotifyDriversButton />
 
       {orders.isError && (
         <InlineBanner
@@ -205,6 +221,13 @@ export default function OrdersScreen() {
         }
         stickySectionHeadersEnabled={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        onEndReached={orders.loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          orders.isFetchingNextPage ? (
+            <ActivityIndicator color={theme.colors.ink} style={styles.more} />
+          ) : null
+        }
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -232,6 +255,7 @@ export default function OrdersScreen() {
         }
         style={styles.list}
       />
+      <NewOrderFab />
     </Screen>
   );
 }
@@ -267,5 +291,8 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: theme.spacing[8],
+  },
+  more: {
+    marginVertical: theme.spacing[4],
   },
 });

@@ -54,6 +54,19 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return (response.status === 204 ? undefined : await response.json()) as T;
 }
 
+/** Business errors the API names with a `code` (team, deliveries). */
+const CODE_MESSAGES: Record<string, string> = {
+  LAST_OWNER: 'La boutique doit garder au moins un propriétaire. Nommez-en un autre avant.',
+  INVITATION_UNKNOWN: 'Ce code n’existe pas. Vérifiez-le.',
+  INVITATION_EXPIRED: 'Ce code a déjà été utilisé ou a expiré. Demandez-en un nouveau.',
+  ALREADY_MEMBER: 'Vous faites déjà partie de cette boutique.',
+  ALREADY_TAKEN: 'Un autre livreur l’a déjà prise.',
+  NOT_A_DELIVERY: 'Seule une commande avec livraison peut avoir un livreur.',
+  NOT_A_DRIVER: 'Ce membre n’est pas livreur.',
+  ORDER_DONE: 'Cette commande est déjà terminée.',
+  NICKNAME_TAKEN: 'Ce pseudo est déjà utilisé dans cette boutique. Choisissez-en un autre.',
+};
+
 /** User-facing French message for any error thrown by apiFetch. */
 export function apiErrorMessage(error: unknown): string {
   if (error instanceof ImageUploadError) return error.message;
@@ -62,6 +75,9 @@ export function apiErrorMessage(error: unknown): string {
   }
   if (error instanceof TypeError) return 'Serveur injoignable. Vérifiez votre connexion.';
   if (error instanceof ApiError) {
+    const code = typeof error.body.code === 'string' ? error.body.code : undefined;
+    if (code && code in CODE_MESSAGES) return CODE_MESSAGES[code]!;
+    if (error.status === 403) return 'Votre rôle ne permet pas cette action.';
     if (error.status === 401) return 'Session expirée. Reconnectez-vous.';
     if (error.status === 404) return 'Élément introuvable.';
     if (error.status >= 500) return 'Le serveur a rencontré un problème. Réessayez.';

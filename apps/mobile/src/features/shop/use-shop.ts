@@ -4,7 +4,15 @@ import { useState } from 'react';
 import { useAuthStore } from '@/features/auth/auth-store';
 
 import { useActiveShopStore } from './active-shop-store';
-import { createShop, listShops, updateShop, type Shop, type ShopInput } from './shop-api';
+import { can, type Permission } from './roles';
+import {
+  createShop,
+  listShops,
+  setMyNickname,
+  updateShop,
+  type Shop,
+  type ShopInput,
+} from './shop-api';
 
 export const shopsQueryKey = (uid: string | undefined) => ['shops', uid] as const;
 
@@ -67,5 +75,24 @@ export function useUpdateShop(shopId: string) {
         shops.map((s) => (s.id === shop.id ? shop : s)),
       );
     },
+  });
+}
+
+/** Whether the current member's role allows `permission` in the active shop. */
+export function useCan(permission: Permission): boolean {
+  return can(useActiveShop().role, permission);
+}
+
+/** Sets my pseudo in the active shop and updates the shop list. */
+export function useSetMyNickname() {
+  const uid = useUid();
+  const { id } = useActiveShop();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (nickname: string | null) => setMyNickname(id, nickname),
+    onSuccess: ({ nickname }) =>
+      queryClient.setQueryData<Shop[]>(shopsQueryKey(uid), (shops = []) =>
+        shops.map((s) => (s.id === id ? { ...s, nickname } : s)),
+      ),
   });
 }

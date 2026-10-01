@@ -20,14 +20,15 @@ import {
   SearchBar,
 } from '@/components/ui';
 import { CustomerRow } from '@/features/customer/customer-row';
-import { useCustomers, useUnlinkedOrdersCount } from '@/features/customer/use-customers';
+import { usePagedCustomers, useUnlinkedOrdersCount } from '@/features/customer/use-customers';
 import { apiErrorMessage } from '@/lib/api-client';
+import { NewOrderFab } from '@/features/order/new-order-fab';
 import { theme } from '@/theme';
 
 export default function CustomersScreen() {
   const [search, setSearch] = useState('');
   const q = useDeferredValue(search.trim());
-  const customers = useCustomers(q || undefined);
+  const customers = usePagedCustomers(q || undefined);
   const unlinked = useUnlinkedOrdersCount().data?.count ?? 0;
   const openNew = () => router.push('/customers/new');
 
@@ -48,7 +49,14 @@ export default function CustomersScreen() {
       )}
 
       <FlatList
-        data={customers.data ?? []}
+        data={customers.items}
+        onEndReached={customers.loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          customers.isFetchingNextPage ? (
+            <ActivityIndicator color={theme.colors.ink} style={styles.more} />
+          ) : null
+        }
         keyExtractor={(c) => c.id}
         renderItem={({ item }) => (
           <CustomerRow customer={item} onPress={() => router.push(`/customers/${item.id}`)} />
@@ -74,6 +82,7 @@ export default function CustomersScreen() {
         style={styles.list}
         contentContainerStyle={styles.listContent}
       />
+      <NewOrderFab />
     </Screen>
   );
 }
@@ -131,5 +140,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: theme.layout.pressedOpacity,
+  },
+  more: {
+    marginVertical: theme.spacing[4],
   },
 });

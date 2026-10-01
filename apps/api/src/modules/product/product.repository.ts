@@ -51,6 +51,9 @@ export type ProductFilters = {
   lowStock?: boolean;
   outOfStock?: boolean;
   archived?: boolean;
+  /** No limit: the whole list. */
+  limit?: number;
+  offset?: number;
 };
 
 export type StockSummary = {
@@ -98,8 +101,10 @@ export async function listProducts(shopId: string, filters: ProductFilters): Pro
   if (filters.lowStock) conditions.push('p.stock_quantity <= p.low_stock_threshold');
   if (filters.outOfStock) conditions.push('p.stock_quantity = 0');
 
+  values.push(filters.limit ?? null, filters.offset ?? 0);
   const { rows } = await pool.query<Product>(
-    `${select} WHERE ${conditions.join(' AND ')} ORDER BY p.name, p.id`,
+    `${select} WHERE ${conditions.join(' AND ')} ORDER BY p.name, p.id
+     LIMIT $${values.length - 1}::int OFFSET $${values.length}::int`,
     values,
   );
   return rows;

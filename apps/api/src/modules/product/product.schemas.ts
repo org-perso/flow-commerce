@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   amount,
   optionalText,
+  optionalPagination,
   pagination,
   queryBoolean,
   requiredText,
@@ -51,6 +52,7 @@ export const listProductsQuery = z.object({
   lowStock: queryBoolean,
   outOfStock: queryBoolean,
   archived: queryBoolean,
+  ...optionalPagination,
 });
 
 /**

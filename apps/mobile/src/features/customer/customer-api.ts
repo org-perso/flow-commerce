@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api-client';
+import { setPage, type Page } from '@/lib/paging';
 
 export type Customer = {
   id: string;
@@ -23,8 +24,12 @@ export type CustomerInput = {
 
 const base = (shopId: string) => `/shops/${shopId}/customers`;
 
-export function listCustomers(shopId: string, q?: string): Promise<Customer[]> {
-  return apiFetch(`${base(shopId)}${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+export function listCustomers(shopId: string, q?: string, page?: Page): Promise<Customer[]> {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  setPage(params, page);
+  const query = params.toString();
+  return apiFetch(`${base(shopId)}${query ? `?${query}` : ''}`);
 }
 
 export function getCustomer(shopId: string, customerId: string): Promise<Customer> {

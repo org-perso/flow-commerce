@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import type { Request } from 'express';
 
-import { currentMember, currentShopId, currentUser } from '../../http/context.js';
+import { currentMember, currentShopId } from '../../http/context.js';
 import { idParam, notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
 import { amount, isoDate, optionalText, pagination, requiredText } from '../../http/schemas.js';
@@ -103,15 +103,30 @@ function scopedFilters<T extends object>(req: Request, filters: T) {
   return { ...filters, viewerId: currentMember(req).userId, driverScope: isDriver(req) };
 }
 
-const userLabel = (req: Request) => {
-  const user = currentUser(req);
-  return user.name ?? user.email ?? 'Le livreur';
-};
-
 const forbidden = () => new ProblemError(403, 'Forbidden', 'Your role does not allow this action.');
 
 /** /shops/:shopId/orders */
 export const ordersRouter = Router();
+
+/**
+ * RG-61: a driver never receives what a parcel contains, only its number and amounts.
+ * Removes `items` from every order sent to a driver (one order or a list).
+ */
+ordersRouter.use((req, res, next) => {
+  if (isDriver(req)) {
+    const json = res.json.bind(res);
+    const strip = (o: unknown) => {
+      if (o && typeof o === 'object' && 'items' in o) {
+        const rest = { ...(o as Record<string, unknown>) };
+        delete rest.items;
+        return rest;
+      }
+      return o;
+    };
+    res.json = (body) => json(Array.isArray(body) ? body.map(strip) : strip(body));
+  }
+  next();
+});
 
 ordersRouter.get('/', async (req, res) => {
   res.json(await listOrders(currentShopId(req), scopedFilters(req, listQuery.parse(req.query))));
@@ -143,7 +158,7 @@ ordersRouter.patch('/:orderId', async (req, res) => {
     const patch = driverUpdateSchema.parse(req.body);
     const before = await findOwnDelivery(shopId, orderId, currentMember(req).userId);
     const order = await updateOrder(shopId, orderId, patch);
-    if (!before.isPaid && order.isPaid) await notifyPaid(shopId, order, userLabel(req));
+    if (!before.isPaid && order.isPaid) await notifyPaid(shopId, order);
     res.json(order);
     return;
   }
@@ -160,7 +175,7 @@ ordersRouter.post('/:orderId/status', async (req, res) => {
     if (!DRIVER_STATUSES.includes(status)) throw forbidden();
   }
   const order = await changeOrderStatus(shopId, orderId, status);
-  if (isDriver(req) && status === 'LIVREE') await notifyDelivered(shopId, order, userLabel(req));
+  if (isDriver(req) && status === 'LIVREE') await notifyDelivered(shopId, order);
   res.json(order);
 });
 

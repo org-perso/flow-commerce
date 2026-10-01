@@ -1,9 +1,11 @@
 import { router, Tabs } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { ShoppingCartPlus } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui';
 import { TabIconSvg, type TabIconName } from '@/components/ui/tab-icons';
+import type { Role } from '@/features/shop/roles';
+import { useActiveShop } from '@/features/shop/use-shop';
 import { theme } from '@/theme';
 
 function TabIcon({ icon, focused }: { icon: TabIconName; focused: boolean }) {
@@ -43,7 +45,11 @@ function NewOrderButton() {
         accessibilityLabel="Nouvelle commande"
         style={({ pressed }) => [styles.action, pressed && styles.pressed]}
       >
-        <Plus size={theme.layout.iconLg} color={theme.colors.onGold} strokeWidth={2.5} />
+        <ShoppingCartPlus
+          size={theme.layout.iconLg}
+          color={theme.colors.onGold}
+          strokeWidth={2.25}
+        />
       </Pressable>
     </View>
   );
@@ -54,14 +60,29 @@ const tabs = [
   { name: 'orders', label: 'Commandes', icon: 'receiptLong' },
   { name: 'stock', label: 'Stock', icon: 'inventory' },
   { name: 'customers', label: 'Clients', icon: 'group' },
+  // Driver space (F-13).
+  { name: 'deliveries', label: 'Livraisons', icon: 'receiptLong' },
+  { name: 'available', label: 'À prendre', icon: 'inventory' },
 ] as const;
 
-function tabScreen({ name, label, icon }: (typeof tabs)[number]) {
+type TabName = (typeof tabs)[number]['name'];
+
+/** Tabs each role sees (F-14): the others are hidden, not just disabled. */
+const TABS_BY_ROLE: Record<Role, readonly TabName[]> = {
+  OWNER: ['index', 'orders', 'stock', 'customers'],
+  MANAGER: ['index', 'orders', 'stock', 'customers'],
+  CM: ['orders', 'stock', 'customers'],
+  DRIVER: ['deliveries', 'available'],
+};
+
+function tabScreen({ name, label, icon }: (typeof tabs)[number], visible: boolean) {
   return (
     <Tabs.Screen
       key={name}
       name={name}
       options={{
+        // href null removes the tab from the bar; the route stays declared.
+        href: visible ? undefined : null,
         title: label,
         tabBarIcon: ({ focused }) => <TabIcon icon={icon} focused={focused} />,
         tabBarLabel: ({ focused }) => <TabLabel label={label} focused={focused} />,
@@ -71,6 +92,9 @@ function tabScreen({ name, label, icon }: (typeof tabs)[number]) {
 }
 
 export default function TabsLayout() {
+  const { role } = useActiveShop();
+  const visible = TABS_BY_ROLE[role];
+  const screen = (tab: (typeof tabs)[number]) => tabScreen(tab, visible.includes(tab.name));
   return (
     <Tabs
       screenOptions={{
@@ -79,10 +103,18 @@ export default function TabsLayout() {
         tabBarStyle: styles.tabBar,
       }}
     >
-      {tabs.slice(0, 2).map(tabScreen)}
-      {/* Placeholder route: the button opens the order form instead of a tab. */}
-      <Tabs.Screen name="new" options={{ tabBarButton: () => <NewOrderButton /> }} />
-      {tabs.slice(2).map(tabScreen)}
+      {tabs.slice(0, 2).map(screen)}
+      {/* Placeholder route: the button opens the order form instead of a tab (not for drivers). */}
+      <Tabs.Screen
+        name="new"
+        options={
+          // Drivers do not create orders; the CM's 3 tabs leave no middle: floating button.
+          role === 'DRIVER' || role === 'CM'
+            ? { href: null }
+            : { tabBarButton: () => <NewOrderButton /> }
+        }
+      />
+      {tabs.slice(2).map(screen)}
     </Tabs>
   );
 }

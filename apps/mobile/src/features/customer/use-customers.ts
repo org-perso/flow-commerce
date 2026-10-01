@@ -1,3 +1,4 @@
+import { asList, usePagedList } from '@/lib/paging';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useActiveShop } from '@/features/shop/use-shop';
@@ -13,6 +14,16 @@ import {
 } from './customer-api';
 
 const customersKey = (shopId: string) => ['shops', shopId, 'customers'] as const;
+
+/** Customer list 30 by 30 (`items`, `loadMore`). */
+export function usePagedCustomers(q?: string) {
+  const shopId = useActiveShop().id;
+  return usePagedList({
+    queryKey: [...customersKey(shopId), 'paged', q ?? ''],
+    fetchPage: (page) => listCustomers(shopId, q, page),
+    pageItems: asList,
+  });
+}
 
 export function useCustomers(q?: string, { enabled = true } = {}) {
   const shopId = useActiveShop().id;

@@ -1,4 +1,4 @@
-import { ArrowRight, MapPin, Phone, Store, Wallet } from 'lucide-react-native';
+import { ArrowRight, Bike, MapPin, Phone, Store, Wallet } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, StatusBadge } from '@/components/ui';
@@ -6,14 +6,42 @@ import { callPhone, formatPhone } from '@/features/customer/contact';
 import { hitSlopFor, theme } from '@/theme';
 import { businessToday, formatAr, formatDateTime, formatDayLabel } from '@/utils/format';
 
-import type { Order } from './order-api';
+import { parcelLabel, type Order } from './order-api';
 import { destructiveStatuses, OPEN_STATUSES, quickActionLabels, TRANSITIONS } from './order-status';
 import { PaymentBadge } from './payment-badge';
 import { useChangeOrderStatus, useUpdateOrder } from './use-orders';
 
 /** "2 × Savon coco, 3 × Thé" — no prices. */
 export function itemsSummary(order: Order): string {
-  return order.items.map((i) => `${i.quantity} × ${i.productName}`).join(', ');
+  return (order.items ?? []).map((i) => `${i.quantity} × ${i.productName}`).join(', ');
+}
+
+/** Bottom line of a delivery: parcel number, then its driver or "À prendre". */
+function DriverLine({ order }: { order: Order }) {
+  if (!order.delivery) return null;
+  const toTake = !order.driver && OPEN_STATUSES.includes(order.status);
+  return (
+    <View style={styles.place}>
+      <Bike
+        size={theme.layout.iconSm}
+        color={toTake ? theme.colors.goldInk : theme.colors.blue}
+        strokeWidth={2}
+      />
+      <AppText
+        variant="caption"
+        color={toTake ? 'goldInk' : 'blue'}
+        numberOfLines={1}
+        style={[styles.flex, styles.strong]}
+      >
+        {parcelLabel(order)}
+        {order.driver
+          ? ` · ${order.driver.name ?? 'Livreur'}`
+          : toTake
+            ? ' · à prendre : aucun livreur'
+            : ''}
+      </AppText>
+    </View>
+  );
 }
 
 /** Planned before today and not handled yet. */
@@ -82,6 +110,7 @@ export function OrderRow({
             <StatusBadge status={order.status} size="sm" />
             <PaymentBadge isPaid={order.isPaid} />
           </View>
+          <DriverLine order={order} />
         </View>
         {phone && (
           <Pressable

@@ -9,15 +9,28 @@ import {
   createInvitation,
   joinWithCode,
   leaveShop,
+  listDrivers,
   listInvitations,
   listMembers,
   removeMember,
   revokeInvitation,
+  setNickname,
 } from './team.service.js';
 
 const roleSchema = z.object({ role: z.enum(ROLES) }).strict();
 const invitationSchema = z.object({ role: z.enum(['MANAGER', 'CM', 'DRIVER']) }).strict();
-const joinSchema = z.object({ code: z.string().trim().length(6) }).strict();
+/** Pseudo in a shop: 2 to 30 characters; empty means "use my account name". */
+const nicknameField = z
+  .string()
+  .trim()
+  .max(30)
+  .transform((v) => v || null)
+  .refine((v) => v === null || v.length >= 2, 'Two characters at least.')
+  .nullable();
+
+const joinSchema = z
+  .object({ code: z.string().trim().length(6), nickname: nicknameField.default(null) })
+  .strict();
 
 /** /shops/:shopId/members — owner and manager (RG-58 is checked per target role). */
 export const membersRouter = Router();
@@ -69,6 +82,22 @@ leaveRouter.post('/', async (req, res) => {
 export const joinRouter = Router();
 
 joinRouter.post('/join', async (req, res) => {
-  const { code } = joinSchema.parse(req.body);
-  res.status(201).json(await joinWithCode(currentUser(req).id, code));
+  const { code, nickname } = joinSchema.parse(req.body);
+  res.status(201).json(await joinWithCode(currentUser(req).id, code, nickname));
+});
+
+/** /shops/:shopId/drivers — names only, to assign a delivery (owner, manager, CM). */
+export const driversRouter = Router();
+driversRouter.use(requirePermission('orders'));
+
+driversRouter.get('/', async (req, res) => {
+  res.json(await listDrivers(currentShopId(req)));
+});
+
+/** PATCH /shops/:shopId/me — any member sets their own pseudo in the shop. */
+export const myMembershipRouter = Router();
+
+myMembershipRouter.patch('/', async (req, res) => {
+  const { nickname } = z.object({ nickname: nicknameField }).strict().parse(req.body);
+  res.json(await setNickname(currentShopId(req), currentMember(req).userId, nickname));
 });

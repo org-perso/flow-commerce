@@ -62,7 +62,7 @@ describe('assigning a driver (F-12, RG-54)', () => {
     const orderId = await newOrder();
     const res = await assign(cm, orderId, ids.rado!);
     expect(res.status).toBe(200);
-    expect(res.body.driver).toEqual({ userId: ids.rado, name: 'rado@example.com' });
+    expect(res.body.driver).toEqual({ userId: ids.rado, name: 'Livreur' });
     const off = await request.delete(api(`/orders/${orderId}/driver`)).set(cm);
     expect(off.body.driver).toBeNull();
   });
@@ -79,6 +79,17 @@ describe('assigning a driver (F-12, RG-54)', () => {
   it('a driver cannot assign', async () => {
     const orderId = await newOrder();
     expect((await assign(rado, orderId, ids.tiana!)).status).toBe(403);
+  });
+});
+
+describe('drivers list', () => {
+  it('names the drivers for owner, manager and CM, not for drivers', async () => {
+    const res = await request.get(api('/drivers')).set(cm);
+    expect(res.body).toEqual([
+      { userId: ids.rado, name: 'Livreur' },
+      { userId: ids.tiana, name: 'Livreur' },
+    ]);
+    expect((await request.get(api('/drivers')).set(rado)).status).toBe(403);
   });
 });
 
@@ -144,8 +155,11 @@ describe('driver space (F-13)', () => {
 
     expect((await request.get(api(`/orders/${other}`)).set(rado)).status).toBe(404);
     expect((await request.get(api(`/orders/${pickup}`)).set(rado)).status).toBe(404);
+    // RG-61: the parcel number and amounts, never its content.
     const detail = await request.get(api(`/orders/${mine}`)).set(rado);
-    expect(detail.body.items[0]).not.toHaveProperty('unitPurchasePrice');
+    expect(detail.body).not.toHaveProperty('items');
+    expect(detail.body).toMatchObject({ number: expect.any(Number), itemsAmount: 9000 });
+    expect(JSON.stringify(all.body)).not.toContain('Savon');
   });
 
   it('marks their delivery in delivery, delivered or returned; nothing else', async () => {

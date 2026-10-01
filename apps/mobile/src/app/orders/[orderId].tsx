@@ -1,9 +1,10 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
   ArrowRight,
   CalendarDays,
   Check,
   MessageCircle,
+  Pencil,
   Phone,
   Store,
   Truck,
@@ -23,7 +24,7 @@ import {
   type OrderStatus,
 } from '@/components/ui';
 import { callPhone, formatPhone, openWhatsApp } from '@/features/customer/contact';
-import type { Order } from '@/features/order/order-api';
+import { parcelLabel, type Order } from '@/features/order/order-api';
 import {
   actionLabels,
   destructiveStatuses,
@@ -32,9 +33,17 @@ import {
   TRANSITIONS,
 } from '@/features/order/order-status';
 import { DateChoice } from '@/features/order/date-choice';
+import { DriverActions } from '@/features/order/driver-actions';
+import { DriverSection } from '@/features/order/driver-picker';
 import { isOverdue } from '@/features/order/order-row';
 import { PaymentBadge } from '@/features/order/payment-badge';
-import { useChangeOrderStatus, useOrder, useUpdateOrder } from '@/features/order/use-orders';
+import {
+  useChangeOrderStatus,
+  useLiveRefresh,
+  useOrder,
+  useUpdateOrder,
+} from '@/features/order/use-orders';
+import { useCan } from '@/features/shop/use-shop';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
 import { textStyles, theme } from '@/theme';
 import { formatAr, formatDateTime, formatDayLabel } from '@/utils/format';
@@ -53,11 +62,15 @@ const confirmTexts: Partial<Record<OrderStatus, { title: string; message: string
 export default function OrderScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const order = useOrder(orderId);
+  useLiveRefresh(order.refetch);
   const changeStatus = useChangeOrderStatus(orderId);
   const updateOrder = useUpdateOrder(orderId);
   const insets = useSafeAreaInsets();
   const [dateOpen, setDateOpen] = useState(false);
   const [newDate, setNewDate] = useState<string | null>(null);
+  // Drivers get their own actions (F-13); the API limits them to their deliveries.
+  const isDriver = !useCan('orders');
+  const canOpenCustomer = useCan('customers');
 
   if (!order.data) {
     return (
@@ -90,14 +103,34 @@ export default function OrderScreen() {
     ]);
   };
 
-  const editable = next.length > 0;
+  const editable = next.length > 0 && !isDriver;
   const nextStep = forward[0];
   const otherStatuses = [...forward.slice(1), ...destructive];
 
   return (
-    <Screen edges={[]}>
+    <Screen edges={[]} onRefresh={() => order.refetch()} refreshing={order.isRefetching}>
+      {editable && (
+        <Stack.Screen
+          options={{
+            headerRight: () => (
+              <Button
+                label="Modifier"
+                icon={Pencil}
+                compact
+                onPress={() => router.push(`/orders/edit/${o.id}`)}
+              />
+            ),
+          }}
+        />
+      )}
       {/* Summary: what the customer pays, where the order stands. */}
       <View style={[styles.card, styles.summary]}>
+        {/* Written on the parcel by the seller; the driver's only reference (RG-61). */}
+        {o.delivery && (
+          <AppText variant="heading" color="blue">
+            {parcelLabel(o)}
+          </AppText>
+        )}
         <View style={styles.row}>
           <AppText style={[styles.total, styles.flex]}>{formatAr(o.totalAmount)}</AppText>
           {o.source && (
@@ -179,7 +212,11 @@ export default function OrderScreen() {
         </View>
       )}
 
-      <CustomerCard order={o} />
+      {isDriver && <DriverActions order={o} />}
+
+      {!isDriver && <DriverSection order={o} />}
+
+      <CustomerCard order={o} pressable={canOpenCustomer} />
 
       {/* Hand-over: planned day, pickup or delivery. */}
       <View style={styles.section}>
@@ -257,9 +294,18 @@ export default function OrderScreen() {
       </Modal>
 
       <View style={styles.section}>
-        <AppText variant="heading">Produits</AppText>
+        <AppText variant="heading">{o.items ? 'Produits' : 'Montants'}</AppText>
         <View style={styles.card}>
-          {o.items.map((item, index) => (
+          {/* Drivers get no items (RG-61): only the amount of the articles. */}
+          {!o.items && (
+            <View style={styles.line}>
+              <AppText color="inkMuted" style={styles.flex}>
+                Articles
+              </AppText>
+              <AppText style={styles.amount}>{formatAr(o.itemsAmount)}</AppText>
+            </View>
+          )}
+          {o.items?.map((item, index) => (
             <View key={item.id} style={[styles.line, index > 0 && styles.lineBorder]}>
               <View style={styles.flex}>
                 <AppText style={styles.strong}>{item.productName}</AppText>
@@ -279,7 +325,9 @@ export default function OrderScreen() {
             </View>
           )}
           <View style={[styles.line, styles.lineBorder]}>
-            <AppText style={[styles.flex, styles.strong]}>Total à payer</AppText>
+            <AppText style={[styles.flex, styles.strong]}>
+              {o.isPaid ? 'Total payé' : o.items ? 'Total à payer' : 'À encaisser'}
+            </AppText>
             <AppText style={[styles.amount, styles.strong]}>{formatAr(o.totalAmount)}</AppText>
           </View>
         </View>
@@ -299,7 +347,7 @@ export default function OrderScreen() {
   );
 }
 
-function CustomerCard({ order }: { order: Order }) {
+function CustomerCard({ order, pressable }: { order: Order; pressable: boolean }) {
   const customer = order.customer;
   if (!customer) {
     return (
@@ -311,7 +359,7 @@ function CustomerCard({ order }: { order: Order }) {
   return (
     <View style={styles.section}>
       <Pressable
-        onPress={() => router.push(`/customers/${customer.id}`)}
+        onPress={pressable ? () => router.push(`/customers/${customer.id}`) : undefined}
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       >
         <AppText variant="caption" color="inkMuted">
@@ -346,7 +394,7 @@ function CustomerCard({ order }: { order: Order }) {
 
 function statusErrorMessage(error: unknown, order: Order): string {
   if (error instanceof ApiError && error.title === 'Insufficient Stock') {
-    const name = order.items.find((i) => i.productId === error.body.productId)?.productName;
+    const name = order.items?.find((i) => i.productId === error.body.productId)?.productName;
     return `Stock insuffisant${name ? ` pour « ${name} »` : ''} : il en reste ${String(error.body.available)}. Ajoutez du stock puis réessayez.`;
   }
   return apiErrorMessage(error);

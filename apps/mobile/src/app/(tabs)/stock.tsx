@@ -14,8 +14,10 @@ import {
   SearchBar,
 } from '@/components/ui';
 import { ProductRow } from '@/features/product/product-row';
-import { useProducts, useStockSummary } from '@/features/product/use-products';
+import { useCan } from '@/features/shop/use-shop';
+import { usePagedProducts, useStockSummary } from '@/features/product/use-products';
 import { apiErrorMessage } from '@/lib/api-client';
+import { NewOrderFab } from '@/features/order/new-order-fab';
 import { theme } from '@/theme';
 import { formatAr } from '@/utils/format';
 
@@ -30,7 +32,7 @@ export default function StockScreen() {
     router.setParams({ filter: value === 'all' ? undefined : value });
   const q = useDeferredValue(search.trim());
 
-  const products = useProducts({
+  const products = usePagedProducts({
     q: q || undefined,
     lowStock: filter === 'low',
     outOfStock: filter === 'out',
@@ -39,12 +41,16 @@ export default function StockScreen() {
   // Counts on the chips and the header line.
   const { data: summary, refetch: refetchSummary } = useStockSummary();
 
+  const canEdit = useCan('catalog.write');
   const openNew = () => router.push('/products/new');
   const isFiltered = q !== '' || filter !== 'all';
 
   return (
     <Screen scroll={false} header={<ScreenHeader />}>
-      <PageTitle title="Stock" action={{ label: 'Ajouter', icon: Plus, onPress: openNew }} />
+      <PageTitle
+        title="Stock"
+        action={canEdit ? { label: 'Ajouter', icon: Plus, onPress: openNew } : undefined}
+      />
       <View style={styles.controls}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Rechercher un produit" />
         <FilterChips
@@ -63,12 +69,14 @@ export default function StockScreen() {
               {summary.productCount} produit{summary.productCount > 1 ? 's' : ''} · {summary.units}{' '}
               article{summary.units > 1 ? 's' : ''}
             </AppText>
-            <AppText variant="caption" color="inkMuted">
-              Valeur :{' '}
-              <AppText variant="caption" style={styles.strong}>
-                {formatAr(summary.stockSaleValue)}
+            {summary.stockSaleValue !== undefined && (
+              <AppText variant="caption" color="inkMuted">
+                Valeur :{' '}
+                <AppText variant="caption" style={styles.strong}>
+                  {formatAr(summary.stockSaleValue)}
+                </AppText>
               </AppText>
-            </AppText>
+            )}
           </View>
         )}
       </View>
@@ -82,12 +90,23 @@ export default function StockScreen() {
       )}
 
       <FlatList
-        data={products.data ?? []}
+        data={products.items}
         keyExtractor={(p) => p.id}
         renderItem={({ item }) => (
-          <ProductRow product={item} onPress={() => router.push(`/products/${item.id}`)} />
+          <ProductRow
+            product={item}
+            canRestock={canEdit}
+            onPress={() => router.push(`/products/${item.id}`)}
+          />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        onEndReached={products.loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          products.isFetchingNextPage ? (
+            <ActivityIndicator color={theme.colors.ink} style={styles.more} />
+          ) : null
+        }
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -110,6 +129,7 @@ export default function StockScreen() {
         style={styles.list}
         contentContainerStyle={styles.listContent}
       />
+      <NewOrderFab />
     </Screen>
   );
 }
@@ -138,5 +158,8 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: theme.spacing[8],
+  },
+  more: {
+    marginVertical: theme.spacing[4],
   },
 });

@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
@@ -19,6 +19,7 @@ import { useDashboard } from '@/features/dashboard/use-dashboard';
 import { useExpenses } from '@/features/expense/use-expenses';
 import { useProducts } from '@/features/product/use-products';
 import { apiErrorMessage } from '@/lib/api-client';
+import { useActiveShop } from '@/features/shop/use-shop';
 import { theme } from '@/theme';
 import { formatAr } from '@/utils/format';
 
@@ -35,7 +36,15 @@ const statusCounters: { status: OrderStatus; label: string }[] = [
   { status: 'LIVREE', label: 'Livrée' },
 ];
 
-export default function DashboardScreen() {
+/** The first tab: the dashboard, or the role's own start screen (CM, driver). */
+export default function HomeTab() {
+  const { role } = useActiveShop();
+  if (role === 'CM') return <Redirect href="/orders" />;
+  if (role === 'DRIVER') return <Redirect href="/deliveries" />;
+  return <DashboardScreen />;
+}
+
+function DashboardScreen() {
   const [period, setPeriod] = useState<DashboardPeriod>('today');
   const dashboard = useDashboard(period);
   const d = dashboard.data;

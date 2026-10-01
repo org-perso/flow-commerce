@@ -134,7 +134,8 @@ function orderLabel(order: Order): string {
   );
 }
 
-export async function notifyDelivered(shopId: string, order: Order, driverName: string) {
+export async function notifyDelivered(shopId: string, order: Order) {
+  const driverName = order.driver?.name ?? 'Le livreur';
   await notifyUsers(await membersWithRoles(shopId, ['OWNER', 'MANAGER']), {
     title: '✅ Commande livrée',
     body: `${driverName} a livré ${orderLabel(order)}`,
@@ -142,7 +143,8 @@ export async function notifyDelivered(shopId: string, order: Order, driverName: 
   });
 }
 
-export async function notifyPaid(shopId: string, order: Order, driverName: string) {
+export async function notifyPaid(shopId: string, order: Order) {
+  const driverName = order.driver?.name ?? 'Le livreur';
   const method = order.paymentMethod ? ` (${order.paymentMethod})` : '';
   await notifyUsers(await membersWithRoles(shopId, ['OWNER', 'MANAGER']), {
     title: '💰 Commande encaissée',

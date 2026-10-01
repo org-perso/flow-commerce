@@ -11,7 +11,10 @@ export type InvitableRole = Exclude<Role, 'OWNER'>;
 
 export type TeamMember = {
   userId: string;
+  /** Account name. */
   name: string | null;
+  /** Pseudo in this shop, shown to the other members instead of the name. */
+  nickname: string | null;
   email: string | null;
   role: Role;
   joinedAt: Date;
@@ -45,7 +48,7 @@ export function canManageRole(actor: Role, role: Role): boolean {
 
 export async function listMembers(shopId: string, db: Db = pool): Promise<TeamMember[]> {
   const { rows } = await db.query<TeamMember>(
-    `SELECT u.id AS "userId", u.name, u.email, m.role, m.created_at AS "joinedAt"
+    `SELECT u.id AS "userId", u.name, m.nickname, u.email, m.role, m.created_at AS "joinedAt"
      FROM shop_members m JOIN users u ON u.id = m.user_id
      WHERE m.shop_id = $1
      ORDER BY array_position(ARRAY['OWNER','MANAGER','CM','DRIVER']::varchar[], m.role),
@@ -144,6 +147,58 @@ export function leaveShop(shopId: string, userId: string): Promise<void> {
   });
 }
 
+/** Drivers of the shop, to pick one for an order (owner, manager, CM). */
+export async function listDrivers(shopId: string): Promise<{ userId: string; name: string }[]> {
+  const { rows } = await pool.query<{ userId: string; name: string }>(
+    `SELECT u.id AS "userId", COALESCE(m.nickname, u.name, 'Livreur') AS name
+     FROM shop_members m JOIN users u ON u.id = m.user_id
+     WHERE m.shop_id = $1 AND m.role = 'DRIVER'
+     ORDER BY name`,
+    [shopId],
+  );
+  return rows;
+}
+
+/** 409 if another member of the shop is already shown under this pseudo (case-insensitive). */
+async function assertNicknameFree(
+  client: pg.PoolClient,
+  shopId: string,
+  userId: string,
+  nickname: string,
+) {
+  const { rows } = await client.query(
+    `SELECT 1 FROM shop_members m JOIN users u ON u.id = m.user_id
+     WHERE m.shop_id = $1 AND m.user_id <> $2
+       AND lower(COALESCE(m.nickname, u.name)) = lower($3)`,
+    [shopId, userId, nickname],
+  );
+  if (rows[0]) {
+    throw new ProblemError(409, 'Conflict', 'This pseudo is already used in this shop.', {
+      code: 'NICKNAME_TAKEN',
+    });
+  }
+}
+
+/**
+ * Sets the member's pseudo in the shop (null: back to the account name). Unique per shop
+ * against what the others are shown as (their pseudo, or their account name).
+ */
+export function setNickname(
+  shopId: string,
+  userId: string,
+  nickname: string | null,
+): Promise<{ nickname: string | null }> {
+  return withTransaction(async (client) => {
+    await client.query('SELECT 1 FROM shops WHERE id = $1 FOR UPDATE', [shopId]);
+    if (nickname) await assertNicknameFree(client, shopId, userId, nickname);
+    await client.query(
+      'UPDATE shop_members SET nickname = $3 WHERE shop_id = $1 AND user_id = $2',
+      [shopId, userId, nickname],
+    );
+    return { nickname };
+  });
+}
+
 // Invitations ----------------------------------------------------------------
 
 const invitationColumns = `id, code, role, expires_at AS "expiresAt", created_at AS "createdAt"`;
@@ -203,7 +258,11 @@ export async function revokeInvitation(
 }
 
 /** RG-52 / RG-53: a valid code makes the user a member with the code's role, once. */
-export function joinWithCode(userId: string, rawCode: string): Promise<ShopWithRole> {
+export function joinWithCode(
+  userId: string,
+  rawCode: string,
+  nickname: string | null = null,
+): Promise<ShopWithRole> {
   const code = rawCode.trim().toUpperCase();
   return withTransaction(async (client) => {
     const { rows } = await client.query<{
@@ -228,10 +287,13 @@ export function joinWithCode(userId: string, rawCode: string): Promise<ShopWithR
         code: 'INVITATION_EXPIRED',
       });
     }
+    // The pseudo chosen with the code must be free in that shop (checked under the shop lock).
+    await client.query('SELECT 1 FROM shops WHERE id = $1 FOR UPDATE', [invitation.shopId]);
+    if (nickname) await assertNicknameFree(client, invitation.shopId, userId, nickname);
     const joined = await client.query(
-      `INSERT INTO shop_members (shop_id, user_id, role) VALUES ($1, $2, $3)
+      `INSERT INTO shop_members (shop_id, user_id, role, nickname) VALUES ($1, $2, $3, $4)
        ON CONFLICT DO NOTHING`,
-      [invitation.shopId, userId, invitation.role],
+      [invitation.shopId, userId, invitation.role, nickname],
     );
     if (joined.rowCount === 0) {
       throw new ProblemError(409, 'Conflict', 'You are already a member of this shop.', {
@@ -244,9 +306,9 @@ export function joinWithCode(userId: string, rawCode: string): Promise<ShopWithR
     ]);
     const shop = await client.query<ShopWithRole>(
       `SELECT id, name, description, created_at AS "createdAt", updated_at AS "updatedAt",
-              $2::varchar AS role
+              $2::varchar AS role, $3::varchar AS nickname
        FROM shops WHERE id = $1`,
-      [invitation.shopId, invitation.role],
+      [invitation.shopId, invitation.role, nickname],
     );
     return shop.rows[0]!;
   });
