@@ -119,7 +119,7 @@ async function deleteMember(client: pg.PoolClient, shopId: string, userId: strin
 
 async function unassignOpenDeliveries(client: pg.PoolClient, shopId: string, userId: string) {
   await client.query(
-    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL
+    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL, delivery_notified_at = NULL
      WHERE shop_id = $1 AND assigned_to = $2
        AND status NOT IN ('LIVREE', 'ANNULEE', 'RETOUR')`,
     [shopId, userId],

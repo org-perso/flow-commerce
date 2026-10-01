@@ -3,11 +3,12 @@ import { z } from 'zod';
 
 import type { Request } from 'express';
 
-import { currentMember, currentShopId } from '../../http/context.js';
+import { currentMember, currentShopId, currentUser } from '../../http/context.js';
 import { idParam, notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
 import { amount, isoDate, optionalText, pagination, requiredText } from '../../http/schemas.js';
 import { phoneField } from '../customer/phone.js';
+import { notifyDelivered, notifyPaid } from '../notification/notification.service.js';
 import { can, requirePermission } from '../shop/permissions.js';
 import {
   assignDriver,
@@ -102,6 +103,11 @@ function scopedFilters<T extends object>(req: Request, filters: T) {
   return { ...filters, viewerId: currentMember(req).userId, driverScope: isDriver(req) };
 }
 
+const userLabel = (req: Request) => {
+  const user = currentUser(req);
+  return user.name ?? user.email ?? 'Le livreur';
+};
+
 const forbidden = () => new ProblemError(403, 'Forbidden', 'Your role does not allow this action.');
 
 /** /shops/:shopId/orders */
@@ -135,8 +141,10 @@ ordersRouter.patch('/:orderId', async (req, res) => {
   const orderId = idParam(req.params.orderId, 'Order');
   if (isDriver(req)) {
     const patch = driverUpdateSchema.parse(req.body);
-    await findOwnDelivery(shopId, orderId, currentMember(req).userId);
-    res.json(await updateOrder(shopId, orderId, patch));
+    const before = await findOwnDelivery(shopId, orderId, currentMember(req).userId);
+    const order = await updateOrder(shopId, orderId, patch);
+    if (!before.isPaid && order.isPaid) await notifyPaid(shopId, order, userLabel(req));
+    res.json(order);
     return;
   }
   res.json(await updateOrder(shopId, orderId, updateOrderSchema.parse(req.body)));
@@ -151,7 +159,9 @@ ordersRouter.post('/:orderId/status', async (req, res) => {
     await findOwnDelivery(shopId, orderId, currentMember(req).userId);
     if (!DRIVER_STATUSES.includes(status)) throw forbidden();
   }
-  res.json(await changeOrderStatus(shopId, orderId, status));
+  const order = await changeOrderStatus(shopId, orderId, status);
+  if (isDriver(req) && status === 'LIVREE') await notifyDelivered(shopId, order, userLabel(req));
+  res.json(order);
 });
 
 /** Assigns a driver (RG-54): owner, manager, CM. */

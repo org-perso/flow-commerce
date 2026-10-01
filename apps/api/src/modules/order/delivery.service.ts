@@ -55,7 +55,8 @@ export async function assignDriver(
     });
   }
   await pool.query(
-    'UPDATE orders SET assigned_to = $3, assigned_at = now() WHERE id = $1 AND shop_id = $2',
+    `UPDATE orders SET assigned_to = $3, assigned_at = now(), delivery_notified_at = NULL
+     WHERE id = $1 AND shop_id = $2`,
     [orderId, shopId, driverId],
   );
   return (await findOrder(shopId, orderId))!;
@@ -64,7 +65,8 @@ export async function assignDriver(
 export async function unassignDriver(shopId: string, orderId: string): Promise<Order> {
   await assertAssignable(shopId, orderId);
   await pool.query(
-    'UPDATE orders SET assigned_to = NULL, assigned_at = NULL WHERE id = $1 AND shop_id = $2',
+    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL, delivery_notified_at = NULL
+     WHERE id = $1 AND shop_id = $2`,
     [orderId, shopId],
   );
   return (await findOrder(shopId, orderId))!;
@@ -80,7 +82,7 @@ export async function claimDelivery(
   driverId: string,
 ): Promise<Order> {
   const { rowCount } = await pool.query(
-    `UPDATE orders SET assigned_to = $3, assigned_at = now()
+    `UPDATE orders SET assigned_to = $3, assigned_at = now(), delivery_notified_at = now()
      WHERE id = $1 AND shop_id = $2
        AND assigned_to IS NULL AND is_delivery AND status = ANY($4)`,
     [orderId, shopId, driverId, OPEN_STATUSES],
@@ -107,7 +109,7 @@ export async function releaseDelivery(
     throw conflict('This order is already done.', 'ORDER_DONE');
   }
   await pool.query(
-    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL
+    `UPDATE orders SET assigned_to = NULL, assigned_at = NULL, delivery_notified_at = NULL
      WHERE id = $1 AND shop_id = $2 AND assigned_to = $3`,
     [orderId, shopId, driverId],
   );

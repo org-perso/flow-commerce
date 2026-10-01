@@ -5,6 +5,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8080),
   DATABASE_URL: z.url(),
   FIREBASE_PROJECT_ID: z.string().min(1, 'FIREBASE_PROJECT_ID is required'),
+  /** Optional: only needed if push security is enabled on the Expo project. */
+  EXPO_ACCESS_TOKEN: z.string().optional(),
   CORS_ORIGINS: z
     .string()
     .default('')

@@ -6,6 +6,7 @@ import { categoriesRouter } from './modules/category/category.routes.js';
 import { customersRouter } from './modules/customer/customer.routes.js';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes.js';
 import { expensesRouter } from './modules/expense/expense.routes.js';
+import { deliveriesRouter } from './modules/notification/notification.routes.js';
 import { ordersRouter } from './modules/order/order.routes.js';
 import { productsRouter } from './modules/product/product.routes.js';
 import {
@@ -53,6 +54,7 @@ export function createApiRouter(verifyToken: TokenVerifier) {
   shopScoped.use('/customers', requirePermission('customers'), customersRouter);
   // Drivers reach their own deliveries; each order route checks which ones.
   shopScoped.use('/orders', requireAnyPermission('orders', 'deliveries'), ordersRouter);
+  shopScoped.use('/deliveries', deliveriesRouter);
   shopScoped.use('/expenses', requirePermission('expenses'), expensesRouter);
   shopScoped.use('/dashboard', requirePermission('dashboard'), dashboardRouter);
   api.use('/shops/:shopId', shopScoped);
