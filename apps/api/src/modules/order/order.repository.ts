@@ -42,6 +42,8 @@ export type Order = {
   isPaid: boolean;
   /** When the order was marked as paid; null if not paid. */
   paidAt: Date | null;
+  /** Delivery driver, when assigned. */
+  driver: { userId: string; name: string | null } | null;
   createdAt: Date;
   updatedAt: Date;
   items: OrderItem[];
@@ -59,11 +61,20 @@ export type OrderFilters = {
   customerId?: string;
   from?: string;
   to?: string;
+  /** mine: assigned to `viewerId`; available: delivery not assigned yet, still open. */
+  assignment?: 'mine' | 'available';
+  /** The current user (for `assignment` and the driver scope). */
+  viewerId?: string;
+  /** Drivers only see their deliveries and the ones to take. */
+  driverScope?: boolean;
   limit: number;
   offset: number;
 };
 
 const TODAY = `(now() AT TIME ZONE 'Indian/Antananarivo')::date`;
+
+/** A delivery no driver has taken yet, still open (RG-55). Uses $3 = OPEN_STATUSES. */
+const AVAILABLE = `(o.assigned_to IS NULL AND o.is_delivery AND o.status = ANY($3))`;
 
 const orderColumns = `o.id, o.number, o.status, o.source,
   to_char(o.scheduled_date, 'YYYY-MM-DD') AS "scheduledDate",
@@ -78,6 +89,9 @@ const orderColumns = `o.id, o.number, o.status, o.source,
   o.total_amount - o.delivery_fee AS "itemsAmount", o.delivery_fee AS "deliveryFee",
   o.total_amount AS "totalAmount", o.payment_method AS "paymentMethod",
   o.paid_at IS NOT NULL AS "isPaid", o.paid_at AS "paidAt",
+  CASE WHEN o.assigned_to IS NULL THEN NULL
+       ELSE (SELECT json_build_object('userId', u.id, 'name', COALESCE(u.name, u.email))
+             FROM users u WHERE u.id = o.assigned_to) END AS driver,
   o.created_at AS "createdAt", o.updated_at AS "updatedAt"`;
 
 async function attachItems(db: Db, orders: Omit<Order, 'items'>[]): Promise<Order[]> {
@@ -134,7 +148,11 @@ function orderConditions(
               WHERE cp.customer_id = o.customer_id AND cp.phone LIKE '%' || $9 || '%'))
             OR EXISTS (
               SELECT 1 FROM order_items i JOIN products p ON p.id = i.product_id
-              WHERE i.order_id = o.id AND p.name ILIKE '%' || $7 || '%'))`,
+              WHERE i.order_id = o.id AND p.name ILIKE '%' || $7 || '%'))
+       AND ($10::text IS NULL
+            OR ($10 = 'mine' AND o.assigned_to = $11)
+            OR ($10 = 'available' AND ${AVAILABLE}))
+       AND (NOT $12::boolean OR o.assigned_to = $11 OR ${AVAILABLE})`,
     values: [
       shopId,
       filters.when ?? null,
@@ -146,6 +164,9 @@ function orderConditions(
       number,
       // "#12" is an order number only, never a phone fragment.
       q && !q.startsWith('#') ? phoneSearchDigits(q) : null,
+      filters.assignment ?? null,
+      filters.viewerId ?? null,
+      filters.driverScope ?? false,
     ],
   };
 }
@@ -158,11 +179,11 @@ export async function listOrders(shopId: string, filters: OrderFilters): Promise
   const where = orderConditions(shopId, filters);
   const { rows } = await pool.query<Omit<Order, 'items'>>(
     `SELECT ${orderColumns} FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
-     WHERE ${where.sql} AND ($10::text IS NULL OR o.status = $10)
+     WHERE ${where.sql} AND ($13::text IS NULL OR o.status = $13)
      ORDER BY
        CASE WHEN $2::text IS NULL THEN NULL ELSE o.scheduled_date END,
        o.created_at DESC, o.id
-     LIMIT $11 OFFSET $12`,
+     LIMIT $14 OFFSET $15`,
     [...where.values, filters.status ?? null, filters.limit, filters.offset],
   );
   return attachItems(pool, rows);

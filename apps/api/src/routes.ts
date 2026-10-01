@@ -10,6 +10,7 @@ import { ordersRouter } from './modules/order/order.routes.js';
 import { productsRouter } from './modules/product/product.routes.js';
 import {
   hideCostsUnlessAllowed,
+  requireAnyPermission,
   requirePermission,
   requireReadWrite,
 } from './modules/shop/permissions.js';
@@ -50,7 +51,8 @@ export function createApiRouter(verifyToken: TokenVerifier) {
   shopScoped.use('/categories', catalog, categoriesRouter);
   shopScoped.use('/products', catalog, productsRouter);
   shopScoped.use('/customers', requirePermission('customers'), customersRouter);
-  shopScoped.use('/orders', requirePermission('orders'), ordersRouter);
+  // Drivers reach their own deliveries; each order route checks which ones.
+  shopScoped.use('/orders', requireAnyPermission('orders', 'deliveries'), ordersRouter);
   shopScoped.use('/expenses', requirePermission('expenses'), expensesRouter);
   shopScoped.use('/dashboard', requirePermission('dashboard'), dashboardRouter);
   api.use('/shops/:shopId', shopScoped);

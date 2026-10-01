@@ -1,10 +1,23 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { currentShopId } from '../../http/context.js';
+import type { Request } from 'express';
+
+import { currentMember, currentShopId } from '../../http/context.js';
 import { idParam, notFound } from '../../http/params.js';
+import { ProblemError } from '../../http/problem.js';
 import { amount, isoDate, optionalText, pagination, requiredText } from '../../http/schemas.js';
 import { phoneField } from '../customer/phone.js';
+import { can, requirePermission } from '../shop/permissions.js';
+import {
+  assignDriver,
+  claimDelivery,
+  DRIVER_STATUSES,
+  driverCanSee,
+  findOwnDelivery,
+  releaseDelivery,
+  unassignDriver,
+} from './delivery.service.js';
 import { ORDER_SOURCES } from './order-source.js';
 import { ORDER_STATUSES } from './order-status.js';
 import { countOrdersByStatus, findOrder, listOrders } from './order.repository.js';
@@ -62,9 +75,14 @@ const updateOrderSchema = z
   .partial()
   .strict();
 
+/** What a driver may change on their own delivery: the payment. */
+const driverUpdateSchema = updateOrderSchema.pick({ paymentMethod: true, isPaid: true });
+
 const statusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
+const driverSchema = z.object({ userId: z.uuid() }).strict();
 
 const filtersQuery = z.object({
+  assignment: z.enum(['mine', 'available']).optional(),
   when: z.enum(['today', 'upcoming']).optional(),
   q: z.string().trim().max(150).optional(),
   customerId: z.uuid().optional(),
@@ -77,38 +95,83 @@ const listQuery = filtersQuery.extend({
   ...pagination,
 });
 
+/** A member who only handles deliveries (driver): limited to their own orders. */
+const isDriver = (req: Request) => !can(currentMember(req).role, 'orders');
+
+function scopedFilters<T extends object>(req: Request, filters: T) {
+  return { ...filters, viewerId: currentMember(req).userId, driverScope: isDriver(req) };
+}
+
+const forbidden = () => new ProblemError(403, 'Forbidden', 'Your role does not allow this action.');
+
 /** /shops/:shopId/orders */
 export const ordersRouter = Router();
 
 ordersRouter.get('/', async (req, res) => {
-  res.json(await listOrders(currentShopId(req), listQuery.parse(req.query)));
+  res.json(await listOrders(currentShopId(req), scopedFilters(req, listQuery.parse(req.query))));
 });
 
 /** Counts per status for the list filters: { total, byStatus }. Before /:orderId. */
 ordersRouter.get('/counts', async (req, res) => {
-  res.json(await countOrdersByStatus(currentShopId(req), filtersQuery.parse(req.query)));
+  const filters = scopedFilters(req, filtersQuery.parse(req.query));
+  res.json(await countOrdersByStatus(currentShopId(req), filters));
 });
 
-ordersRouter.post('/', async (req, res) => {
+ordersRouter.post('/', requirePermission('orders'), async (req, res) => {
   const order = await createOrder(currentShopId(req), createOrderSchema.parse(req.body));
   res.status(201).location(`${req.baseUrl}/${order.id}`).json(order);
 });
 
 ordersRouter.get('/:orderId', async (req, res) => {
   const order = await findOrder(currentShopId(req), idParam(req.params.orderId, 'Order'));
-  if (!order) throw notFound('Order');
+  if (!order || (isDriver(req) && !driverCanSee(order, currentMember(req).userId))) {
+    throw notFound('Order');
+  }
   res.json(order);
 });
 
 ordersRouter.patch('/:orderId', async (req, res) => {
-  const patch = updateOrderSchema.parse(req.body);
-  res.json(await updateOrder(currentShopId(req), idParam(req.params.orderId, 'Order'), patch));
+  const shopId = currentShopId(req);
+  const orderId = idParam(req.params.orderId, 'Order');
+  if (isDriver(req)) {
+    const patch = driverUpdateSchema.parse(req.body);
+    await findOwnDelivery(shopId, orderId, currentMember(req).userId);
+    res.json(await updateOrder(shopId, orderId, patch));
+    return;
+  }
+  res.json(await updateOrder(shopId, orderId, updateOrderSchema.parse(req.body)));
 });
 
 /** Status changes go through here (not PATCH) because they move stock. */
 ordersRouter.post('/:orderId/status', async (req, res) => {
+  const shopId = currentShopId(req);
+  const orderId = idParam(req.params.orderId, 'Order');
   const { status } = statusSchema.parse(req.body);
-  res.json(
-    await changeOrderStatus(currentShopId(req), idParam(req.params.orderId, 'Order'), status),
-  );
+  if (isDriver(req)) {
+    await findOwnDelivery(shopId, orderId, currentMember(req).userId);
+    if (!DRIVER_STATUSES.includes(status)) throw forbidden();
+  }
+  res.json(await changeOrderStatus(shopId, orderId, status));
+});
+
+/** Assigns a driver (RG-54): owner, manager, CM. */
+ordersRouter.put('/:orderId/driver', requirePermission('orders'), async (req, res) => {
+  const { userId } = driverSchema.parse(req.body);
+  res.json(await assignDriver(currentShopId(req), idParam(req.params.orderId, 'Order'), userId));
+});
+
+ordersRouter.delete('/:orderId/driver', requirePermission('orders'), async (req, res) => {
+  res.json(await unassignDriver(currentShopId(req), idParam(req.params.orderId, 'Order')));
+});
+
+/** A driver takes a delivery still to take (RG-55). */
+ordersRouter.post('/:orderId/claim', requirePermission('deliveries'), async (req, res) => {
+  const orderId = idParam(req.params.orderId, 'Order');
+  res.json(await claimDelivery(currentShopId(req), orderId, currentMember(req).userId));
+});
+
+/** A driver gives back one of their deliveries, until it is delivered. */
+ordersRouter.post('/:orderId/release', requirePermission('deliveries'), async (req, res) => {
+  const orderId = idParam(req.params.orderId, 'Order');
+  res.json(await releaseDelivery(currentShopId(req), orderId, currentMember(req).userId));
 });

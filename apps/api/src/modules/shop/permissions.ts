@@ -52,6 +52,17 @@ export function requirePermission(permission: Permission): RequestHandler {
   };
 }
 
+/** 403 unless the role has at least one of the permissions. */
+export function requireAnyPermission(...permissions: Permission[]): RequestHandler {
+  return (req, _res, next) => {
+    const { role } = currentMember(req);
+    if (!permissions.some((p) => can(role, p))) {
+      throw new ProblemError(403, 'Forbidden', 'Your role does not allow this action.');
+    }
+    next();
+  };
+}
+
 /** GET (reading) needs `read`, any other method (writing) needs `write`. */
 export function requireReadWrite(read: Permission, write: Permission): RequestHandler {
   return (req, res, next) => requirePermission(req.method === 'GET' ? read : write)(req, res, next);
