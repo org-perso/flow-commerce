@@ -101,12 +101,9 @@ export default function StockScreen() {
         ListEmptyComponent={
           products.isPending ? (
             <ActivityIndicator color={theme.colors.ink} style={styles.loader} />
-          ) : isFiltered ? (
-            <EmptyState message="Aucun produit trouvé." />
           ) : (
             <EmptyState
-              message="Aucun produit pour l'instant."
-              action={{ label: 'Ajouter un produit', onPress: openNew }}
+              message={isFiltered ? 'Aucun produit trouvé.' : "Aucun produit pour l'instant."}
             />
           )
         }

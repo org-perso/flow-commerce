@@ -33,6 +33,8 @@ export const theme = {
     rowMinHeight: 56,
     /** Visual height of compact controls (segments, chips, compact buttons); hitSlop tops them up to tapMin. */
     controlHeight: 36,
+    /** Width of every border and divider (fields, cards, chips, buttons). */
+    border: 0.5,
     /** Icon sizes. */
     iconSm: 16,
     iconMd: 20,

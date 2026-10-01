@@ -709,7 +709,7 @@ const styles = StyleSheet.create({
   card: {
     padding: theme.spacing[3],
     borderRadius: theme.radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
   },
@@ -735,7 +735,7 @@ const styles = StyleSheet.create({
     minHeight: theme.layout.rowMinHeight,
     padding: theme.spacing[3],
     borderRadius: theme.radius.md,
-    borderWidth: 1,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
   },
@@ -780,7 +780,7 @@ const styles = StyleSheet.create({
     minHeight: theme.layout.controlHeight,
     paddingHorizontal: theme.spacing[4],
     borderRadius: theme.radius.pill,
-    borderWidth: 1,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
   },
@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
   more: {
     marginTop: theme.spacing[3],
     paddingTop: theme.spacing[3],
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
   },
   line: {
@@ -799,7 +799,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing[2],
   },
   lineDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
     paddingTop: theme.spacing[3],
   },

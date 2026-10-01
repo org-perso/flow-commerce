@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing[3],
     padding: theme.spacing[3],
     borderRadius: theme.radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
   },
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
   },
   contactOutline: {
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
   },
   contactFilled: {
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing[4],
     paddingTop: theme.spacing[2],
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
   },
   flex: {

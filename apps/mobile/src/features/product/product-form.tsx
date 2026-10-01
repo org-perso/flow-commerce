@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm, useWatch } from 'react-hook-form';
+import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { z } from 'zod';
 
 import { FormTextField } from '@/components/form-text-field';
-import { AlertBanner, AppText, Button } from '@/components/ui';
+import { AlertBanner, AppText, FormScreen } from '@/components/ui';
 import { apiErrorMessage } from '@/lib/api-client';
 import { amountField, optionalTextField, quantityField, toFieldValue } from '@/lib/form-fields';
 import { theme } from '@/theme';
@@ -34,6 +35,10 @@ type ProductFormProps = {
   submitLabel: string;
   onSubmit: (values: ProductFormOutput) => Promise<unknown>;
   error: unknown;
+  /** Under the fields (e.g. a delete button). */
+  extra?: ReactNode;
+  /** Inside another layout (sign-up flow) instead of its own screen. */
+  inline?: boolean;
 };
 
 function digitsToNumber(value: string | undefined) {
@@ -41,7 +46,14 @@ function digitsToNumber(value: string | undefined) {
   return /^\d+$/.test(digits) ? Number(digits) : null;
 }
 
-export function ProductForm({ product, submitLabel, onSubmit, error }: ProductFormProps) {
+export function ProductForm({
+  product,
+  submitLabel,
+  onSubmit,
+  error,
+  extra,
+  inline,
+}: ProductFormProps) {
   const { control, handleSubmit, formState } = useForm<FormInput, unknown, ProductFormOutput>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -68,8 +80,14 @@ export function ProductForm({ product, submitLabel, onSubmit, error }: ProductFo
   });
 
   return (
-    <View style={styles.root}>
-      {error != null && <AlertBanner tone="danger" message={apiErrorMessage(error)} />}
+    <FormScreen
+      submitLabel={submitLabel}
+      onSubmit={submit}
+      submitting={formState.isSubmitting}
+      error={error != null ? apiErrorMessage(error) : undefined}
+      extra={extra}
+      inline={inline}
+    >
       <Controller
         control={control}
         name="image"
@@ -151,14 +169,7 @@ export function ProductForm({ product, submitLabel, onSubmit, error }: ProductFo
           Pour changer le stock, utilisez les entrées et sorties depuis la fiche produit.
         </AppText>
       )}
-      <Button
-        label={submitLabel}
-        variant="primary"
-        fullWidth
-        loading={formState.isSubmitting}
-        onPress={submit}
-      />
-    </View>
+    </FormScreen>
   );
 }
 

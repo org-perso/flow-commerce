@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: StyleSheet.hairlineWidth,
+    height: theme.layout.border,
     backgroundColor: theme.colors.line,
   },
   dividerInset: {

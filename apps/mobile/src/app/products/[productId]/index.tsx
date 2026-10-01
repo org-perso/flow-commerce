@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing[2],
   },
   movementBorder: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
   },
   strong: {

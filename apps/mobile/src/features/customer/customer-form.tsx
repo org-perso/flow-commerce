@@ -2,11 +2,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import { Plus, X } from 'lucide-react-native';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { z } from 'zod';
 
 import { FormTextField } from '@/components/form-text-field';
-import { AlertBanner, AppText, Button, TextField } from '@/components/ui';
+import { AlertBanner, AppText, Button, FormScreen, TextField } from '@/components/ui';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
 import { optionalTextField } from '@/lib/form-fields';
 import { hitSlopFor, theme } from '@/theme';
@@ -36,9 +37,20 @@ type CustomerFormProps = {
   submitLabel: string;
   onSubmit: (values: CustomerInput) => Promise<unknown>;
   error: unknown;
+  /** Under the fields (e.g. a delete button). */
+  extra?: ReactNode;
+  /** Inside another layout (sign-up flow) instead of its own screen. */
+  inline?: boolean;
 };
 
-export function CustomerForm({ customer, submitLabel, onSubmit, error }: CustomerFormProps) {
+export function CustomerForm({
+  customer,
+  submitLabel,
+  onSubmit,
+  error,
+  extra,
+  inline,
+}: CustomerFormProps) {
   const { control, handleSubmit, formState } = useForm<
     z.input<typeof schema>,
     unknown,
@@ -66,7 +78,14 @@ export function CustomerForm({ customer, submitLabel, onSubmit, error }: Custome
       : undefined;
 
   return (
-    <View style={styles.root}>
+    <FormScreen
+      submitLabel={submitLabel}
+      onSubmit={submit}
+      submitting={formState.isSubmitting}
+      error={error != null ? apiErrorMessage(error) : undefined}
+      extra={extra}
+      inline={inline}
+    >
       {duplicateOf ? (
         <View style={styles.group}>
           <AlertBanner
@@ -149,15 +168,7 @@ export function CustomerForm({ customer, submitLabel, onSubmit, error }: Custome
       <AppText variant="caption" color="inkMuted">
         L’adresse de livraison se saisit avec chaque commande.
       </AppText>
-
-      <Button
-        label={submitLabel}
-        variant="primary"
-        fullWidth
-        loading={formState.isSubmitting}
-        onPress={submit}
-      />
-    </View>
+    </FormScreen>
   );
 }
 

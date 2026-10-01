@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: theme.spacing[4],
     borderRadius: theme.radius.pill,
-    borderWidth: 1,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
   },
