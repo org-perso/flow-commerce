@@ -13,9 +13,9 @@
 
 | Rôle | Description |
 |---|---|
-| **Propriétaire** | Crée la boutique. Tous les droits, dont toute l'équipe et les paramètres. Au moins un par boutique. |
-| **Gérant** | Gère l'activité au quotidien à la place du propriétaire, et gère les **community managers**. Ne gère ni les autres rôles ni les paramètres de la boutique. |
-| **Community Manager (CM)** | Répond aux clients sur les réseaux et prend les commandes. Ne voit pas les chiffres. |
+| **Propriétaire** | Crée la boutique. Tous les droits, dont toute l'équipe et les paramètres. Une boutique peut avoir plusieurs propriétaires (ex. associé), au moins un. |
+| **Gérant** | Gère l'activité au quotidien à la place du propriétaire, et gère les **community managers** et les **livreurs**. Ne gère ni les propriétaires, ni les gérants, ni les paramètres de la boutique. |
+| **Community Manager (CM)** | Répond aux clients sur les réseaux et prend les commandes. Ne voit ni les chiffres, ni les prix d'achat, ni les bénéfices. |
 | **Livreur** | Livre les commandes et encaisse. Ne voit que ses livraisons et celles qui restent à prendre. |
 
 Un même compte peut être membre de **plusieurs boutiques**, avec un rôle différent dans chacune (ex. livreur indépendant). Le sélecteur de boutique de l'en-tête affiche toutes ses boutiques.
@@ -27,7 +27,7 @@ Un même compte peut être membre de **plusieurs boutiques**, avec un rôle diff
 - **Inviter** : choisir un rôle → l'app génère un **code de 6 caractères valable 7 jours**, à partager (WhatsApp, SMS…).
 - Voir et annuler les codes en cours.
 - Changer le rôle d'un membre ; retirer un membre.
-- Le **propriétaire** gère tous les rôles ; le **gérant** ne peut inviter, retirer ou voir les codes que pour des **CM** (RG-58).
+- Le **propriétaire** gère tous les rôles ; le **gérant** ne peut inviter, retirer ou voir les codes que pour des **CM** et des **livreurs** (RG-58).
 
 ### F-11 Rejoindre une boutique
 - Toute personne connectée peut saisir un code (« Rejoindre une boutique ») : elle devient membre avec le rôle du code.
@@ -37,10 +37,11 @@ Un même compte peut être membre de **plusieurs boutiques**, avec un rôle diff
 ### F-12 Assigner les livraisons
 - Sur une commande avec livraison, le propriétaire, le gérant ou le CM **choisit le livreur** (ou le retire).
 - Le livreur peut **prendre pour lui** une livraison non assignée.
+- Le livreur peut **rendre** une livraison qu'il a prise, tant qu'elle n'est pas livrée : elle redevient « à prendre ».
 
 ### F-13 Espace livreur
 - Le livreur arrive sur **« Mes livraisons »** (aujourd'hui, en retard, à venir) et **« À prendre »** (livraisons non assignées).
-- Sur ses commandes : voir le client (nom, téléphone, lieu, adresse, précisions), appeler, WhatsApp, **marquer livrée**, **encaisser**.
+- Sur ses commandes : voir le client (nom, téléphone, lieu, adresse, précisions), les produits et le montant à encaisser ; appeler, WhatsApp, **marquer livrée**, **signaler un retour** (avec confirmation), **encaisser**.
 
 ### F-14 Navigation selon le rôle
 - Les onglets, boutons et chiffres que le rôle ne peut pas utiliser sont **masqués**, pas seulement bloqués.
@@ -64,19 +65,22 @@ Notifications push sur le téléphone ; un appui ouvre la commande concernée.
 
 | Action | Propriétaire | Gérant | CM | Livreur |
 |---|:-:|:-:|:-:|:-:|
-| Créer / modifier une commande | ✅ | ✅ | ✅ | ❌ |
+| Créer / modifier / annuler une commande | ✅ | ✅ | ✅ | ❌ |
 | Voir les commandes | toutes | toutes | toutes | les siennes + à prendre |
-| Changer le statut d'une commande | ✅ | ✅ | ✅ | livrée, sur les siennes |
+| Changer le statut d'une commande | ✅ | ✅ | ✅ | livrée ou retour, sur les siennes |
 | Encaisser | ✅ | ✅ | ✅ | sur les siennes |
-| Assigner un livreur | ✅ | ✅ | ✅ | se l'assigner (non assignées) |
+| Assigner un livreur | ✅ | ✅ | ✅ | prendre (non assignées) ou rendre (les siennes) |
 | Clients : voir / créer / modifier | ✅ | ✅ | ✅ | nom, téléphone, adresse de ses livraisons |
-| Stock : voir | ✅ | ✅ | ✅ | ❌ |
+| Stock : voir | ✅ | ✅ | ✅ (sans prix d'achat) | ❌ |
+| Prix d'achat, bénéfice, marge, valeur du stock | ✅ | ✅ | ❌ | ❌ |
 | Produits et stock : modifier | ✅ | ✅ | ❌ | ❌ |
 | Dépenses | ✅ | ✅ | ❌ | ❌ |
 | Tableau de bord (CA, bénéfice) | ✅ | ✅ | ❌ | ❌ |
 | Paramètres de la boutique | ✅ | ❌ | ❌ | ❌ |
 | Équipe : voir les membres | ✅ | ✅ | ❌ | ❌ |
-| Équipe : inviter, retirer, changer de rôle | tous les rôles | CM seulement | ❌ | ❌ |
+| Équipe : inviter, retirer, changer de rôle | tous les rôles | CM et livreurs | ❌ | ❌ |
+
+Les droits de chaque rôle sont fixes en v2 (pas de réglage par boutique).
 
 ## 5. Règles de gestion
 
@@ -88,8 +92,9 @@ Notifications push sur le téléphone ; un appui ouvre la commande concernée.
 - **RG-55** Un livreur ne peut prendre qu'une livraison **non assignée et encore ouverte** ; si deux livreurs la prennent en même temps, seul le premier l'obtient.
 - **RG-56** Un membre retiré perd immédiatement l'accès à la boutique ; ses livraisons en cours redeviennent non assignées.
 - **RG-57** Les données créées par un membre (commandes, clients…) restent dans la boutique après son départ.
-- **RG-58** Le **propriétaire** peut inviter, retirer et changer le rôle de tous les membres. Le **gérant** ne peut agir que sur les **CM** : inviter un CM, retirer un CM ; il ne peut pas donner un autre rôle ni modifier un propriétaire, un gérant ou un livreur.
+- **RG-58** Le **propriétaire** peut inviter, retirer et changer le rôle de tous les membres, y compris nommer un autre propriétaire. Le **gérant** ne peut agir que sur les **CM** et les **livreurs** : les inviter, les retirer, passer l'un à l'autre ; il ne peut ni donner le rôle Gérant ou Propriétaire, ni modifier un propriétaire ou un gérant.
 - **RG-59** Une notification n'est envoyée qu'aux membres **actuels** de la boutique, et un livreur n'est jamais notifié pour une boutique qu'il a quittée.
+- **RG-60** Les prix d'achat, bénéfices, marges et la valeur du stock ne sont **jamais envoyés** par le serveur à un CM ou à un livreur (pas seulement masqués dans l'app).
 
 ## 6. Hors périmètre v2
-Abonnements payants (freemium), suivi GPS des livreurs, paiement des livreurs, historique de qui a fait quoi (journal d'activité).
+Abonnements payants (freemium), suivi GPS des livreurs, paiement des livreurs, historique de qui a fait quoi (journal d'activité), permissions réglables par boutique.

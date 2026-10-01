@@ -1,14 +1,15 @@
 import { Router } from 'express';
 
-import { currentShop, currentUser } from '../../http/context.js';
-import { createShop, listShopsByOwner, updateShop } from './shop.repository.js';
+import { currentMember, currentShop, currentUser } from '../../http/context.js';
+import { requirePermission } from './permissions.js';
+import { createShop, listShopsForUser, updateShop } from './shop.repository.js';
 import { createShopSchema, updateShopSchema } from './shop.schemas.js';
 
-/** /shops — the current user's shops. */
+/** /shops — the shops the current user is a member of, with their role. */
 export const shopsRouter = Router();
 
 shopsRouter.get('/', async (req, res) => {
-  res.json(await listShopsByOwner(currentUser(req).id));
+  res.json(await listShopsForUser(currentUser(req).id));
 });
 
 shopsRouter.post('/', async (req, res) => {
@@ -21,10 +22,10 @@ shopsRouter.post('/', async (req, res) => {
 export const shopRouter = Router();
 
 shopRouter.get('/', (req, res) => {
-  res.json(currentShop(req));
+  res.json({ ...currentShop(req), role: currentMember(req).role });
 });
 
-shopRouter.patch('/', async (req, res) => {
+shopRouter.patch('/', requirePermission('shop.settings'), async (req, res) => {
   const patch = updateShopSchema.parse(req.body);
-  res.json(await updateShop(currentShop(req).id, patch));
+  res.json({ ...(await updateShop(currentShop(req).id, patch)), role: currentMember(req).role });
 });

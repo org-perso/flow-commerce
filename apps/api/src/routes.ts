@@ -8,6 +8,11 @@ import { dashboardRouter } from './modules/dashboard/dashboard.routes.js';
 import { expensesRouter } from './modules/expense/expense.routes.js';
 import { ordersRouter } from './modules/order/order.routes.js';
 import { productsRouter } from './modules/product/product.routes.js';
+import {
+  hideCostsUnlessAllowed,
+  requirePermission,
+  requireReadWrite,
+} from './modules/shop/permissions.js';
 import { requireShop } from './modules/shop/shop.middleware.js';
 import { shopRouter, shopsRouter } from './modules/shop/shop.routes.js';
 import { meRouter } from './modules/user/me.routes.js';
@@ -26,16 +31,18 @@ export function createApiRouter(verifyToken: TokenVerifier) {
   api.use('/me', meRouter);
   api.use('/shops', shopsRouter);
 
-  // Everything below /shops/:shopId is scoped to a shop owned by the current user.
+  // Everything below /shops/:shopId is scoped to a shop the current user is a member of,
+  // and each area checks the permission of their role (af-v2 §4).
   const shopScoped = Router({ mergeParams: true });
-  shopScoped.use(requireShop);
+  shopScoped.use(requireShop, hideCostsUnlessAllowed);
   shopScoped.use('/', shopRouter);
-  shopScoped.use('/categories', categoriesRouter);
-  shopScoped.use('/products', productsRouter);
-  shopScoped.use('/customers', customersRouter);
-  shopScoped.use('/orders', ordersRouter);
-  shopScoped.use('/expenses', expensesRouter);
-  shopScoped.use('/dashboard', dashboardRouter);
+  const catalog = requireReadWrite('catalog.read', 'catalog.write');
+  shopScoped.use('/categories', catalog, categoriesRouter);
+  shopScoped.use('/products', catalog, productsRouter);
+  shopScoped.use('/customers', requirePermission('customers'), customersRouter);
+  shopScoped.use('/orders', requirePermission('orders'), ordersRouter);
+  shopScoped.use('/expenses', requirePermission('expenses'), expensesRouter);
+  shopScoped.use('/dashboard', requirePermission('dashboard'), dashboardRouter);
   api.use('/shops/:shopId', shopScoped);
 
   return api;

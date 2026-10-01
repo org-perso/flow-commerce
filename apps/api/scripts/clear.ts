@@ -58,7 +58,8 @@ if (args.includes('--all')) {
     'TOUT',
   );
   await pool.query(
-    `TRUNCATE users, shops, product_categories, ${SHOP_DATA.join(', ')} RESTART IDENTITY CASCADE`,
+    `TRUNCATE users, shops, shop_members, shop_invitations, push_tokens, product_categories, ${SHOP_DATA.join(', ')}
+       RESTART IDENTITY CASCADE`,
   );
   console.log('Base vidée. Reconnectez-vous dans l’app : le compte sera recréé, puis la boutique.');
 } else {
@@ -76,6 +77,8 @@ if (args.includes('--all')) {
     }
     if (deleteShop) {
       await client.query('DELETE FROM product_categories WHERE shop_id = $1', [shop.id]);
+      await client.query('DELETE FROM shop_invitations WHERE shop_id = $1', [shop.id]);
+      await client.query('DELETE FROM shop_members WHERE shop_id = $1', [shop.id]);
       await client.query('DELETE FROM shops WHERE id = $1', [shop.id]);
     } else {
       await client.query('UPDATE shops SET last_order_number = 0 WHERE id = $1', [shop.id]);
