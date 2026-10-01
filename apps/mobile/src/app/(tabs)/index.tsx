@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing[1],
     padding: theme.spacing[2],
     borderRadius: theme.radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
   },
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   card: {
     paddingHorizontal: theme.spacing[4],
     borderRadius: theme.radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
   },
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   detail: {
     gap: theme.spacing[1],
     paddingBottom: theme.spacing[3],
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
     paddingTop: theme.spacing[2],
   },
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     minHeight: theme.sizes.tapMin - theme.spacing[2],
   },
   lineTotal: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
   },
   flex: {

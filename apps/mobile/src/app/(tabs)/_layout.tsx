@@ -1,14 +1,19 @@
 import { router, Tabs } from 'expo-router';
-import { House, Package, Plus, Receipt, Users, type LucideIcon } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui';
+import { TabIconSvg, type TabIconName } from '@/components/ui/tab-icons';
 import { theme } from '@/theme';
 
-function TabIcon({ Icon, focused }: { Icon: LucideIcon; focused: boolean }) {
+function TabIcon({ icon, focused }: { icon: TabIconName; focused: boolean }) {
   return (
     <View style={[styles.iconPill, focused && styles.iconPillActive]}>
-      <Icon size={22} strokeWidth={2} color={focused ? theme.colors.ink : theme.colors.inkMuted} />
+      <TabIconSvg
+        name={icon}
+        size={theme.layout.iconLg}
+        color={focused ? theme.colors.ink : theme.colors.inkMuted}
+      />
     </View>
   );
 }
@@ -45,20 +50,20 @@ function NewOrderButton() {
 }
 
 const tabs = [
-  { name: 'index', label: 'Accueil', Icon: House },
-  { name: 'orders', label: 'Commandes', Icon: Receipt },
-  { name: 'stock', label: 'Stock', Icon: Package },
-  { name: 'customers', label: 'Clients', Icon: Users },
+  { name: 'index', label: 'Accueil', icon: 'home' },
+  { name: 'orders', label: 'Commandes', icon: 'receiptLong' },
+  { name: 'stock', label: 'Stock', icon: 'inventory' },
+  { name: 'customers', label: 'Clients', icon: 'group' },
 ] as const;
 
-function tabScreen({ name, label, Icon }: (typeof tabs)[number]) {
+function tabScreen({ name, label, icon }: (typeof tabs)[number]) {
   return (
     <Tabs.Screen
       key={name}
       name={name}
       options={{
         title: label,
-        tabBarIcon: ({ focused }) => <TabIcon Icon={Icon} focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon icon={icon} focused={focused} />,
         tabBarLabel: ({ focused }) => <TabLabel label={label} focused={focused} />,
       }}
     />

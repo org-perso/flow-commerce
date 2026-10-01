@@ -55,7 +55,10 @@ export default function ExpensesScreen() {
     >
       <View style={styles.header}>
         <FilterChips options={periods} value={period} onChange={setPeriod} />
-        <KpiCard label="Total des dépenses" value={formatAr(expenses.data?.total ?? 0)} />
+        {/* No total card for an empty period: the empty message says it all. */}
+        {!!expenses.data?.items.length && (
+          <KpiCard label="Total des dépenses" value={formatAr(expenses.data.total)} />
+        )}
       </View>
 
       {expenses.isError && (

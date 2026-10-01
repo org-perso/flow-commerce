@@ -11,21 +11,23 @@ export default function EditProductScreen() {
   const product = useProduct(productId);
   const updateProduct = useUpdateProduct(productId);
 
-  return (
-    <Screen edges={[]}>
-      {product.data ? (
-        <ProductForm
-          product={product.data}
-          submitLabel="Enregistrer"
-          error={updateProduct.error}
-          onSubmit={async ({ initialStock: _, ...values }) => {
-            await updateProduct.mutateAsync(values);
-            router.back();
-          }}
-        />
-      ) : (
+  if (!product.data) {
+    return (
+      <Screen edges={[]}>
         <ActivityIndicator color={theme.colors.ink} />
-      )}
-    </Screen>
+      </Screen>
+    );
+  }
+
+  return (
+    <ProductForm
+      product={product.data}
+      submitLabel="Enregistrer"
+      error={updateProduct.error}
+      onSubmit={async ({ initialStock: _, ...values }) => {
+        await updateProduct.mutateAsync(values);
+        router.back();
+      }}
+    />
   );
 }

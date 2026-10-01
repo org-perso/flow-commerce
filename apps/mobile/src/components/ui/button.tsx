@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing[6],
   },
   secondary: {
-    borderWidth: 1,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
   },
   compact: {

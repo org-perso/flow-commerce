@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing[4],
     paddingTop: theme.spacing[3],
     borderRadius: theme.radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
   },
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing[3],
     minHeight: theme.layout.rowMinHeight,
     paddingVertical: theme.spacing[3],
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
   },
   icon: {

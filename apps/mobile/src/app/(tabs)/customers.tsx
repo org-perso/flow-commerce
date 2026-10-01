@@ -67,10 +67,8 @@ export default function CustomersScreen() {
           ) : q ? (
             <EmptyState message="Aucun client trouvé." />
           ) : (
-            <EmptyState
-              message="Aucun client pour l'instant."
-              action={{ label: 'Ajouter un client', onPress: openNew }}
-            />
+            // The title's « Ajouter » button is the only way in: no duplicate here.
+            <EmptyState message="Aucun client pour l'instant." />
           )
         }
         style={styles.list}

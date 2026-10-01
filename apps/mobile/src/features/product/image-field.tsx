@@ -1,11 +1,14 @@
 import { Image } from 'expo-image';
-import { Camera, ImagePlus, Trash2 } from 'lucide-react-native';
+import { Camera, Crown, ImagePlus, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText, Button } from '@/components/ui';
 import { pickProductImage } from '@/lib/product-image';
 import { theme } from '@/theme';
+
+/** Photos need Firebase Storage (Blaze plan): shown as a Premium feature until it is enabled. */
+const PHOTO_PREMIUM = true;
 
 type ImageFieldProps = {
   /** Local uri (just picked) or stored URL. */
@@ -17,6 +20,13 @@ export function ImageField({ value, onChange }: ImageFieldProps) {
   const [busy, setBusy] = useState(false);
 
   const pick = async (source: 'camera' | 'library') => {
+    if (PHOTO_PREMIUM) {
+      Alert.alert(
+        'Fonction Premium',
+        'Les photos des produits arrivent bientôt avec l’offre Premium.',
+      );
+      return;
+    }
     setBusy(true);
     try {
       const uri = await pickProductImage(source);
@@ -35,7 +45,17 @@ export function ImageField({ value, onChange }: ImageFieldProps) {
 
   return (
     <View style={styles.root}>
-      <AppText variant="label">Photo (facultatif)</AppText>
+      <View style={styles.labelRow}>
+        <AppText variant="label">Photo (facultatif)</AppText>
+        {PHOTO_PREMIUM && (
+          <View style={styles.premium}>
+            <Crown size={theme.layout.iconSm} color={theme.colors.goldInk} strokeWidth={2} />
+            <AppText variant="caption" color="goldInk">
+              Premium
+            </AppText>
+          </View>
+        )}
+      </View>
       <View style={styles.row}>
         <View style={styles.preview}>
           {value ? (
@@ -71,6 +91,20 @@ export function ImageField({ value, onChange }: ImageFieldProps) {
 const styles = StyleSheet.create({
   root: {
     gap: theme.spacing[1],
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[2],
+  },
+  premium: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[1],
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.goldSoft,
   },
   row: {
     flexDirection: 'row',

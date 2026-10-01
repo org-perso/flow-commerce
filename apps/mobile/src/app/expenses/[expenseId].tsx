@@ -36,23 +36,23 @@ export default function EditExpenseScreen() {
   }
 
   return (
-    <Screen edges={[]}>
-      <ExpenseForm
-        expense={expense.data}
-        submitLabel="Enregistrer"
-        error={updateExpense.error ?? deleteExpense.error}
-        onSubmit={async (values) => {
-          await updateExpense.mutateAsync(values);
-          router.back();
-        }}
-      />
-      <Button
-        label="Supprimer la dépense"
-        variant="danger"
-        fullWidth
-        loading={deleteExpense.isPending}
-        onPress={confirmDelete}
-      />
-    </Screen>
+    <ExpenseForm
+      expense={expense.data}
+      submitLabel="Enregistrer"
+      error={updateExpense.error ?? deleteExpense.error}
+      onSubmit={async (values) => {
+        await updateExpense.mutateAsync(values);
+        router.back();
+      }}
+      extra={
+        <Button
+          label="Supprimer la dépense"
+          variant="danger"
+          fullWidth
+          loading={deleteExpense.isPending}
+          onPress={confirmDelete}
+        />
+      }
+    />
   );
 }

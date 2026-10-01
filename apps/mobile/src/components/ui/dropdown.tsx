@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     minHeight: theme.layout.controlHeight,
     paddingHorizontal: theme.spacing[3],
     borderRadius: theme.radius.pill,
-    borderWidth: 1,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
   },

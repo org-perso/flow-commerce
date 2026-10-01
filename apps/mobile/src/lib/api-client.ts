@@ -20,6 +20,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Wakes the API up (Render free plan sleeps after 15 min idle, ~30–60 s to start) while the
+ * user is still on the splash or sign-in screen. Fire and forget: errors are ignored.
+ */
+export function wakeUpApi(): void {
+  fetch(`${apiUrl}/api/v1/health`).catch(() => {});
+}
+
 /** Calls the API with the Firebase ID token (refreshed by the SDK when expired). */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = await auth.currentUser?.getIdToken();

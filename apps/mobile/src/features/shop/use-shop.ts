@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { useAuthStore } from '@/features/auth/auth-store';
 
@@ -19,12 +20,17 @@ export function useShops() {
 /**
  * The shop the app currently works on: the last one picked, or the first one.
  * Only used below the root guard, where the user has at least one shop.
+ * When the shop list empties (sign-out, shop deleted), the guard unmounts these screens but
+ * they render once more first: they then get the last known shop instead of crashing.
  */
 export function useActiveShop(): Shop {
   const uid = useUid();
   const { data: shops = [] } = useShops();
   const activeId = useActiveShopStore((s) => (uid ? s.byUser[uid] : undefined));
-  const shop = shops.find((s) => s.id === activeId) ?? shops[0];
+  const current = shops.find((s) => s.id === activeId) ?? shops[0];
+  const [lastShop, setLastShop] = useState(current);
+  if (current && current !== lastShop) setLastShop(current);
+  const shop = current ?? lastShop;
   if (!shop) throw new Error('useActiveShop used without any shop');
   return shop;
 }

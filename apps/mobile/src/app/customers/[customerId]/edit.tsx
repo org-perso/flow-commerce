@@ -11,21 +11,23 @@ export default function EditCustomerScreen() {
   const customer = useCustomer(customerId);
   const updateCustomer = useUpdateCustomer(customerId);
 
-  return (
-    <Screen edges={[]}>
-      {customer.data ? (
-        <CustomerForm
-          customer={customer.data}
-          submitLabel="Enregistrer"
-          error={updateCustomer.error}
-          onSubmit={async (values) => {
-            await updateCustomer.mutateAsync(values);
-            router.back();
-          }}
-        />
-      ) : (
+  if (!customer.data) {
+    return (
+      <Screen edges={[]}>
         <ActivityIndicator color={theme.colors.ink} />
-      )}
-    </Screen>
+      </Screen>
+    );
+  }
+
+  return (
+    <CustomerForm
+      customer={customer.data}
+      submitLabel="Enregistrer"
+      error={updateCustomer.error}
+      onSubmit={async (values) => {
+        await updateCustomer.mutateAsync(values);
+        router.back();
+      }}
+    />
   );
 }

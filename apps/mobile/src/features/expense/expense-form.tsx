@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { z } from 'zod';
 
 import { FormTextField } from '@/components/form-text-field';
-import { AlertBanner, AppText, Button, FilterChips } from '@/components/ui';
+import { AppText, FilterChips, FormScreen } from '@/components/ui';
 import { apiErrorMessage } from '@/lib/api-client';
 import { amountField, optionalTextField } from '@/lib/form-fields';
 import { theme } from '@/theme';
@@ -37,9 +38,20 @@ type ExpenseFormProps = {
   submitLabel: string;
   onSubmit: (values: ExpenseInput) => Promise<unknown>;
   error: unknown;
+  /** Under the fields (e.g. a delete button). */
+  extra?: ReactNode;
+  /** Inside another layout (sign-up flow) instead of its own screen. */
+  inline?: boolean;
 };
 
-export function ExpenseForm({ expense, submitLabel, onSubmit, error }: ExpenseFormProps) {
+export function ExpenseForm({
+  expense,
+  submitLabel,
+  onSubmit,
+  error,
+  extra,
+  inline,
+}: ExpenseFormProps) {
   const { control, handleSubmit, formState } = useForm<
     z.input<typeof schema>,
     unknown,
@@ -59,8 +71,14 @@ export function ExpenseForm({ expense, submitLabel, onSubmit, error }: ExpenseFo
   });
 
   return (
-    <View style={{ gap: theme.spacing[4] }}>
-      {error != null && <AlertBanner tone="danger" message={apiErrorMessage(error)} />}
+    <FormScreen
+      submitLabel={submitLabel}
+      onSubmit={submit}
+      submitting={formState.isSubmitting}
+      error={error != null ? apiErrorMessage(error) : undefined}
+      extra={extra}
+      inline={inline}
+    >
       <View style={{ gap: theme.spacing[2] }}>
         <AppText variant="label">Catégorie</AppText>
         <Controller
@@ -94,13 +112,6 @@ export function ExpenseForm({ expense, submitLabel, onSubmit, error }: ExpenseFo
         multiline
         maxLength={1000}
       />
-      <Button
-        label={submitLabel}
-        variant="primary"
-        fullWidth
-        loading={formState.isSubmitting}
-        onPress={submit}
-      />
-    </View>
+    </FormScreen>
   );
 }

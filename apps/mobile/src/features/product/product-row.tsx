@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surfaceRaised,
     borderRadius: theme.radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
   },
   body: {
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing[3],
     marginHorizontal: theme.spacing[3],
     paddingVertical: theme.spacing[3],
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
   },
   stepper: {
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: theme.layout.controlHeight,
     borderRadius: theme.radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
   },
   step: {

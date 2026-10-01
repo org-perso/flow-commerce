@@ -86,7 +86,14 @@ export function CategoryPicker({ value, onChange }: CategoryPickerProps) {
                 returnKeyType="done"
               />
             </View>
-            <Button label="Ajouter" icon={Plus} loading={createCategory.isPending} onPress={add} />
+            <View style={styles.addButton}>
+              <Button
+                label="Ajouter"
+                icon={Plus}
+                loading={createCategory.isPending}
+                onPress={add}
+              />
+            </View>
           </View>
           {createError && <AlertBanner tone="danger" message={createError} />}
           <FlatList
@@ -125,7 +132,7 @@ const styles = StyleSheet.create({
     minHeight: theme.sizes.tapMin,
     paddingHorizontal: theme.spacing[3],
     backgroundColor: theme.colors.surfaceRaised,
-    borderWidth: 1,
+    borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     borderRadius: theme.radius.md,
   },
@@ -144,6 +151,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: theme.spacing[2],
+  },
+  addButton: {
+    alignSelf: 'stretch',
+    justifyContent: 'flex-end',
   },
   list: {
     borderRadius: theme.radius.md,

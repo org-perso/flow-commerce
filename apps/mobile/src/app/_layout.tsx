@@ -10,16 +10,22 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 
 import { headerOptions } from '@/components/header-options';
 import { AppText, Button } from '@/components/ui';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { useShops } from '@/features/shop/use-shop';
+import { wakeUpApi } from '@/lib/api-client';
 import { queryClient } from '@/lib/query-client';
 import { theme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
+wakeUpApi();
+// Also when coming back from the background: the server may have slept in the meantime.
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') wakeUpApi();
+});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({

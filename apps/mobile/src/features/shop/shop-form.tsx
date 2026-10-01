@@ -1,11 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { View } from 'react-native';
+import type { ReactNode } from 'react';
 
 import { FormTextField } from '@/components/form-text-field';
-import { AlertBanner, Button } from '@/components/ui';
+import { FormScreen } from '@/components/ui';
 import { apiErrorMessage } from '@/lib/api-client';
-import { theme } from '@/theme';
 
 import { shopSchema, toShopInput, type ShopFormValues } from './schemas';
 import type { Shop, ShopInput } from './shop-api';
@@ -15,9 +14,20 @@ type ShopFormProps = {
   submitLabel: string;
   onSubmit: (input: ShopInput) => Promise<unknown>;
   error: unknown;
+  /** Under the fields (e.g. a delete button). */
+  extra?: ReactNode;
+  /** Inside another layout (sign-up flow) instead of its own screen. */
+  inline?: boolean;
 };
 
-export function ShopForm({ initialShop, submitLabel, onSubmit, error }: ShopFormProps) {
+export function ShopForm({
+  initialShop,
+  submitLabel,
+  onSubmit,
+  error,
+  extra,
+  inline,
+}: ShopFormProps) {
   const { control, handleSubmit, formState } = useForm<ShopFormValues>({
     resolver: zodResolver(shopSchema),
     defaultValues: {
@@ -32,8 +42,14 @@ export function ShopForm({ initialShop, submitLabel, onSubmit, error }: ShopForm
   });
 
   return (
-    <View style={{ gap: theme.spacing[4] }}>
-      {error != null && <AlertBanner tone="danger" message={apiErrorMessage(error)} />}
+    <FormScreen
+      submitLabel={submitLabel}
+      onSubmit={submit}
+      submitting={formState.isSubmitting}
+      error={error != null ? apiErrorMessage(error) : undefined}
+      extra={extra}
+      inline={inline}
+    >
       <FormTextField
         control={control}
         name="name"
@@ -51,13 +67,6 @@ export function ShopForm({ initialShop, submitLabel, onSubmit, error }: ShopForm
         multiline
         maxLength={1000}
       />
-      <Button
-        label={submitLabel}
-        variant="primary"
-        fullWidth
-        loading={formState.isSubmitting}
-        onPress={submit}
-      />
-    </View>
+    </FormScreen>
   );
 }
