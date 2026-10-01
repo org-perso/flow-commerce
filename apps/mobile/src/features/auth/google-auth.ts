@@ -1,5 +1,10 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
-import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import {
+  GoogleAuthProvider,
+  reauthenticateWithCredential,
+  signInWithCredential,
+} from 'firebase/auth';
+import { Platform } from 'react-native';
 
 import { auth } from '@/lib/firebase';
 
@@ -8,9 +13,9 @@ type GoogleSignInModule = typeof import('@react-native-google-signin/google-sign
 const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-// The native module does not exist in Expo Go: importing it there crashes at load time.
+// The native module does not exist in Expo Go nor on the web: importing it crashes there.
 function loadGoogleSignIn(): GoogleSignInModule | null {
-  if (isExpoGo || !webClientId) return null;
+  if (isExpoGo || Platform.OS === 'web' || !webClientId) return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod: GoogleSignInModule = require('@react-native-google-signin/google-signin');
   mod.GoogleSignin.configure({ webClientId });
@@ -48,4 +53,17 @@ export function isGoogleSignInInProgress(error: unknown) {
     google.isErrorWithCode(error) &&
     error.code === google.statusCodes.IN_PROGRESS
   );
+}
+
+/** Asks the Google account again (Firebase wants a recent sign-in to delete an account). */
+export async function reauthenticateWithGoogle(): Promise<boolean> {
+  if (!google || !auth.currentUser) return false;
+  const { GoogleSignin, isSuccessResponse } = google;
+  const response = await GoogleSignin.signIn();
+  if (!isSuccessResponse(response) || !response.data.idToken) return false;
+  await reauthenticateWithCredential(
+    auth.currentUser,
+    GoogleAuthProvider.credential(response.data.idToken),
+  );
+  return true;
 }

@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
-import { Check, Plus } from 'lucide-react-native';
+import { Check, KeyRound, Plus } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 
 import { Avatar, ListGroup, ListRow, Screen } from '@/components/ui';
+import { ROLE_LABELS } from '@/features/shop/roles';
 import { useActiveShop, useSetActiveShop, useShops } from '@/features/shop/use-shop';
 import { theme } from '@/theme';
 
@@ -20,7 +21,7 @@ export default function ShopSwitcherScreen() {
             key={shop.id}
             leading={<Avatar name={shop.name} />}
             title={shop.name}
-            subtitle={shop.description ?? undefined}
+            subtitle={ROLE_LABELS[shop.role]}
             trailing={
               shop.id === activeShop.id ? (
                 <Check size={theme.layout.iconMd} color={theme.colors.blue} strokeWidth={2} />
@@ -44,6 +45,16 @@ export default function ShopSwitcherScreen() {
           title="Créer une boutique"
           titleColor="blue"
           onPress={() => router.replace('/new-shop')}
+        />
+        <ListRow
+          leading={
+            <View style={styles.plus}>
+              <KeyRound size={theme.layout.iconMd} color={theme.colors.blue} strokeWidth={2} />
+            </View>
+          }
+          title="Rejoindre une boutique"
+          titleColor="blue"
+          onPress={() => router.replace('/join-shop')}
         />
       </ListGroup>
     </Screen>

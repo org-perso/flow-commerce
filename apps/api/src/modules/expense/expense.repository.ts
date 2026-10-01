@@ -36,25 +36,34 @@ export type ExpenseFilters = {
   from?: string;
   to?: string;
   category?: ExpenseCategory;
+  /** No limit: every expense. */
+  limit?: number;
+  offset?: number;
 };
 
 export async function listExpenses(
   shopId: string,
   filters: ExpenseFilters,
 ): Promise<{ items: Expense[]; total: number }> {
-  const { rows } = await pool.query<Expense & { grandTotal: number }>(
-    `SELECT ${columns}, (sum(amount) OVER ())::bigint AS "grandTotal" FROM expenses
-     WHERE shop_id = $1
+  const where = `shop_id = $1
        AND ($2::date IS NULL OR date >= $2)
        AND ($3::date IS NULL OR date <= $3)
-       AND ($4::text IS NULL OR category = $4)
-     ORDER BY date DESC, created_at DESC`,
-    [shopId, filters.from ?? null, filters.to ?? null, filters.category ?? null],
-  );
-  return {
-    items: rows.map(({ grandTotal: _, ...expense }) => expense),
-    total: rows[0]?.grandTotal ?? 0,
-  };
+       AND ($4::text IS NULL OR category = $4)`;
+  const values = [shopId, filters.from ?? null, filters.to ?? null, filters.category ?? null];
+  const [items, total] = await Promise.all([
+    pool.query<Expense>(
+      `SELECT ${columns} FROM expenses WHERE ${where}
+       ORDER BY date DESC, created_at DESC, id
+       LIMIT $5::int OFFSET $6::int`,
+      [...values, filters.limit ?? null, filters.offset ?? 0],
+    ),
+    // The total covers every matching expense, not only this page.
+    pool.query<{ total: number }>(
+      `SELECT COALESCE(sum(amount), 0)::bigint AS total FROM expenses WHERE ${where}`,
+      values,
+    ),
+  ]);
+  return { items: items.rows, total: total.rows[0]!.total };
 }
 
 export async function findExpense(shopId: string, expenseId: string): Promise<Expense | null> {

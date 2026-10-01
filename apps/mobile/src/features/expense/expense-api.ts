@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api-client';
+import { setPage, type Page } from '@/lib/paging';
 
 export const EXPENSE_CATEGORIES = {
   ACHAT_PRODUITS: 'Achat de produits',
@@ -35,10 +36,12 @@ const base = (shopId: string) => `/shops/${shopId}/expenses`;
 export function listExpenses(
   shopId: string,
   filters: ExpenseFilters,
+  page?: Page,
 ): Promise<{ items: Expense[]; total: number }> {
   const params = new URLSearchParams();
   if (filters.from) params.set('from', filters.from);
   if (filters.to) params.set('to', filters.to);
+  setPage(params, page);
   const query = params.toString();
   return apiFetch(`${base(shopId)}${query ? `?${query}` : ''}`);
 }

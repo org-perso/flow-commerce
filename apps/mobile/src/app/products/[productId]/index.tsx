@@ -1,21 +1,70 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { ArrowDownToLine, ArrowUpFromLine, ClipboardCheck, Pencil } from 'lucide-react-native';
+import {
+  Archive,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ClipboardCheck,
+  Package,
+  Pencil,
+} from 'lucide-react-native';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
-import { AlertBanner, AppText, Button, KpiCard, Screen } from '@/components/ui';
+import { AlertBanner, AppText, Button, Screen } from '@/components/ui';
 import type { ManualMovementType } from '@/features/product/product-api';
 import { movementLabels } from '@/features/product/stock-movement-labels';
 import { useArchiveProduct, useProduct, useStockMovements } from '@/features/product/use-products';
+import { useCan } from '@/features/shop/use-shop';
 import { apiErrorMessage } from '@/lib/api-client';
 import { textStyles, theme } from '@/theme';
 import { formatAr, formatDateTime } from '@/utils/format';
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <AppText variant="caption" color="inkMuted" style={styles.sectionLabel}>
+      {children.toUpperCase()}
+    </AppText>
+  );
+}
+
+/** One figure of the stats card: small label, value, optional note. */
+function Stat({
+  label,
+  value,
+  caption,
+  tone,
+}: {
+  label: string;
+  value: string;
+  caption?: string;
+  tone?: 'danger' | 'success';
+}) {
+  const color =
+    tone === 'danger' ? 'statusCancelledFg' : tone === 'success' ? 'statusDeliveredFg' : 'ink';
+  return (
+    <View style={styles.stat}>
+      <AppText variant="caption" color="inkMuted">
+        {label}
+      </AppText>
+      <AppText style={styles.statValue} color={color} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </AppText>
+      {caption && (
+        <AppText variant="caption" color={color}>
+          {caption}
+        </AppText>
+      )}
+    </View>
+  );
+}
 
 export default function ProductScreen() {
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const product = useProduct(productId);
   const movements = useStockMovements(productId);
   const archive = useArchiveProduct(productId);
+  // A CM reads the stock only (no costs, no changes).
+  const canEdit = useCan('catalog.write');
 
   if (!product.data) {
     return (
@@ -49,86 +98,117 @@ export default function ProductScreen() {
       <Stack.Screen
         options={{
           title: p.name,
-          headerRight: () => (
-            <Button
-              label="Modifier"
-              icon={Pencil}
-              compact
-              onPress={() =>
-                router.push({ pathname: '/products/[productId]/edit', params: { productId } })
-              }
-            />
-          ),
+          headerRight: () =>
+            canEdit && (
+              <Button
+                label="Modifier"
+                icon={Pencil}
+                compact
+                onPress={() =>
+                  router.push({ pathname: '/products/[productId]/edit', params: { productId } })
+                }
+              />
+            ),
         }}
       />
 
       {archived && <AlertBanner message="Ce produit est archivé." />}
-      {!archived && p.isLowStock && (
-        <AlertBanner message={`Stock faible : seuil d'alerte à ${p.lowStockThreshold}.`} />
-      )}
       {archive.isError && <AlertBanner tone="danger" message={apiErrorMessage(archive.error)} />}
 
-      <View style={styles.section}>
-        <KpiCard variant="hero" label="En stock" value={String(p.stockQuantity)} />
-        <View style={styles.row}>
-          <KpiCard label="Prix de vente" value={formatAr(p.sellingPrice)} />
-          <KpiCard label="Prix d'achat" value={formatAr(p.purchasePrice)} />
-        </View>
-        <KpiCard label="Marge par unité" value={formatAr(p.sellingPrice - p.purchasePrice)} />
-        {p.image && <Image source={{ uri: p.image }} style={styles.photo} contentFit="cover" />}
-        {p.category || p.description ? (
-          <View style={styles.card}>
-            {p.category && (
-              <AppText variant="caption" color="inkMuted">
-                {p.category.name}
-              </AppText>
-            )}
-            {p.description && <AppText>{p.description}</AppText>}
+      {/* Identity: photo, name, category, description. */}
+      <View style={[styles.card, styles.identity]}>
+        {p.image ? (
+          <Image source={{ uri: p.image }} style={styles.thumb} contentFit="cover" />
+        ) : (
+          <View style={[styles.thumb, styles.thumbEmpty]}>
+            <Package size={theme.layout.iconLg} color={theme.colors.inkMuted} strokeWidth={1.5} />
           </View>
-        ) : null}
+        )}
+        <View style={styles.cell}>
+          <AppText style={styles.strong} numberOfLines={2}>
+            {p.name}
+          </AppText>
+          {p.category && (
+            <AppText variant="caption" color="inkMuted">
+              {p.category.name}
+            </AppText>
+          )}
+          {p.description && (
+            <AppText variant="caption" numberOfLines={3}>
+              {p.description}
+            </AppText>
+          )}
+        </View>
       </View>
 
-      {!archived && (
-        <View style={styles.section}>
-          <AppText variant="heading">Mouvement de stock</AppText>
-          <View style={styles.row}>
-            <View style={styles.cell}>
-              <Button
-                label="Entrée"
-                icon={ArrowDownToLine}
-                fullWidth
-                onPress={() => openMovement('AJOUT')}
-              />
-            </View>
-            <View style={styles.cell}>
-              <Button
-                label="Sortie"
-                icon={ArrowUpFromLine}
-                fullWidth
-                onPress={() => openMovement('RETRAIT')}
-              />
-            </View>
+      {/* Figures at a glance: stock, then prices (costs hidden from the CM, RG-60). */}
+      <View style={[styles.card, styles.stats]}>
+        <Stat
+          label="En stock"
+          value={String(p.stockQuantity)}
+          tone={!archived && p.isLowStock ? 'danger' : undefined}
+          caption={!archived && p.isLowStock ? `Alerte à ${p.lowStockThreshold}` : undefined}
+        />
+        <Stat label="Vente" value={formatAr(p.sellingPrice)} />
+        {p.purchasePrice !== undefined && (
+          <>
+            <Stat label="Achat" value={formatAr(p.purchasePrice)} />
+            <Stat
+              label="Marge"
+              value={formatAr(p.sellingPrice - p.purchasePrice)}
+              tone={p.sellingPrice < p.purchasePrice ? 'danger' : 'success'}
+            />
+          </>
+        )}
+      </View>
+
+      {!archived && canEdit && (
+        <View style={styles.row}>
+          <View style={styles.cell}>
+            <Button
+              label="Entrée"
+              icon={ArrowDownToLine}
+              compact
+              fullWidth
+              onPress={() => openMovement('AJOUT')}
+            />
           </View>
-          <Button
-            label="Faire l'inventaire"
-            icon={ClipboardCheck}
-            fullWidth
-            onPress={() => openMovement('AJUSTEMENT')}
-          />
+          <View style={styles.cell}>
+            <Button
+              label="Sortie"
+              icon={ArrowUpFromLine}
+              compact
+              fullWidth
+              onPress={() => openMovement('RETRAIT')}
+            />
+          </View>
+          <View style={styles.cell}>
+            <Button
+              label="Inventaire"
+              icon={ClipboardCheck}
+              compact
+              fullWidth
+              onPress={() => openMovement('AJUSTEMENT')}
+            />
+          </View>
         </View>
       )}
 
-      <View style={styles.section}>
-        <AppText variant="heading">Historique</AppText>
-        {movements.data?.length === 0 && (
-          <AppText color="inkMuted">{"Aucun mouvement pour l'instant."}</AppText>
+      <View style={styles.group}>
+        <SectionLabel>Historique du stock</SectionLabel>
+        {movements.isSuccess && movements.items.length === 0 && (
+          <AppText variant="caption" color="inkMuted">
+            {"Aucun mouvement pour l'instant."}
+          </AppText>
         )}
-        {movements.data && movements.data.length > 0 && (
-          <View style={styles.card}>
-            {movements.data.map((m, index) => (
+        {movements.items.length > 0 && (
+          <View style={[styles.card, styles.list]}>
+            {movements.items.map((m, index) => (
               <View key={m.id} style={[styles.movement, index > 0 && styles.movementBorder]}>
                 <View style={styles.cell}>
-                  <AppText style={styles.strong}>{movementLabels[m.type]}</AppText>
+                  <AppText variant="label" style={styles.strong}>
+                    {movementLabels[m.type]}
+                  </AppText>
                   <AppText variant="caption" color="inkMuted" numberOfLines={2}>
                     {formatDateTime(m.createdAt)}
                     {m.reason ? ` · ${m.reason}` : ''}
@@ -144,60 +224,93 @@ export default function ProductScreen() {
             ))}
           </View>
         )}
+        {movements.hasNextPage && (
+          <Button
+            label="Voir plus de mouvements"
+            variant="ghost"
+            compact
+            loading={movements.isFetchingNextPage}
+            onPress={movements.loadMore}
+          />
+        )}
       </View>
 
-      <View style={styles.section}>
-        <Button
-          label="Modifier le produit"
-          icon={Pencil}
-          fullWidth
-          onPress={() =>
-            router.push({ pathname: '/products/[productId]/edit', params: { productId } })
-          }
-        />
-        {archived ? (
+      {/* Editing is in the header; archiving stays apart, at the bottom. */}
+      {canEdit &&
+        (archived ? (
           <Button
             label="Restaurer le produit"
             variant="ghost"
+            compact
             loading={archive.isPending}
             onPress={() => archive.mutate(false)}
           />
         ) : (
           <Button
             label="Archiver le produit"
-            variant="danger"
-            fullWidth
+            icon={Archive}
+            variant="ghost"
+            compact
             loading={archive.isPending}
             onPress={confirmArchive}
           />
-        )}
-      </View>
+        ))}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  section: {
-    gap: theme.spacing[3],
+  group: {
+    gap: theme.spacing[2],
+  },
+  sectionLabel: {
+    fontFamily: theme.typography.heading.fontFamily,
+    paddingHorizontal: theme.spacing[1],
   },
   row: {
     flexDirection: 'row',
-    gap: theme.spacing[3],
+    gap: theme.spacing[2],
   },
   cell: {
     flex: 1,
   },
-  photo: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.navySoft,
-  },
   card: {
     backgroundColor: theme.colors.surfaceRaised,
     borderRadius: theme.radius.md,
-    padding: theme.spacing[4],
-    gap: theme.spacing[1],
+    borderWidth: theme.layout.border,
+    borderColor: theme.colors.line,
+    padding: theme.spacing[3],
+  },
+  identity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[3],
+  },
+  thumb: {
+    width: theme.spacing[8] * 2,
+    height: theme.spacing[8] * 2,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.navySoft,
+  },
+  thumbEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: theme.spacing[3],
+  },
+  stat: {
+    flexBasis: '50%',
+    gap: theme.spacing[1] / 2,
+    paddingRight: theme.spacing[2],
+  },
+  statValue: {
+    ...textStyles.amountMd,
+  },
+  list: {
+    paddingVertical: theme.spacing[1],
   },
   movement: {
     flexDirection: 'row',
@@ -213,6 +326,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.heading.fontFamily,
   },
   quantity: {
-    ...textStyles.amountMd,
+    fontFamily: theme.typography.heading.fontFamily,
+    fontVariant: ['tabular-nums'],
   },
 });

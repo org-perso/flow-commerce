@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { currentShopId } from '../../http/context.js';
 import { idParam, notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
-import { optionalText, requiredText } from '../../http/schemas.js';
+import { optionalPagination, optionalText, requiredText } from '../../http/schemas.js';
 import {
   countUnlinkedOrders,
   deleteCustomer,
@@ -32,14 +32,17 @@ const updateCustomerSchema = z
   .object({ name: requiredText(150), phones, socialProfile: optionalText(255) })
   .partial()
   .strict();
-const listQuery = z.object({ q: z.string().trim().max(150).optional() });
+const listQuery = z.object({
+  q: z.string().trim().max(150).optional(),
+  ...optionalPagination,
+});
 
 /** /shops/:shopId/customers */
 export const customersRouter = Router();
 
 customersRouter.get('/', async (req, res) => {
-  const { q } = listQuery.parse(req.query);
-  res.json(await listCustomers(currentShopId(req), q || undefined));
+  const { q, ...page } = listQuery.parse(req.query);
+  res.json(await listCustomers(currentShopId(req), q || undefined, page));
 });
 
 /** Orders to link to a customer file (banner on the customer list). Before /:customerId. */

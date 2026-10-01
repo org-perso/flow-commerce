@@ -1,3 +1,4 @@
+import { X } from 'lucide-react-native';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { hitSlopFor, theme } from '@/theme';
@@ -9,6 +10,8 @@ type InlineBannerProps = {
   tone: 'warning' | 'danger' | 'success';
   action?: { label: string; onPress: () => void };
   onPress?: () => void;
+  /** Shows a close cross. */
+  onDismiss?: () => void;
 };
 
 const tones = {
@@ -17,7 +20,7 @@ const tones = {
   success: { bg: theme.colors.statusDeliveredBg, fg: theme.colors.statusDeliveredFg },
 } as const;
 
-export function InlineBanner({ message, tone, action, onPress }: InlineBannerProps) {
+export function InlineBanner({ message, tone, action, onPress, onDismiss }: InlineBannerProps) {
   const { bg, fg } = tones[tone];
   return (
     <Pressable
@@ -38,6 +41,16 @@ export function InlineBanner({ message, tone, action, onPress }: InlineBannerPro
           <AppText variant="label" style={[styles.action, { color: fg }]}>
             {action.label}
           </AppText>
+        </Pressable>
+      )}
+      {onDismiss && (
+        <Pressable
+          onPress={onDismiss}
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
+          hitSlop={hitSlopFor(theme.layout.iconMd)}
+        >
+          <X size={theme.layout.iconMd} color={fg} strokeWidth={2} />
         </Pressable>
       )}
     </Pressable>

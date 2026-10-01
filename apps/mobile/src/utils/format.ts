@@ -30,6 +30,22 @@ export function businessDate(date: string | Date = new Date()): string {
   );
 }
 
+/** Current time in Madagascar, as HH:MM (24 h). */
+export function businessNow(): string {
+  return new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Indian/Antananarivo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date());
+}
+
+/** "14:00" → "14h", "14:30" → "14h30". */
+export function formatHour(hhmm: string): string {
+  const [h, m] = hhmm.split(':');
+  return `${Number(h)}h${m === '00' ? '' : m}`;
+}
+
 /** Today in Madagascar, as YYYY-MM-DD. */
 export function businessToday(): string {
   return businessDate();

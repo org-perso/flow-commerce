@@ -1,6 +1,7 @@
 /**
- * Test data for one shop: 5 products, 3 customers, 10 orders planned today
- * (varied status, payment and delivery), plus 1 overdue and 2 upcoming orders, 2 expenses.
+ * Test data for one shop: 5 products, 3 customers, 16 orders planned today
+ * (varied status, payment, delivery, slot and place), plus 1 overdue and 2 upcoming orders,
+ * 2 expenses. Open deliveries are shared between the shop's drivers, if it has any.
  *
  *   yarn seed                 (the only shop in the database)
  *   yarn seed --shop "Glow UP"
@@ -169,6 +170,25 @@ const ORDERS: Seed[] = [
     source: 'FACEBOOK',
     delivery: delivery('67 ha', 2000),
   },
+  // Today's round: same places at several moments (grouping by moment and place)
+  ...(
+    [
+      ['Analakely', 0],
+      ['analakély', 1],
+      ['Ivandry', 2],
+      ['Ivandry', 3],
+      ['Ankorondrano', 4],
+      ['Analakely', 3],
+    ] as const
+  ).map(([place, customer]): Seed => ({
+    customer: customer % CUSTOMERS.length,
+    items: [[1, 1]],
+    status: 'CONFIRMEE',
+    isPaid: false,
+    paymentMethod: 'MVola',
+    source: 'FACEBOOK',
+    delivery: delivery(place, 3000),
+  })),
   // Overdue (planned yesterday, still open) and upcoming
   {
     customer: 1,
@@ -236,8 +256,26 @@ for (const [name, category, purchasePrice, sellingPrice, stock, threshold] of PR
 const customerIds: string[] = [];
 for (const customer of CUSTOMERS) customerIds.push((await insertCustomer(shop.id, customer)).id);
 
-for (const seed of ORDERS) {
+/** Varied slots, as customers ask: morning, "before 11", "after 17", none. */
+const SLOTS = [
+  { from: '08:00', to: '12:00' },
+  null,
+  { from: null, to: '11:00' },
+  { from: '14:00', to: '16:00' },
+  { from: '17:00', to: null },
+];
+
+// Open deliveries go to the shop's drivers in turn; one in three stays "à prendre".
+const { rows: drivers } = await pool.query<{ userId: string }>(
+  `SELECT user_id AS "userId" FROM shop_members WHERE shop_id = $1 AND role = 'DRIVER'
+   ORDER BY created_at`,
+  [shop.id],
+);
+let assigned = 0;
+
+for (const [index, seed] of ORDERS.entries()) {
   const order = await createOrder(shop.id, {
+    timeSlot: SLOTS[index % SLOTS.length]!,
     customerId: seed.customer === null ? null : customerIds[seed.customer]!,
     customer: null,
     items: seed.items.map(([p, quantity]) => ({ productId: productIds[p]!, quantity })),
@@ -251,6 +289,15 @@ for (const seed of ORDERS) {
   const steps =
     seed.status === 'ANNULEE' ? ['ANNULEE' as const] : PATH.slice(1, PATH.indexOf(seed.status) + 1);
   for (const status of steps) await changeOrderStatus(shop.id, order.id, status);
+
+  const open = !['LIVREE', 'ANNULEE'].includes(seed.status);
+  if (seed.delivery && open && drivers.length > 0 && index % 3 !== 0) {
+    await pool.query(
+      `UPDATE orders SET assigned_to = $3, assigned_at = now(), delivery_notified_at = now()
+       WHERE id = $1 AND shop_id = $2`,
+      [order.id, shop.id, drivers[assigned++ % drivers.length]!.userId],
+    );
+  }
 }
 
 await insertExpense(shop.id, {
@@ -267,6 +314,6 @@ await insertExpense(shop.id, {
 });
 
 console.log(
-  `« ${shop.name} » : ${PRODUCTS.length} produits, ${CUSTOMERS.length} clients, ${ORDERS.length} commandes (10 aujourd'hui, 1 en retard, 2 à venir), 2 dépenses.`,
+  `« ${shop.name} » : ${PRODUCTS.length} produits, ${CUSTOMERS.length} clients, ${ORDERS.length} commandes (16 aujourd'hui, 1 en retard, 2 à venir), ${assigned} livraisons données à ${drivers.length} livreur(s), 2 dépenses.`,
 );
 await pool.end();

@@ -2,6 +2,7 @@ import supertest from 'supertest';
 
 import { createApp } from '../src/app.js';
 import type { TokenVerifier } from '../src/auth/firebase-auth.js';
+import type { PushMessage } from '../src/modules/notification/push.js';
 import { pool } from '../src/db/pool.js';
 
 // Test tokens are "test:<uid>"; anything else is rejected like a bad Firebase token.
@@ -11,11 +12,23 @@ const fakeVerifier: TokenVerifier = async (token) => {
   return { firebaseUid: uid, email: `${uid}@example.com`, emailVerified: true, name: null };
 };
 
-export const request = supertest(createApp({ verifyToken: fakeVerifier }));
+/** Push notifications sent during the test (cleared by resetDatabase). */
+export const sentPushes: PushMessage[] = [];
+
+export const request = supertest(
+  createApp({
+    verifyToken: fakeVerifier,
+    sendPush: async (messages) => {
+      sentPushes.push(...messages);
+      return messages.map((m) => ({ ok: true, unregistered: m.to.startsWith('gone:') }));
+    },
+  }),
+);
 
 export const auth = (uid: string) => ({ Authorization: `Bearer test:${uid}` });
 
 export async function resetDatabase() {
+  sentPushes.length = 0;
   await pool.query(
     `TRUNCATE users, shops, products, customers, orders, order_items, expenses, stock_movements
      RESTART IDENTITY CASCADE`,

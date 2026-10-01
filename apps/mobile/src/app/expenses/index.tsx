@@ -20,7 +20,7 @@ import {
   Screen,
 } from '@/components/ui';
 import { EXPENSE_CATEGORIES } from '@/features/expense/expense-api';
-import { useExpenses } from '@/features/expense/use-expenses';
+import { usePagedExpenses } from '@/features/expense/use-expenses';
 import { apiErrorMessage } from '@/lib/api-client';
 import { theme } from '@/theme';
 import { businessToday, formatAr, isoToFrDate, monthRange } from '@/utils/format';
@@ -37,7 +37,7 @@ export default function ExpensesScreen() {
   const [period, setPeriod] = useState<Period>('month');
   const today = businessToday();
   const range = period === 'all' ? {} : monthRange(today, period === 'lastMonth' ? -1 : 0);
-  const expenses = useExpenses(range);
+  const expenses = usePagedExpenses(range);
 
   return (
     <Screen
@@ -56,8 +56,8 @@ export default function ExpensesScreen() {
       <View style={styles.header}>
         <FilterChips options={periods} value={period} onChange={setPeriod} />
         {/* No total card for an empty period: the empty message says it all. */}
-        {!!expenses.data?.items.length && (
-          <KpiCard label="Total des dépenses" value={formatAr(expenses.data.total)} />
+        {!!expenses.items.length && expenses.firstPage && (
+          <KpiCard label="Total des dépenses" value={formatAr(expenses.firstPage.total)} />
         )}
       </View>
 
@@ -70,7 +70,7 @@ export default function ExpensesScreen() {
       )}
 
       <FlatList
-        data={expenses.data?.items ?? []}
+        data={expenses.items}
         keyExtractor={(e) => e.id}
         renderItem={({ item }) => (
           <Pressable
@@ -89,6 +89,13 @@ export default function ExpensesScreen() {
           </Pressable>
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        onEndReached={expenses.loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          expenses.isFetchingNextPage ? (
+            <ActivityIndicator color={theme.colors.ink} style={styles.more} />
+          ) : null
+        }
         refreshControl={
           <RefreshControl refreshing={expenses.isRefetching} onRefresh={() => expenses.refetch()} />
         }
@@ -111,7 +118,7 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
-    marginTop: -theme.spacing[3],
+    marginTop: -theme.spacing[1],
   },
   row: {
     flexDirection: 'row',
@@ -141,5 +148,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  more: {
+    marginVertical: theme.spacing[4],
   },
 });

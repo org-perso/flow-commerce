@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: theme.spacing[4],
-    gap: theme.spacing[6],
+    gap: theme.spacing[4],
   },
   fill: {
     flex: 1,

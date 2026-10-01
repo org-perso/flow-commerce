@@ -10,6 +10,7 @@ const messages: Record<string, string> = {
   'auth/account-exists-with-different-credential':
     'Un compte existe déjà avec cet email. Connectez-vous avec votre mot de passe.',
   'auth/network-request-failed': 'Pas de connexion internet. Vérifiez votre réseau.',
+  'auth/requires-recent-login': 'Par sécurité, reconnectez-vous puis réessayez.',
 };
 
 export function authErrorMessage(error: unknown): string {

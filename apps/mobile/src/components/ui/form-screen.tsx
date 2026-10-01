@@ -65,7 +65,7 @@ export function FormScreen({
 
 const styles = StyleSheet.create({
   fields: {
-    gap: theme.spacing[4],
+    gap: theme.spacing[3],
   },
   actions: {
     gap: theme.spacing[3],

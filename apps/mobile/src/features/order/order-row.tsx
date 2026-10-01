@@ -1,24 +1,65 @@
-import { ArrowRight, MapPin, Phone, Store, Wallet } from 'lucide-react-native';
+import { ArrowRight, Bike, Clock, MapPin, Phone, Store, Wallet } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, StatusBadge } from '@/components/ui';
 import { callPhone, formatPhone } from '@/features/customer/contact';
 import { hitSlopFor, theme } from '@/theme';
-import { businessToday, formatAr, formatDateTime, formatDayLabel } from '@/utils/format';
+import {
+  businessNow,
+  businessToday,
+  formatAr,
+  formatDateTime,
+  formatDayLabel,
+} from '@/utils/format';
 
-import type { Order } from './order-api';
+import { parcelLabel, type Order } from './order-api';
 import { destructiveStatuses, OPEN_STATUSES, quickActionLabels, TRANSITIONS } from './order-status';
 import { PaymentBadge } from './payment-badge';
+import { slotLabel } from './time-slot';
 import { useChangeOrderStatus, useUpdateOrder } from './use-orders';
 
 /** "2 × Savon coco, 3 × Thé" — no prices. */
 export function itemsSummary(order: Order): string {
-  return order.items.map((i) => `${i.quantity} × ${i.productName}`).join(', ');
+  return (order.items ?? []).map((i) => `${i.quantity} × ${i.productName}`).join(', ');
 }
 
-/** Planned before today and not handled yet. */
+/** Bottom line of a delivery: parcel number, then its driver or "À prendre". */
+function DriverLine({ order }: { order: Order }) {
+  if (!order.delivery) return null;
+  const toTake = !order.driver && OPEN_STATUSES.includes(order.status);
+  return (
+    <View style={styles.place}>
+      <Bike
+        size={theme.layout.iconSm}
+        color={toTake ? theme.colors.goldInk : theme.colors.blue}
+        strokeWidth={2}
+      />
+      <AppText
+        variant="caption"
+        color={toTake ? 'goldInk' : 'blue'}
+        numberOfLines={1}
+        style={[styles.flex, styles.strong]}
+      >
+        {parcelLabel(order)}
+        {order.driver
+          ? ` · ${order.driver.name ?? 'Livreur'}`
+          : toTake
+            ? ' · à prendre : aucun livreur'
+            : ''}
+      </AppText>
+    </View>
+  );
+}
+
+/**
+ * Not handled yet after its planned day, or today once its slot has ended ("avant 11h" still
+ * open at 11h) — RG-27.
+ */
 export function isOverdue(order: Order, today = businessToday()): boolean {
-  return order.scheduledDate < today && OPEN_STATUSES.includes(order.status);
+  if (!OPEN_STATUSES.includes(order.status)) return false;
+  if (order.scheduledDate < today) return true;
+  const end = order.timeSlot?.to;
+  return order.scheduledDate === today && !!end && end <= businessNow();
 }
 
 type OrderRowProps = {
@@ -41,17 +82,27 @@ export function OrderRow({
 }: OrderRowProps) {
   const today = businessToday();
   const overdue = isOverdue(order, today);
-  const phone = hideCustomer ? null : order.customer?.phone;
+  const phone = hideCustomer ? null : (order.customer?.phone ?? order.delivery?.phone);
   const place = order.delivery
     ? (order.delivery.place ?? order.delivery.address ?? 'À livrer')
     : 'Retrait';
   const title = hideCustomer
     ? formatDateTime(order.createdAt)
     : (order.customer?.name ?? 'Client de passage');
+  const slot = slotLabel(order.timeSlot);
   const date =
     overdue || order.scheduledDate !== today
       ? formatDayLabel(order.scheduledDate, today).toLowerCase()
       : null;
+
+  // A delivery: the place leads, then when, status, customer and driver (all readable).
+  const deliveryLayout = !!order.delivery && !hideCustomer;
+  const when = [
+    showDate || overdue ? formatDayLabel(order.scheduledDate, today) : null,
+    slot ?? (showDate || overdue ? null : 'Toute la journée'),
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <View style={styles.card}>
@@ -60,29 +111,72 @@ export function OrderRow({
         accessibilityRole="button"
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
       >
-        <View style={styles.flex}>
-          <View style={styles.line}>
-            <AppText style={[styles.flex, styles.strong]} numberOfLines={1}>
-              {title}
-            </AppText>
-            <AppText style={styles.total}>{formatAr(order.totalAmount)}</AppText>
-          </View>
-          <View style={styles.line}>
+        {deliveryLayout ? (
+          <View style={[styles.flex, styles.stack]}>
+            <View style={styles.line}>
+              <View style={styles.place}>
+                <MapPin size={theme.layout.iconSm} color={theme.colors.ink} strokeWidth={2} />
+                <AppText style={[styles.flex, styles.strong]} numberOfLines={1}>
+                  {place}
+                </AppText>
+              </View>
+              <AppText style={styles.total}>{formatAr(order.totalAmount)}</AppText>
+            </View>
             <View style={styles.place}>
-              {order.delivery ? (
-                <MapPin size={theme.layout.iconSm} color={theme.colors.inkMuted} strokeWidth={2} />
-              ) : (
-                <Store size={theme.layout.iconSm} color={theme.colors.inkMuted} strokeWidth={2} />
-              )}
-              <AppText variant="caption" color="inkMuted" numberOfLines={1} style={styles.flex}>
-                {place}
-                {showDate && date ? ` · ${date}` : ''}
+              <Clock
+                size={theme.layout.iconSm}
+                color={overdue ? theme.colors.statusCancelledFg : theme.colors.inkMuted}
+                strokeWidth={2}
+              />
+              <AppText
+                variant="caption"
+                color={overdue ? 'statusCancelledFg' : 'inkMuted'}
+                numberOfLines={1}
+                style={styles.flex}
+              >
+                {when}
               </AppText>
             </View>
-            <StatusBadge status={order.status} size="sm" />
-            <PaymentBadge isPaid={order.isPaid} />
+            <View style={styles.line}>
+              <StatusBadge status={order.status} size="sm" />
+              <PaymentBadge isPaid={order.isPaid} />
+              <AppText variant="caption" color="inkMuted" numberOfLines={1} style={styles.flex}>
+                {order.customer?.name ?? 'Client de passage'}
+              </AppText>
+            </View>
+            <DriverLine order={order} />
           </View>
-        </View>
+        ) : (
+          <View style={styles.flex}>
+            <View style={styles.line}>
+              <AppText style={[styles.flex, styles.strong]} numberOfLines={1}>
+                {title}
+              </AppText>
+              <AppText style={styles.total}>{formatAr(order.totalAmount)}</AppText>
+            </View>
+            <View style={styles.line}>
+              <View style={styles.place}>
+                {order.delivery ? (
+                  <MapPin
+                    size={theme.layout.iconSm}
+                    color={theme.colors.inkMuted}
+                    strokeWidth={2}
+                  />
+                ) : (
+                  <Store size={theme.layout.iconSm} color={theme.colors.inkMuted} strokeWidth={2} />
+                )}
+                <AppText variant="caption" color="inkMuted" numberOfLines={1} style={styles.flex}>
+                  {place}
+                  {showDate && date ? ` · ${date}` : ''}
+                  {slot ? ` · ${slot}` : ''}
+                </AppText>
+              </View>
+              <StatusBadge status={order.status} size="sm" />
+              <PaymentBadge isPaid={order.isPaid} />
+            </View>
+            <DriverLine order={order} />
+          </View>
+        )}
         {phone && (
           <Pressable
             onPress={() => callPhone(phone)}
@@ -183,6 +277,10 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  stack: {
+    gap: theme.spacing[1],
+    paddingVertical: theme.spacing[1],
   },
   strong: {
     fontFamily: theme.typography.heading.fontFamily,

@@ -16,6 +16,8 @@ export type DeliveryInput = {
   address: string | null;
   note: string | null;
   fee: number;
+  /** Number to call for a walk-in customer (no customer card). */
+  phone?: string | null;
 };
 
 export type CreateOrderInput = {
@@ -26,6 +28,8 @@ export type CreateOrderInput = {
   source: OrderSource | null;
   /** Planned day (YYYY-MM-DD); null means today. */
   scheduledDate: string | null;
+  /** Hours of the planned day; null: any time. */
+  timeSlot: { from: string | null; to: string | null } | null;
   /** null: not delivered (pickup, hand delivery), so no delivery fee. */
   delivery: DeliveryInput | null;
   paymentMethod: string | null;
@@ -46,6 +50,7 @@ function deliveryColumns(delivery: DeliveryInput | null) {
     delivery?.address ?? null,
     delivery?.note ?? null,
     delivery?.fee ?? 0,
+    delivery?.phone ?? null,
   ] as const;
 }
 
@@ -176,10 +181,10 @@ export function createOrder(shopId: string, input: CreateOrderInput): Promise<Or
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO orders (shop_id, customer_id, status, source, payment_method,
          is_delivery, delivery_place, delivery_address, delivery_note, delivery_fee,
-         scheduled_date, paid_at, number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-         COALESCE($11::date, (now() AT TIME ZONE 'Indian/Antananarivo')::date),
-         CASE WHEN $12::boolean THEN now() END, $13)
+         delivery_phone, scheduled_date, paid_at, number, slot_from, slot_to)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+         COALESCE($12::date, (now() AT TIME ZONE 'Indian/Antananarivo')::date),
+         CASE WHEN $13::boolean THEN now() END, $14, $15::time, $16::time)
        RETURNING id`,
       [
         shopId,
@@ -191,6 +196,8 @@ export function createOrder(shopId: string, input: CreateOrderInput): Promise<Or
         input.scheduledDate,
         input.isPaid,
         counter[0]!.number,
+        input.timeSlot?.from ?? null,
+        input.timeSlot?.to ?? null,
       ],
     );
     const orderId = rows[0]!.id;
@@ -239,7 +246,7 @@ export function updateOrder(
     if (patch.delivery !== undefined) {
       await client.query(
         `UPDATE orders SET is_delivery = $2, delivery_place = $3, delivery_address = $4,
-           delivery_note = $5, delivery_fee = $6 WHERE id = $1`,
+           delivery_note = $5, delivery_fee = $6, delivery_phone = $7 WHERE id = $1`,
         [orderId, ...deliveryColumns(patch.delivery)],
       );
     }
@@ -252,6 +259,8 @@ export function updateOrder(
          payment_method = CASE WHEN $5::boolean THEN $6 ELSE payment_method END,
          source         = CASE WHEN $7::boolean THEN $8 ELSE source END,
          scheduled_date = COALESCE($10::date, scheduled_date),
+         slot_from      = CASE WHEN $12::boolean THEN $13::time ELSE slot_from END,
+         slot_to        = CASE WHEN $12::boolean THEN $14::time ELSE slot_to END,
          paid_at        = CASE WHEN $11::boolean IS NULL THEN paid_at
                                WHEN $11 THEN COALESCE(paid_at, now()) END,
          total_amount   = $9
@@ -268,6 +277,9 @@ export function updateOrder(
         itemsAmount + deliveryFee,
         patch.scheduledDate ?? null,
         patch.isPaid ?? null,
+        patch.timeSlot !== undefined,
+        patch.timeSlot?.from ?? null,
+        patch.timeSlot?.to ?? null,
       ],
     );
     return (await findOrder(shopId, orderId, client))!;

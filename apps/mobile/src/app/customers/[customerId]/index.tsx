@@ -22,8 +22,6 @@ import { ApiError, apiErrorMessage } from '@/lib/api-client';
 import { hitSlopFor, theme } from '@/theme';
 import { formatAr, formatPhone } from '@/utils/format';
 
-const SOLD = ['CONFIRMEE', 'EN_PREPARATION', 'EN_LIVRAISON', 'LIVREE'];
-
 function QuickAction({
   icon: Icon,
   label,
@@ -75,10 +73,7 @@ export default function CustomerScreen() {
 
   const c = customer.data;
   const mainPhone = c.phones[0];
-  const list = orders.data ?? [];
-  const spent = list
-    .filter((o) => SOLD.includes(o.status))
-    .reduce((sum, o) => sum + o.itemsAmount, 0);
+  const list = orders.items;
 
   const confirmDelete = () =>
     Alert.alert('Supprimer ce client ?', 'Cette action est définitive.', [
@@ -189,8 +184,9 @@ export default function CustomerScreen() {
       )}
 
       <View style={styles.row}>
-        <KpiCard label="Commandes" value={String(list.length)} />
-        <KpiCard label="Achats" value={formatAr(spent)} />
+        {/* Computed by the API over every order (RG-31), not only the loaded page. */}
+        <KpiCard label="Commandes" value={String(c.orderCount)} />
+        <KpiCard label="Achats" value={formatAr(c.totalSpent)} />
       </View>
 
       <View style={styles.section}>
@@ -207,10 +203,18 @@ export default function CustomerScreen() {
             onPress={() => router.push(`/orders/${order.id}`)}
           />
         ))}
+        {orders.hasNextPage && (
+          <Button
+            label="Voir plus de commandes"
+            variant="ghost"
+            loading={orders.isFetchingNextPage}
+            onPress={orders.loadMore}
+          />
+        )}
       </View>
 
       {deleteError && <InlineBanner tone="danger" message={deleteError} />}
-      {list.length === 0 && orders.isSuccess && (
+      {list.length === 0 && orders.isSuccess && !orders.hasNextPage && (
         <Button
           label="Supprimer le client"
           variant="danger"

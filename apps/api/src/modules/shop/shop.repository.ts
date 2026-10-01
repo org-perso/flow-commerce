@@ -1,5 +1,6 @@
 import { pool, withTransaction } from '../../db/pool.js';
 import { seedDefaultCategories } from '../category/category.repository.js';
+import type { Role } from './permissions.js';
 
 export type Shop = {
   id: string;
@@ -9,40 +10,62 @@ export type Shop = {
   updatedAt: Date;
 };
 
+/** A shop as listed for a user: with their role in it. */
+/** `nickname`: the user's pseudo in the shop (null: their account name is shown). */
+export type ShopWithRole = Shop & { role: Role; nickname: string | null };
+
+export type Member = { userId: string; role: Role };
+
 export type ShopInput = {
   name: string;
   description: string | null;
 };
 
 const columns = `id, name, description, created_at AS "createdAt", updated_at AS "updatedAt"`;
+const shopColumns = `s.id, s.name, s.description, s.created_at AS "createdAt",
+  s.updated_at AS "updatedAt"`;
 
-export async function listShopsByOwner(ownerId: string): Promise<Shop[]> {
-  const { rows } = await pool.query<Shop>(
-    `SELECT ${columns} FROM shops WHERE owner_id = $1 ORDER BY created_at`,
-    [ownerId],
+/** Shops the user is a member of, with their role. */
+export async function listShopsForUser(userId: string): Promise<ShopWithRole[]> {
+  const { rows } = await pool.query<ShopWithRole>(
+    `SELECT ${shopColumns}, m.role, m.nickname
+     FROM shops s JOIN shop_members m ON m.shop_id = s.id
+     WHERE m.user_id = $1 ORDER BY s.created_at`,
+    [userId],
   );
   return rows;
 }
 
-/** Ownership is part of the lookup: another user's shop is simply not found. */
-export async function findShopForOwner(shopId: string, ownerId: string): Promise<Shop | null> {
-  const { rows } = await pool.query<Shop>(
-    `SELECT ${columns} FROM shops WHERE id = $1 AND owner_id = $2`,
-    [shopId, ownerId],
+/** Membership is part of the lookup: a shop the user is not a member of is simply not found. */
+export async function findShopForMember(
+  shopId: string,
+  userId: string,
+): Promise<{ shop: Shop; role: Role } | null> {
+  const { rows } = await pool.query<Shop & { role: Role }>(
+    `SELECT ${shopColumns}, m.role
+     FROM shops s JOIN shop_members m ON m.shop_id = s.id
+     WHERE s.id = $1 AND m.user_id = $2`,
+    [shopId, userId],
   );
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  const { role, ...shop } = rows[0];
+  return { shop, role };
 }
 
-/** Creates the shop with its standard product categories. */
-export function createShop(ownerId: string, input: ShopInput): Promise<Shop> {
+/** Creates the shop with its standard product categories; the creator is its owner. */
+export function createShop(ownerId: string, input: ShopInput): Promise<ShopWithRole> {
   return withTransaction(async (client) => {
     const { rows } = await client.query<Shop>(
       `INSERT INTO shops (owner_id, name, description) VALUES ($1, $2, $3) RETURNING ${columns}`,
       [ownerId, input.name, input.description],
     );
     const shop = rows[0]!;
+    await client.query(
+      `INSERT INTO shop_members (shop_id, user_id, role) VALUES ($1, $2, 'OWNER')`,
+      [shop.id, ownerId],
+    );
     await seedDefaultCategories(client, shop.id);
-    return shop;
+    return { ...shop, role: 'OWNER', nickname: null };
   });
 }
 

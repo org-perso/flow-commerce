@@ -10,6 +10,7 @@ import { authErrorMessage } from '@/features/auth/auth-errors';
 import { signIn } from '@/features/auth/auth-service';
 import { FormTextField } from '@/components/form-text-field';
 import { GoogleSignInButton } from '@/features/auth/google-sign-in-button';
+import { TermsNotice } from '@/features/auth/terms-consent';
 import { signInSchema, type SignInValues } from '@/features/auth/schemas';
 import { theme } from '@/theme';
 
@@ -65,6 +66,7 @@ export default function SignInScreen() {
         onPress={onSubmit}
       />
       <GoogleSignInButton />
+      <TermsNotice />
       <View style={styles.footer}>
         <AppText color="inkMuted">Pas encore de compte ?</AppText>
         <Button label="Créer un compte" variant="ghost" onPress={() => router.push('/sign-up')} />

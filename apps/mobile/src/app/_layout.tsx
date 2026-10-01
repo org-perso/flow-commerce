@@ -6,7 +6,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -15,8 +15,9 @@ import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { headerOptions } from '@/components/header-options';
 import { AppText, Button } from '@/components/ui';
 import { useAuthStore } from '@/features/auth/auth-store';
-import { useShops } from '@/features/shop/use-shop';
+import { useSetActiveShop, useShops } from '@/features/shop/use-shop';
 import { wakeUpApi } from '@/lib/api-client';
+import { onNotificationTap, registerForPushNotifications } from '@/lib/push-notifications';
 import { queryClient } from '@/lib/query-client';
 import { theme } from '@/theme';
 
@@ -56,6 +57,7 @@ function RootNavigator({ ready }: { ready: boolean }) {
   const shopsQuery = useShops();
 
   const hasShop = signedIn && (shopsQuery.data?.length ?? 0) > 0;
+  usePushNotifications(hasShop);
   // Loading and errors cover the navigator instead of replacing it (see RootLayout).
   const overlay = !ready ? null : signedIn && shopsQuery.isPending ? (
     <FullScreenLoader />
@@ -108,6 +110,36 @@ function RootNavigator({ ready }: { ready: boolean }) {
           />
           <Stack.Screen name="orders/new" options={headerOptions('Nouvelle commande')} />
           <Stack.Screen name="orders/[orderId]" options={headerOptions('Commande')} />
+          <Stack.Screen
+            name="orders/edit/[orderId]"
+            options={headerOptions('Modifier la commande')}
+          />
+          <Stack.Screen name="team/index" options={headerOptions('Équipe', { showShop: false })} />
+          <Stack.Screen
+            name="team/invite"
+            options={headerOptions('Inviter', { showShop: false })}
+          />
+          <Stack.Screen
+            name="team/[userId]"
+            options={headerOptions('Membre', { showShop: false })}
+          />
+          <Stack.Screen
+            name="my-nickname"
+            options={headerOptions('Mon pseudo', { showShop: false })}
+          />
+          <Stack.Screen name="round" options={headerOptions('Ma tournée', { showShop: false })} />
+          <Stack.Screen
+            name="account-settings"
+            options={headerOptions('Paramètres du compte', { showShop: false })}
+          />
+          <Stack.Screen
+            name="delete-account"
+            options={headerOptions('Supprimer mon compte', { showShop: false })}
+          />
+          <Stack.Screen
+            name="join-shop"
+            options={headerOptions('Rejoindre une boutique', { showShop: false })}
+          />
           <Stack.Screen name="expenses/index" options={headerOptions('Dépenses')} />
           <Stack.Screen name="expenses/new" options={headerOptions('Nouvelle dépense')} />
           <Stack.Screen name="expenses/[expenseId]" options={headerOptions('Dépense')} />
@@ -122,6 +154,29 @@ function RootNavigator({ ready }: { ready: boolean }) {
       {overlay}
     </>
   );
+}
+
+/**
+ * Once in the app: registers the device for push notifications, and opens what a tapped
+ * notification is about (switching to its shop first).
+ */
+function usePushNotifications(inApp: boolean) {
+  const uid = useAuthStore((s) => s.user?.uid);
+  const setActiveShop = useSetActiveShop();
+
+  useEffect(() => {
+    if (inApp) registerForPushNotifications();
+  }, [inApp, uid]);
+
+  useEffect(() => {
+    if (!inApp) return;
+    return onNotificationTap((data) => {
+      setActiveShop(data.shopId);
+      if (data.type === 'order') router.push(`/orders/${data.orderId}`);
+      else router.navigate(data.tab === 'available' ? '/available' : '/deliveries');
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- subscribe once inside the app
+  }, [inApp]);
 }
 
 function FullScreenLoader() {

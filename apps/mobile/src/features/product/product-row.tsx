@@ -9,10 +9,15 @@ import { formatAr } from '@/utils/format';
 import type { Product } from './product-api';
 import { useCreateStockMovement } from './use-products';
 
-type ProductRowProps = { product: Product; onPress: () => void };
+type ProductRowProps = {
+  product: Product;
+  onPress: () => void;
+  /** Quick restock on low stock; off for roles that only read the stock (CM). */
+  canRestock?: boolean;
+};
 
 /** Product card; low or empty stock gets a quick restock stepper. */
-export function ProductRow({ product, onPress }: ProductRowProps) {
+export function ProductRow({ product, onPress, canRestock = true }: ProductRowProps) {
   const archived = product.archivedAt !== null;
   const outOfStock = !archived && product.stockQuantity === 0;
   const low = !archived && !outOfStock && product.isLowStock;
@@ -55,7 +60,7 @@ export function ProductRow({ product, onPress }: ProductRowProps) {
           )}
         </View>
       </Pressable>
-      {(low || outOfStock) && <Restock productId={product.id} />}
+      {canRestock && (low || outOfStock) && <Restock productId={product.id} />}
     </View>
   );
 }
