@@ -1,0 +1,211 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Flow.Co brand tokens (mirrors the mobile app's src/theme/tokens.ts). */
+:root {
+  --radius: 0.625rem;
+
+  --background: #f4f6fa;
+  --foreground: #16325c;
+  --card: #ffffff;
+  --card-foreground: #16325c;
+  --popover: #ffffff;
+  --popover-foreground: #16325c;
+  --primary: #16325c;
+  --primary-foreground: #ffffff;
+  --secondary: #e6ecf6;
+  --secondary-foreground: #16325c;
+  --muted: #eef1f6;
+  --muted-foreground: #5b6474;
+  --accent: #e6ecf6;
+  --accent-foreground: #16325c;
+  --destructive: #9b2c2c;
+  --destructive-foreground: #ffffff;
+  --border: #d8dee8;
+  --input: #d8dee8;
+  --ring: #1f5bc4;
+
+  --navy: #16325c;
+  --navy-soft: #e6ecf6;
+  --navy-raised: #2b4a78;
+  --on-navy-muted: #c9d6ee;
+  --link: #1f5bc4;
+  --gold: #f2b544;
+  --gold-soft: #fff4dc;
+  --gold-ink: #8a6a1c;
+  --on-gold: #16325c;
+
+  --success: #16693a;
+  --success-soft: #ddf3e6;
+  --danger: #9b2c2c;
+  --danger-soft: #fbe3e3;
+
+  --sidebar: #16325c;
+  --sidebar-foreground: #c9d6ee;
+
+  --gold-hover: #e9a92f;
+  --table-head: #fafbfd;
+  /* Cost share bar on the dashboard. */
+  --cost: #9aa9c2;
+
+  /* Order status badges */
+  --st-pending-bg: #eceef2;
+  --st-pending-fg: #4a5261;
+  --st-confirmed-bg: #e3ecfb;
+  --st-confirmed-fg: #1e4e9e;
+  --st-preparing-bg: #fbf0d6;
+  --st-preparing-fg: #7a5608;
+  --st-shipping-bg: #ece7fd;
+  --st-shipping-fg: #4c2fb3;
+  --st-delivered-bg: #ddf3e6;
+  --st-delivered-fg: #16693a;
+  --st-cancelled-bg: #fbe3e3;
+  --st-cancelled-fg: #9b2c2c;
+  --st-returned-bg: #f9e1ec;
+  --st-returned-fg: #8e2657;
+}
+
+/* Dark: same identity at night (navy surfaces, light text, gold accent unchanged). */
+.dark {
+  color-scheme: dark;
+
+  --background: #0e1726;
+  --foreground: #e6ecf6;
+  --card: #16233a;
+  --card-foreground: #e6ecf6;
+  --popover: #1a2942;
+  --popover-foreground: #e6ecf6;
+  --primary: #e6ecf6;
+  --primary-foreground: #0e1726;
+  --secondary: #223252;
+  --secondary-foreground: #e6ecf6;
+  --muted: #1c2b45;
+  --muted-foreground: #9aa6b8;
+  --accent: #223252;
+  --accent-foreground: #e6ecf6;
+  --destructive: #f08a8a;
+  --destructive-foreground: #0e1726;
+  --border: #2a3a55;
+  --input: #2f4160;
+  --ring: #6ea0f5;
+
+  --navy: #0a1220;
+  --navy-soft: #223252;
+  --navy-raised: #2b4a78;
+  --on-navy-muted: #c9d6ee;
+  --link: #6ea0f5;
+  --gold: #f2b544;
+  --gold-soft: #3a2f16;
+  --gold-ink: #f2c66d;
+  --on-gold: #16325c;
+
+  --success: #6fd49a;
+  --success-soft: #153826;
+  --danger: #f08a8a;
+  --danger-soft: #3d1c1f;
+
+  --sidebar: #0a1220;
+  --sidebar-foreground: #c9d6ee;
+
+  --gold-hover: #f5c262;
+  --table-head: #1a2942;
+  --cost: #5d6f8f;
+
+  --st-pending-bg: #26334a;
+  --st-pending-fg: #c3cad6;
+  --st-confirmed-bg: #1b3359;
+  --st-confirmed-fg: #8fb4f5;
+  --st-preparing-bg: #3a2f16;
+  --st-preparing-fg: #f2c66d;
+  --st-shipping-bg: #2c2552;
+  --st-shipping-fg: #b4a3f5;
+  --st-delivered-bg: #153826;
+  --st-delivered-fg: #6fd49a;
+  --st-cancelled-bg: #3d1c1f;
+  --st-cancelled-fg: #f08a8a;
+  --st-returned-bg: #3a1a2a;
+  --st-returned-fg: #ee8fbb;
+}
+
+@theme inline {
+  --font-sans:
+    var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-navy: var(--navy);
+  --color-navy-soft: var(--navy-soft);
+  --color-navy-raised: var(--navy-raised);
+  --color-on-navy-muted: var(--on-navy-muted);
+  --color-link: var(--link);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-ink: var(--gold-ink);
+  --color-on-gold: var(--on-gold);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+
+  --color-gold-hover: var(--gold-hover);
+  --color-table-head: var(--table-head);
+  --color-cost: var(--cost);
+
+  /* Order status badges */
+  --color-st-pending-bg: var(--st-pending-bg);
+  --color-st-pending-fg: var(--st-pending-fg);
+  --color-st-confirmed-bg: var(--st-confirmed-bg);
+  --color-st-confirmed-fg: var(--st-confirmed-fg);
+  --color-st-preparing-bg: var(--st-preparing-bg);
+  --color-st-preparing-fg: var(--st-preparing-fg);
+  --color-st-shipping-bg: var(--st-shipping-bg);
+  --color-st-shipping-fg: var(--st-shipping-fg);
+  --color-st-delivered-bg: var(--st-delivered-bg);
+  --color-st-delivered-fg: var(--st-delivered-fg);
+  --color-st-cancelled-bg: var(--st-cancelled-bg);
+  --color-st-cancelled-fg: var(--st-cancelled-fg);
+  --color-st-returned-bg: var(--st-returned-bg);
+  --color-st-returned-fg: var(--st-returned-fg);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    font-feature-settings: "cv11";
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
