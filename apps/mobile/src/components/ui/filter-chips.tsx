@@ -40,7 +40,7 @@ export function FilterChips<T extends string>({ options, value, onChange }: Filt
               {option.label}
               {option.count !== undefined && (
                 <AppText variant="label" color={selected ? 'onNavyMuted' : 'inkMuted'}>
-                  {` ${option.count}`}
+                  {` (${option.count})`}
                 </AppText>
               )}
             </AppText>

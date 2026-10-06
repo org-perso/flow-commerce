@@ -17,7 +17,7 @@ import { PaymentBadge, StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NotifyDriversButton } from "@/features/order/notify-drivers-button";
-import { parcelLabel, type Order } from "@/features/order/order-api";
+import { parcelNumber, type Order } from "@/features/order/order-api";
 import { OrderSheet } from "@/features/order/order-sheet";
 import { OPEN_STATUSES } from "@/features/order/order-status";
 import { customerName, isOverdue, phoneOf } from "@/features/order/order-utils";
@@ -93,7 +93,7 @@ function DeliveryCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-semibold text-link">
-          {parcelLabel(order)}
+          {parcelNumber(order)}
         </span>
         <span className="tabular text-sm font-semibold">
           {formatAr(order.totalAmount)}
@@ -208,7 +208,7 @@ function Column({
       )}
       {total > 0 && (
         <p className="px-1 text-xs text-muted-foreground">
-          À encaisser : {formatAr(total)}
+          Non payé : {formatAr(total)}
         </p>
       )}
     </section>
@@ -243,6 +243,7 @@ export default function DeliveriesPage() {
   return (
     <>
       <PageHeader
+        refresh
         title="Livraisons"
         description={
           orders.data

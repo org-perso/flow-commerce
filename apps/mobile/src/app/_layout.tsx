@@ -87,6 +87,11 @@ function RootNavigator({ ready }: { ready: boolean }) {
             name="account"
             options={headerOptions('Compte et boutique', { showShop: false })}
           />
+          <Stack.Screen name="sales-report" options={headerOptions('Recap des ventes')} />
+          <Stack.Screen
+            name="status-colors"
+            options={headerOptions('Couleurs des états', { showShop: false })}
+          />
           <Stack.Screen
             name="shop-settings"
             options={headerOptions('Modifier la boutique', { showShop: false })}

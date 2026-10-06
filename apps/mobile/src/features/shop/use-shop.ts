@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { useAuthStore } from '@/features/auth/auth-store';
+import type { StatusColors } from '@/theme/state-colors';
 
 import { useActiveShopStore } from './active-shop-store';
 import { can, type Permission } from './roles';
@@ -10,6 +11,7 @@ import {
   listShops,
   setMyNickname,
   updateShop,
+  updateStatusColors,
   type Shop,
   type ShopInput,
 } from './shop-api';
@@ -71,8 +73,22 @@ export function useUpdateShop(shopId: string) {
   return useMutation({
     mutationFn: (input: ShopInput) => updateShop(shopId, input),
     onSuccess: (shop) => {
+      // Merged: the PATCH response has no pseudo (nickname), the list does.
       queryClient.setQueryData<Shop[]>(shopsQueryKey(uid), (shops = []) =>
-        shops.map((s) => (s.id === shop.id ? shop : s)),
+        shops.map((s) => (s.id === shop.id ? { ...s, ...shop } : s)),
+      );
+    },
+  });
+}
+
+export function useUpdateStatusColors(shopId: string) {
+  const uid = useUid();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (colors: StatusColors) => updateStatusColors(shopId, colors),
+    onSuccess: (shop) => {
+      queryClient.setQueryData<Shop[]>(shopsQueryKey(uid), (shops = []) =>
+        shops.map((s) => (s.id === shop.id ? { ...s, ...shop } : s)),
       );
     },
   });

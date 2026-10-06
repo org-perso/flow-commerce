@@ -46,11 +46,12 @@ export function useOrderCounts(filters: Omit<OrderFilters, 'status'>) {
   });
 }
 
-export function useOrder(orderId: string) {
+export function useOrder(orderId: string, enabled = true) {
   const shopId = useActiveShop().id;
   return useQuery({
     queryKey: [...ordersKey(shopId), 'detail', orderId],
     queryFn: () => getOrder(shopId, orderId),
+    enabled,
   });
 }
 
@@ -137,3 +138,36 @@ export function useDriverOrders(assignment: 'mine' | 'available') {
   useLiveRefresh(orders.refetch);
   return orders;
 }
+
+/**
+ * Places of the last 200 orders, most used first ("Analakely", "Ivandry"…), to suggest while
+ * typing: faster, and the same spelling keeps the driver's round grouped by place.
+ */
+export function useRecentPlaces() {
+  const shopId = useActiveShop().id;
+  return useQuery({
+    queryKey: [...ordersKey(shopId), 'places'],
+    queryFn: async () => {
+      const orders = await listOrders(shopId, {}, { limit: 200, offset: 0 });
+      const byKey = new Map<string, { label: string; count: number }>();
+      for (const o of orders) {
+        const label = o.delivery?.place?.trim();
+        if (!label) continue;
+        const key = placeSearchKey(label);
+        const seen = byKey.get(key);
+        byKey.set(key, { label: seen?.label ?? label, count: (seen?.count ?? 0) + 1 });
+      }
+      return [...byKey.values()].sort((a, b) => b.count - a.count).map((p) => p.label);
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** "Analakély " and "analakely" are the same place. */
+export const placeSearchKey = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();

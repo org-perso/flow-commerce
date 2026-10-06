@@ -1,3 +1,4 @@
+import type { StatusColors } from '@/theme/state-colors';
 import { apiFetch } from '@/lib/api-client';
 
 import type { Role } from './roles';
@@ -10,6 +11,8 @@ export type Shop = {
   role: Role;
   /** Their pseudo in this shop, shown to the other members (null: their account name). */
   nickname: string | null;
+  /** Colors picked for the order states; absent on an older API. */
+  statusColors?: StatusColors;
   createdAt: string;
   updatedAt: string;
 };
@@ -18,6 +21,11 @@ export type ShopInput = {
   name: string;
   description: string | null;
 };
+
+/** Saves the whole set of chosen colors ({} = defaults). Owner only. */
+export function updateStatusColors(shopId: string, statusColors: StatusColors): Promise<Shop> {
+  return apiFetch(`/shops/${shopId}`, { method: 'PATCH', body: JSON.stringify({ statusColors }) });
+}
 
 export function listShops(): Promise<Shop[]> {
   return apiFetch('/shops');

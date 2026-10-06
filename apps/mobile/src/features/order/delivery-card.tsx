@@ -5,6 +5,7 @@ import { LayoutAnimation, Pressable, StyleSheet, View } from 'react-native';
 import { AppText, Button, StatusBadge } from '@/components/ui';
 import { callPhone, formatPhone, openWhatsApp } from '@/features/customer/contact';
 import { hitSlopFor, textStyles, theme } from '@/theme';
+import { useStateColor } from '@/theme/state-colors';
 import { businessToday, formatAr, formatDayLabel } from '@/utils/format';
 
 import { DriverActions } from './driver-actions';
@@ -38,6 +39,9 @@ export function DeliveryCard({
     setOpen((v) => !v);
   };
   const overdue = isOverdue(order, today);
+  // Same colors as the order cards: status as background, payment as the left stripe.
+  const statusColor = useStateColor(order.status);
+  const paymentColor = useStateColor(order.isPaid ? 'PAID' : 'UNPAID');
   // Short, so it stays readable next to the badges: "8h–12h", or "Hier · Avant 11h".
   const when = [
     order.scheduledDate === today ? null : formatDayLabel(order.scheduledDate, today),
@@ -47,7 +51,8 @@ export function DeliveryCard({
     .join(' · ');
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: statusColor.bg }]}>
+      <View style={[styles.stripe, { backgroundColor: paymentColor.fg }]} />
       <Pressable
         onPress={toggle}
         accessibilityRole="button"
@@ -96,7 +101,7 @@ export function DeliveryCard({
               numberOfLines={1}
               style={[styles.flex, styles.strong]}
             >
-              {parcelNumber(order)} · {order.customer?.name ?? 'Client de passage'}
+              {parcelNumber(order)} · {order.customer?.name ?? 'Client sans fiche'}
             </AppText>
           </View>
         </View>
@@ -152,7 +157,7 @@ export function DeliveryCard({
               >
                 {order.isPaid
                   ? `Payée${order.paymentMethod ? ` · ${order.paymentMethod}` : ''}`
-                  : 'À encaisser'}
+                  : 'Non payée'}
               </AppText>
               <AppText style={styles.amount}>{formatAr(order.totalAmount)}</AppText>
             </View>
@@ -197,10 +202,17 @@ export function DeliveryCard({
 
 const styles = StyleSheet.create({
   card: {
+    overflow: 'hidden',
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surfaceRaised,
     borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
+  },
+  stripe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: theme.spacing[1],
   },
   body: {
     flexDirection: 'row',

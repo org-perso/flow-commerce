@@ -7,6 +7,7 @@ import {
   MessageCircle,
   Pencil,
   Phone,
+  RotateCcw,
   Store,
   User,
   Wallet,
@@ -26,7 +27,7 @@ import {
   type OrderStatus,
 } from '@/components/ui';
 import { callPhone, formatPhone, openWhatsApp } from '@/features/customer/contact';
-import { parcelLabel, parcelNumber, type Order } from '@/features/order/order-api';
+import { parcelNumber, type Order } from '@/features/order/order-api';
 import {
   actionLabels,
   destructiveStatuses,
@@ -39,6 +40,7 @@ import { slotLabel, type TimeSlot } from '@/features/order/time-slot';
 import { TimeSlotChoice } from '@/features/order/time-slot-choice';
 import { DriverActions } from '@/features/order/driver-actions';
 import { DriverSection } from '@/features/order/driver-picker';
+import { orderRecapMessage } from '@/features/order/order-message';
 import { isOverdue } from '@/features/order/order-row';
 import { PaymentBadge } from '@/features/order/payment-badge';
 import {
@@ -47,9 +49,10 @@ import {
   useOrder,
   useUpdateOrder,
 } from '@/features/order/use-orders';
-import { useCan } from '@/features/shop/use-shop';
+import { useActiveShop, useCan } from '@/features/shop/use-shop';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
 import { hitSlopFor, textStyles, theme } from '@/theme';
+import { useStateColor } from '@/theme/state-colors';
 import { formatAr, formatDateTime, formatDayLabel } from '@/utils/format';
 
 const confirmTexts: Partial<Record<OrderStatus, { title: string; message: string }>> = {
@@ -75,6 +78,7 @@ export default function OrderScreen() {
   const [newSlot, setNewSlot] = useState<TimeSlot | null>(null);
   // Drivers get their own actions (F-13); the API limits them to their deliveries.
   const isDriver = !useCan('orders');
+  const shopName = useActiveShop().name;
   const canOpenCustomer = useCan('customers');
 
   if (!order.data) {
@@ -90,6 +94,7 @@ export default function OrderScreen() {
   }
 
   const o = order.data;
+  const recapPhone = o.customer?.phone ?? o.delivery?.phone ?? null;
   const overdue = isOverdue(o);
   const next = TRANSITIONS[o.status];
   const forward = next.filter((s) => !destructiveStatuses.includes(s));
@@ -133,7 +138,7 @@ export default function OrderScreen() {
         <View style={styles.headRow}>
           {/* Written on the parcel by the seller; the driver's only reference (RG-61). */}
           <AppText variant="label" color="blue" style={styles.strong}>
-            {o.delivery ? parcelLabel(o) : `Commande ${parcelNumber(o)}`}
+            {parcelNumber(o)}
           </AppText>
           <StatusBadge status={o.status} size="sm" />
           <PaymentBadge isPaid={o.isPaid} />
@@ -197,11 +202,7 @@ export default function OrderScreen() {
                 ...otherStatuses.map((status) => ({
                   value: status,
                   label: theme.statusColors[status].label,
-                  leading: (
-                    <View
-                      style={[styles.dot, { backgroundColor: theme.statusColors[status].fg }]}
-                    />
-                  ),
+                  leading: <StatusDot status={status} />,
                 })),
               ]}
             />
@@ -215,11 +216,13 @@ export default function OrderScreen() {
 
       {/* Where, when, who: one card, one line each. */}
       <View style={styles.group}>
-        <SectionLabel>{o.delivery ? 'Livraison' : 'Retrait'}</SectionLabel>
+        <SectionLabel>{o.delivery ? 'Livraison' : 'À récupérer'}</SectionLabel>
         <View style={[styles.card, styles.list]}>
           <InfoLine
             icon={o.delivery ? MapPin : Store}
-            title={o.delivery ? (o.delivery.place ?? 'Lieu non précisé') : 'Retrait en main propre'}
+            title={
+              o.delivery ? (o.delivery.place ?? 'Lieu non précisé') : 'À récupérer en main propre'
+            }
             subtitle={
               o.delivery
                 ? [o.delivery.address, o.delivery.note].filter(Boolean).join(' · ') || undefined
@@ -253,7 +256,7 @@ export default function OrderScreen() {
 
       <Modal visible={dateOpen} animationType="slide" onRequestClose={() => setDateOpen(false)}>
         <View style={[styles.modal, { paddingTop: insets.top + theme.spacing[3] }]}>
-          <AppText variant="heading">Date prévue</AppText>
+          <AppText variant="heading">Livrer le</AppText>
           <DateChoice value={newDate} onChange={setNewDate} />
           <AppText variant="label">Heure</AppText>
           <TimeSlotChoice value={newSlot} onChange={setNewSlot} />
@@ -320,12 +323,38 @@ export default function OrderScreen() {
           )}
           <View style={[styles.line, styles.lineBorder]}>
             <AppText style={[styles.flex, styles.strong]}>
-              {o.isPaid ? 'Total payé' : o.items ? 'Total à payer' : 'À encaisser'}
+              {o.isPaid ? 'Total payé' : o.items ? 'Total à payer' : 'Non payée'}
             </AppText>
             <AppText style={[styles.amount, styles.strong]}>{formatAr(o.totalAmount)}</AppText>
           </View>
         </View>
       </View>
+
+      {/* Send the summary to the customer, or start a new order from this one. */}
+      {!isDriver && (
+        <View style={styles.row}>
+          {recapPhone && (
+            <View style={styles.flex}>
+              <Button
+                label="Envoyer le récap"
+                icon={MessageCircle}
+                compact
+                fullWidth
+                onPress={() => openWhatsApp(recapPhone, orderRecapMessage(o, shopName))}
+              />
+            </View>
+          )}
+          <View style={styles.flex}>
+            <Button
+              label="Recommander"
+              icon={RotateCcw}
+              compact
+              fullWidth
+              onPress={() => router.push({ pathname: '/orders/new', params: { from: o.id } })}
+            />
+          </View>
+        </View>
+      )}
 
       {/* Rarely needed: undo a payment marked by mistake. */}
       {editable && o.isPaid && (
@@ -339,6 +368,10 @@ export default function OrderScreen() {
       )}
     </Screen>
   );
+}
+
+function StatusDot({ status }: { status: OrderStatus }) {
+  return <View style={[styles.dot, { backgroundColor: useStateColor(status).fg }]} />;
 }
 
 function SectionLabel({ children }: { children: string }) {
@@ -426,7 +459,7 @@ function CustomerLine({ order, pressable }: { order: Order; pressable: boolean }
     <InfoLine
       divider
       icon={User}
-      title={customer?.name ?? 'Client de passage'}
+      title={customer?.name ?? 'Client sans fiche'}
       subtitle={phone ? formatPhone(phone) : 'Pas de numéro'}
       onPress={customer && pressable ? () => router.push(`/customers/${customer.id}`) : undefined}
       trailing={

@@ -260,6 +260,7 @@ export default function TeamPage() {
   return (
     <>
       <PageHeader
+        refresh
         title="Équipe"
         description="Qui fait quoi dans la boutique. Chacun apparaît sous son pseudo, jamais son email."
         actions={

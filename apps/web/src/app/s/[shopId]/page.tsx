@@ -36,13 +36,10 @@ import type {
 } from "@/features/dashboard/dashboard-api";
 import { useDashboard } from "@/features/dashboard/use-dashboard";
 import { parcelNumber } from "@/features/order/order-api";
-import {
-  OPEN_STATUSES,
-  STATUS_CLASSES,
-  STATUS_LABELS,
-} from "@/features/order/order-status";
+import { OPEN_STATUSES, STATUS_LABELS } from "@/features/order/order-status";
 import { customerName } from "@/features/order/order-utils";
 import { useCan, useShop } from "@/features/shop/shop-context";
+import { colorVars, stateColorKey } from "@/features/shop/state-colors";
 import {
   formatAr,
   formatDayLabel,
@@ -136,7 +133,7 @@ function TodoList({ d, base }: { d: Dashboard; base: string }) {
             key: "unpaid",
             icon: Wallet,
             tone: "bg-navy-soft text-navy",
-            title: `${formatAr(d.unpaid.amount)} à encaisser`,
+            title: `${formatAr(d.unpaid.amount)} non payés`,
             subtitle: `${plural(d.unpaid.count, "commande")} non payée${d.unpaid.count > 1 ? "s" : ""}`,
             href: `${base}/commandes?quand=toutes`,
           },
@@ -328,6 +325,7 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader
+        refresh
         title="Tableau de bord"
         description={`${formatLongDate()} · ${shop.name}`}
         actions={
@@ -377,7 +375,7 @@ export default function DashboardPage() {
               icon={ReceiptText}
             />
             <Kpi
-              label="À encaisser"
+              label="Non payées"
               value={formatAr(d.unpaid.amount)}
               caption={
                 d.unpaid.count
@@ -400,10 +398,8 @@ export default function DashboardPage() {
                 </span>
                 <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <span
-                    className={cn(
-                      "size-2 rounded-full",
-                      STATUS_CLASSES[status].dot,
-                    )}
+                    style={colorVars(stateColorKey(shop.statusColors, status))}
+                    className="state-dot size-2 rounded-full"
                   />
                   {STATUS_LABELS[status]}
                   <ArrowRight className="ml-auto size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />

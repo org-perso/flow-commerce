@@ -101,7 +101,8 @@ export default function StockPage() {
   return (
     <>
       <PageHeader
-        title="Stock"
+        refresh
+        title="Produits"
         description="Le stock ne change que par les commandes, les entrées, les sorties et les inventaires."
         actions={
           canWrite && (
@@ -175,15 +176,8 @@ export default function StockPage() {
             >
               {t.label}
               {t.count !== undefined && (
-                <span
-                  className={cn(
-                    "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                    tab === t.key
-                      ? "bg-navy text-white"
-                      : "bg-navy-soft text-navy",
-                  )}
-                >
-                  {t.count}
+                <span className="tabular text-muted-foreground">
+                  ({t.count})
                 </span>
               )}
             </button>

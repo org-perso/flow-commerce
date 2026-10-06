@@ -11,7 +11,9 @@ import {
   updateShop,
   type Shop,
   type ShopInput,
+  updateStatusColors,
 } from "./shop-api";
+import type { StatusColors } from "./state-colors";
 
 export const shopsKey = ["shops"] as const;
 
@@ -43,6 +45,14 @@ export function useUpdateShop(shopId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ShopInput) => updateShop(shopId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: shopsKey }),
+  });
+}
+
+export function useUpdateStatusColors(shopId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (colors: StatusColors) => updateStatusColors(shopId, colors),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: shopsKey }),
   });
 }

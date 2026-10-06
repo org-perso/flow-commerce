@@ -21,6 +21,7 @@ import { useProducts } from '@/features/product/use-products';
 import { apiErrorMessage } from '@/lib/api-client';
 import { useActiveShop } from '@/features/shop/use-shop';
 import { theme } from '@/theme';
+import { useStateColor } from '@/theme/state-colors';
 import { formatAr } from '@/utils/format';
 
 const periods = [
@@ -114,6 +115,7 @@ function StatusCounter({
   label: string;
   count: number;
 }) {
+  const color = useStateColor(status);
   return (
     <Pressable
       onPress={() => router.navigate({ pathname: '/orders', params: { status, when: 'all' } })}
@@ -121,7 +123,7 @@ function StatusCounter({
       accessibilityLabel={`${count} ${label}`}
       style={({ pressed }) => [styles.counter, pressed && styles.pressed]}
     >
-      <View style={[styles.dot, { backgroundColor: theme.statusColors[status].fg }]} />
+      <View style={[styles.dot, { backgroundColor: color.fg }]} />
       <AppText
         variant="label"
         color="inkMuted"

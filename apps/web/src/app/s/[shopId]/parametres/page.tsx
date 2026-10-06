@@ -39,6 +39,7 @@ import { useMe, useUpdateMe } from "@/features/me/use-me";
 import { ROLE_LABELS } from "@/features/shop/roles";
 import { useCan, useShop } from "@/features/shop/shop-context";
 import { ShopForm } from "@/features/shop/shop-form";
+import { StatusColorsCard } from "@/features/shop/status-colors-card";
 import { useSetMyNickname, useUpdateShop } from "@/features/shop/use-shops";
 import { useLeaveShop } from "@/features/team/use-team";
 import { ApiError, apiErrorMessage } from "@/lib/api-client";
@@ -280,6 +281,8 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         )}
+
+        {canSettings && <StatusColorsCard key={`colors-${shop.id}`} />}
 
         <NicknameCard key={shop.id} />
 

@@ -268,10 +268,11 @@ const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["G", "D"], label: "Tableau de bord" },
   { keys: ["G", "C"], label: "Commandes" },
   { keys: ["G", "L"], label: "Livraisons" },
-  { keys: ["G", "S"], label: "Stock" },
+  { keys: ["G", "S"], label: "Produits" },
   { keys: ["G", "K"], label: "Clients" },
   { keys: ["G", "E"], label: "Dépenses" },
   { keys: ["G", "Q"], label: "Équipe" },
+  { keys: ["G", "R"], label: "Recap des ventes" },
   { keys: ["G", "P"], label: "Paramètres" },
   { keys: ["?"], label: "Afficher cette aide" },
 ];
@@ -356,6 +357,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const base = `/s/${shop.id}`;
   const items = useNavItems();
   const canOrders = useCan("orders");
+  // On the orders pages, their own "Nouvelle commande" button is enough.
+  const onOrders = usePathname().startsWith(`${base}/commandes`);
   const [collapsedValue, setCollapsed] = useLocalStorage(
     "flowco:sidebar-collapsed",
     "0",
@@ -453,7 +456,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               ref={searchRef}
               value={search}
               onValueChange={setSearch}
-              placeholder="Rechercher une commande (client, n°, produit)…"
+              placeholder="Rechercher une commande (client, lieu, n°, produit)…"
               aria-label="Rechercher une commande"
             />
           </form>
@@ -466,7 +469,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <UserRound className="size-3.5" />
               {ROLE_LABELS[shop.role]}
             </span>
-            {canOrders && (
+            {canOrders && !onOrders && (
               <Button variant="gold" size="sm" asChild>
                 <Link
                   href={`${base}/commandes/nouvelle`}

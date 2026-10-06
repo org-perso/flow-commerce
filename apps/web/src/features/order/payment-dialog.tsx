@@ -36,7 +36,13 @@ export function PaymentDialog({
   const save = async () => {
     try {
       await update.mutateAsync({ isPaid: true, paymentMethod: method });
-      toast.success(`${formatAr(order.totalAmount)} encaissés.`);
+      // No confirmation before: a mistake is undone from the toast instead.
+      toast.success(`${formatAr(order.totalAmount)} encaissés.`, {
+        action: {
+          label: "Annuler",
+          onClick: () => update.mutate({ isPaid: false }),
+        },
+      });
       onOpenChange(false);
     } catch {
       // Shown below.

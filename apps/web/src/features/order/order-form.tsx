@@ -22,6 +22,7 @@ import { Avatar } from "@/components/app/avatar";
 import { Field } from "@/components/app/field";
 import { InlineAlert } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
@@ -35,12 +36,13 @@ import { toInt } from "@/lib/form-fields";
 import { businessToday, formatAr, formatPhone, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import type { Order, OrderPatch, OrderSource } from "./order-api";
-import { PAYMENT_METHODS, SOURCE_LABELS } from "./order-status";
+import type { Order, OrderPatch } from "./order-api";
+import { PAYMENT_METHODS } from "./order-status";
 import { orderErrorMessage } from "./order-utils";
+import { ApiError } from "@/lib/api-client";
 import { Chip, DateChoice, TimeSlotChoice } from "./schedule-fields";
 import type { TimeSlot } from "./time-slot";
-import { useCreateOrder, useUpdateOrder } from "./use-orders";
+import { useCreateOrder, useRecentPlaces, useUpdateOrder } from "./use-orders";
 
 type Line = { product: Product; quantity: number };
 type CustomerChoice =
@@ -136,15 +138,24 @@ function Stepper({
  * New order or edit of an existing one. Lines can only change while the order is pending:
  * after confirmation the stock is taken, so they are shown locked.
  */
+/** Products listed at a time under the search field. */
+const PRODUCTS_STEP = 5;
+
 export function OrderForm({
   order,
   customerId,
+  template,
 }: {
   order?: Order;
   customerId?: string;
+  /** "Recommander": a new order prefilled from this one (products, delivery, customer). */
+  template?: Order;
 }) {
   const router = useRouter();
   const shopId = useShopId();
+  // Starting values: the edited order, or the copied one (current prices, planned today, not paid).
+  const start = order ?? template;
+  const recentPlaces = useRecentPlaces();
   const canCosts = useCan("costs");
   const createOrder = useCreateOrder();
   const updateOrder = useUpdateOrder(order?.id ?? "");
@@ -153,7 +164,7 @@ export function OrderForm({
   const base = `/s/${shopId}/commandes`;
 
   const prefill = useCustomer(
-    order ? (order.customer?.id ?? undefined) : customerId,
+    start ? (start.customer?.id ?? undefined) : customerId,
   );
   const [prefillDismissed, setPrefillDismissed] = useState(false);
 
@@ -174,7 +185,7 @@ export function OrderForm({
   // Products
   const [lineState, setLines] = useState<Line[]>(
     () =>
-      order?.items?.map((i) => ({
+      start?.items?.map((i) => ({
         product: lineProduct(i),
         quantity: i.quantity,
       })) ?? [],
@@ -197,31 +208,30 @@ export function OrderForm({
     order?.scheduledDate ?? businessToday(),
   );
   const [timeSlot, setTimeSlot] = useState<TimeSlot | null>(
-    order?.timeSlot ?? null,
+    start?.timeSlot ?? null,
   );
 
   // Delivery
-  const [isDelivery, setIsDelivery] = useState(!!order?.delivery);
+  // New orders start as a delivery, the most common case; an edited order keeps its mode.
+  const [isDelivery, setIsDelivery] = useState(start ? !!start.delivery : true);
   const [deliveryPlace, setDeliveryPlace] = useState(
-    order?.delivery?.place ?? "",
+    start?.delivery?.place ?? "",
   );
   const [deliveryAddress, setDeliveryAddress] = useState(
-    order?.delivery?.address ?? "",
+    start?.delivery?.address ?? "",
   );
-  const [deliveryNote, setDeliveryNote] = useState(order?.delivery?.note ?? "");
+  const [deliveryNote, setDeliveryNote] = useState(start?.delivery?.note ?? "");
   const [deliveryPhone, setDeliveryPhone] = useState(
-    order?.delivery?.phone ?? "",
+    start?.delivery?.phone ?? "",
   );
   const [deliveryFee, setDeliveryFee] = useState(
-    order?.deliveryFee ? String(order.deliveryFee) : "",
+    start?.deliveryFee ? String(start.deliveryFee) : "",
   );
 
   const [paymentMethod, setPaymentMethod] = useState(
-    order?.paymentMethod ?? "",
+    start?.paymentMethod ?? "",
   );
   const [isPaid, setIsPaid] = useState(order?.isPaid ?? false);
-  const [source, setSource] = useState<OrderSource | "">(order?.source ?? "");
-  const [confirmNow, setConfirmNow] = useState(false);
   const [formError, setFormError] = useState<string>();
 
   const itemsAmount = lines.reduce(
@@ -324,7 +334,6 @@ export function OrderForm({
               : !prefillDismissed
                 ? (order.customer?.id ?? null)
                 : null,
-          source: source || null,
           scheduledDate,
           timeSlot,
           delivery,
@@ -357,13 +366,13 @@ export function OrderForm({
             productId: l.product.id,
             quantity: l.quantity,
           })),
-          source: source || null,
+          source: null,
           scheduledDate,
           timeSlot,
           delivery,
           paymentMethod: paymentMethod || null,
           isPaid,
-          status: confirmNow ? "CONFIRMEE" : "EN_ATTENTE",
+          status: "EN_ATTENTE",
         });
         toast.success(
           `Commande #${String(created.number).padStart(3, "0")} créée.`,
@@ -392,6 +401,23 @@ export function OrderForm({
   }, []);
 
   const apiError = editing ? updateOrder.error : createOrder.error;
+  // "Stock insuffisant": offer the fix in one tap (reduce to what is left, or remove the line).
+  const stockFix =
+    linesEditable &&
+    apiError instanceof ApiError &&
+    apiError.title === "Insufficient Stock" &&
+    lines.some((l) => l.product.id === apiError.body.productId)
+      ? {
+          productId: String(apiError.body.productId),
+          available: Number(apiError.body.available ?? 0),
+        }
+      : null;
+  const applyStockFix = () => {
+    if (!stockFix) return;
+    setQuantity(stockFix.productId, stockFix.available);
+    createOrder.reset();
+    updateOrder.reset();
+  };
   const errorMessage =
     formError ??
     (apiError
@@ -401,15 +427,256 @@ export function OrderForm({
         )
       : undefined);
 
-  const suggestions = (products.data ?? [])
-    .filter((p) => !lines.some((l) => l.product.id === p.id))
-    .slice(0, 6);
+  // 5 products at a time ("Voir plus" adds 5); back to 5 when the search changes.
+  const [more, setMore] = useState({ query: "", shown: PRODUCTS_STEP });
+  const shown = more.query === productQuery ? more.shown : PRODUCTS_STEP;
+  const matching = (products.data ?? []).filter(
+    (p) => !lines.some((l) => l.product.id === p.id),
+  );
+  const suggestions = matching.slice(0, shown);
+  const hiddenCount = matching.length - suggestions.length;
 
   return (
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="flex flex-col gap-4">
-        {/* 1. Client */}
-        <Step n={1} title="Client">
+        {/* 1. Produits */}
+        <Step
+          n={1}
+          title="Produits"
+          right={
+            <span className="text-sm text-muted-foreground">
+              {plural(itemCount, "article")}
+            </span>
+          }
+        >
+          {!linesEditable && (
+            <InlineAlert icon={Lock}>
+              Produits verrouillés : la commande est confirmée. Annulez-la et
+              recréez-la pour changer les produits.
+            </InlineAlert>
+          )}
+          {linesEditable && (
+            <>
+              <label className="flex h-10 items-center gap-2 rounded-md border bg-card px-3 text-muted-foreground focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/30">
+                <Search className="size-4" />
+                <input
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Ajouter un produit"
+                  aria-label="Rechercher un produit"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none"
+                />
+              </label>
+              {(productQuery !== "" || lines.length === 0) &&
+                suggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={p.stockQuantity <= 0}
+                        onClick={() => addProduct(p)}
+                        className="flex h-10 items-center gap-2 rounded-lg border border-dashed bg-card pr-3 pl-1.5 text-sm hover:border-solid hover:bg-accent disabled:opacity-50"
+                      >
+                        <Avatar name={p.name} className="size-7 rounded-md" />
+                        <span className="font-medium">{p.name}</span>
+                        <span className="text-muted-foreground">
+                          {formatAr(p.sellingPrice)} ·{" "}
+                          {p.stockQuantity > 0
+                            ? `${p.stockQuantity} en stock`
+                            : "rupture"}
+                        </span>
+                        <Plus className="size-4 text-link" />
+                      </button>
+                    ))}
+                    {hiddenCount > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-10"
+                        onClick={() =>
+                          setMore({
+                            query: productQuery,
+                            shown: shown + PRODUCTS_STEP,
+                          })
+                        }
+                      >
+                        Voir plus de produits ({hiddenCount})
+                      </Button>
+                    )}
+                  </div>
+                )}
+              {productQuery !== "" &&
+                products.isSuccess &&
+                suggestions.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Aucun produit trouvé pour « {productQuery} ».
+                  </p>
+                )}
+            </>
+          )}
+          {lines.length === 0 ? (
+            <p className="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
+              Aucun produit pour l’instant.
+            </p>
+          ) : (
+            <ul className="divide-y rounded-lg border">
+              {lines.map((line) => {
+                const max = Number.isFinite(line.product.stockQuantity)
+                  ? line.product.stockQuantity
+                  : 1_000_000;
+                const last =
+                  linesEditable &&
+                  Number.isFinite(line.product.stockQuantity) &&
+                  line.quantity >= line.product.stockQuantity;
+                return (
+                  <li
+                    key={line.product.id}
+                    className="flex flex-wrap items-center gap-3 p-3"
+                  >
+                    <Avatar
+                      name={line.product.name}
+                      className="size-9 rounded-md"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">
+                        {line.product.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatAr(line.product.sellingPrice)} l’unité
+                      </p>
+                      {last && (
+                        <p className="text-xs font-semibold text-gold-ink">
+                          Dernier(s) en stock : il sera épuisé après cette
+                          commande.
+                        </p>
+                      )}
+                    </div>
+                    {linesEditable ? (
+                      <Stepper
+                        value={line.quantity}
+                        max={max}
+                        onChange={(q) =>
+                          setQuantity(line.product.id, Math.min(q, max))
+                        }
+                      />
+                    ) : (
+                      <span className="text-sm">× {line.quantity}</span>
+                    )}
+                    <span className="tabular w-28 text-right font-semibold">
+                      {formatAr(line.quantity * line.product.sellingPrice)}
+                    </span>
+                    {linesEditable && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Retirer ${line.product.name}`}
+                        onClick={() => setQuantity(line.product.id, 0)}
+                      >
+                        <Trash2 />
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Step>
+
+        {/* 2. Livraison */}
+        <Step n={2} title="Livraison">
+          <RadioGroup
+            value={isDelivery ? "delivery" : "pickup"}
+            onValueChange={(v) => setIsDelivery(v === "delivery")}
+            className="grid-cols-2"
+            aria-label="Mode de remise"
+          >
+            <RadioCard value="delivery">
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <Truck className="size-4" /> Livraison
+              </span>
+              <span className="text-xs text-muted-foreground">
+                À une adresse
+              </span>
+            </RadioCard>
+            <RadioCard value="pickup">
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <Store className="size-4" /> À récupérer
+              </span>
+              <span className="text-xs text-muted-foreground">
+                En main propre
+              </span>
+            </RadioCard>
+          </RadioGroup>
+          {isDelivery && (
+            <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
+              <Field
+                label="Lieu de livraison"
+                htmlFor="place"
+                hint="Quartier ou repère : sert à regrouper les tournées."
+              >
+                <Input
+                  id="place"
+                  list="recent-places"
+                  autoComplete="off"
+                  value={deliveryPlace}
+                  onChange={(e) => setDeliveryPlace(e.target.value)}
+                  placeholder="Analakely, Ivandry…"
+                />
+                {/* Places already used, suggested by the browser while typing. */}
+                <datalist id="recent-places">
+                  {recentPlaces.data?.map((place) => (
+                    <option key={place} value={place} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field label="Frais (Ar)" htmlFor="fee">
+                <Input
+                  id="fee"
+                  inputMode="numeric"
+                  value={deliveryFee}
+                  onChange={(e) => setDeliveryFee(e.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+              <Field
+                label="Adresse (facultatif)"
+                htmlFor="address"
+                className="sm:col-span-2"
+              >
+                <Input
+                  id="address"
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  placeholder="Rue, lot, repère…"
+                />
+              </Field>
+              <Field
+                label="Précisions (facultatif)"
+                htmlFor="note"
+                className="sm:col-span-2"
+              >
+                <Input
+                  id="note"
+                  value={deliveryNote}
+                  onChange={(e) => setDeliveryNote(e.target.value)}
+                  placeholder="Ex. appeler avant, portail bleu…"
+                />
+              </Field>
+            </div>
+          )}
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium">Livrer le</span>
+            <DateChoice value={scheduledDate} onChange={setScheduledDate} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium">Heure</span>
+            <TimeSlotChoice value={timeSlot} onChange={setTimeSlot} />
+          </div>
+        </Step>
+
+        {/* 3. Client: after the delivery, as on mobile. */}
+        <Step n={3} title="Client (optionnel)">
           {customer.kind === "existing" && (
             <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
               <Avatar name={customer.customer.name} className="size-10" />
@@ -516,7 +783,7 @@ export function OrderForm({
                 className="font-medium text-link hover:underline"
                 onClick={resetCustomer}
               >
-                Client de passage
+                Sans fiche
               </button>
             )}
             {customer.kind !== "new" && (
@@ -529,262 +796,43 @@ export function OrderForm({
               </button>
             )}
           </div>
-        </Step>
-
-        {/* 2. Produits */}
-        <Step
-          n={2}
-          title="Produits"
-          right={
-            <span className="text-sm text-muted-foreground">
-              {plural(itemCount, "article")}
-            </span>
-          }
-        >
-          {!linesEditable && (
-            <InlineAlert icon={Lock}>
-              Produits verrouillés : la commande est confirmée. Annulez-la et
-              recréez-la pour changer les produits.
-            </InlineAlert>
+          {/* For a delivery, a number to call when the customer has none. */}
+          {needsDeliveryPhone && (
+            <Field
+              label="Téléphone pour la livraison"
+              htmlFor="delivery-phone"
+              hint={
+                customer.kind === "existing"
+                  ? "Ce client n’a pas de numéro : le livreur doit pouvoir appeler."
+                  : "Client sans fiche : le livreur doit pouvoir appeler."
+              }
+            >
+              <Input
+                id="delivery-phone"
+                type="tel"
+                value={deliveryPhone}
+                onChange={(e) => setDeliveryPhone(e.target.value)}
+                placeholder="034 00 000 00"
+              />
+            </Field>
           )}
-          {linesEditable && (
-            <>
-              <label className="flex h-10 items-center gap-2 rounded-md border bg-card px-3 text-muted-foreground focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/30">
-                <Search className="size-4" />
-                <input
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Ajouter un produit"
-                  aria-label="Rechercher un produit"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none"
-                />
-              </label>
-              {(productQuery !== "" || lines.length === 0) &&
-                suggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {suggestions.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        disabled={p.stockQuantity <= 0}
-                        onClick={() => addProduct(p)}
-                        className="flex h-10 items-center gap-2 rounded-lg border border-dashed bg-card pr-3 pl-1.5 text-sm hover:border-solid hover:bg-accent disabled:opacity-50"
-                      >
-                        <Avatar name={p.name} className="size-7 rounded-md" />
-                        <span className="font-medium">{p.name}</span>
-                        <span className="text-muted-foreground">
-                          {formatAr(p.sellingPrice)} ·{" "}
-                          {p.stockQuantity > 0
-                            ? `${p.stockQuantity} en stock`
-                            : "rupture"}
-                        </span>
-                        <Plus className="size-4 text-link" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              {productQuery !== "" &&
-                products.isSuccess &&
-                suggestions.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Aucun produit trouvé pour « {productQuery} ».
-                  </p>
-                )}
-            </>
-          )}
-          {lines.length === 0 ? (
-            <p className="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
-              Aucun produit pour l’instant.
-            </p>
-          ) : (
-            <ul className="divide-y rounded-lg border">
-              {lines.map((line) => {
-                const max = Number.isFinite(line.product.stockQuantity)
-                  ? line.product.stockQuantity
-                  : 1_000_000;
-                const last =
-                  linesEditable &&
-                  Number.isFinite(line.product.stockQuantity) &&
-                  line.quantity >= line.product.stockQuantity;
-                return (
-                  <li
-                    key={line.product.id}
-                    className="flex flex-wrap items-center gap-3 p-3"
-                  >
-                    <Avatar
-                      name={line.product.name}
-                      className="size-9 rounded-md"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">
-                        {line.product.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatAr(line.product.sellingPrice)} l’unité
-                      </p>
-                      {last && (
-                        <p className="text-xs font-semibold text-gold-ink">
-                          Dernier(s) en stock : il sera épuisé après cette
-                          commande.
-                        </p>
-                      )}
-                    </div>
-                    {linesEditable ? (
-                      <Stepper
-                        value={line.quantity}
-                        max={max}
-                        onChange={(q) =>
-                          setQuantity(line.product.id, Math.min(q, max))
-                        }
-                      />
-                    ) : (
-                      <span className="text-sm">× {line.quantity}</span>
-                    )}
-                    <span className="tabular w-28 text-right font-semibold">
-                      {formatAr(line.quantity * line.product.sellingPrice)}
-                    </span>
-                    {linesEditable && (
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Retirer ${line.product.name}`}
-                        onClick={() => setQuantity(line.product.id, 0)}
-                      >
-                        <Trash2 />
-                      </Button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Step>
-
-        {/* 3. Remise et date */}
-        <Step n={3} title="Remise et date">
-          <RadioGroup
-            value={isDelivery ? "delivery" : "pickup"}
-            onValueChange={(v) => setIsDelivery(v === "delivery")}
-            className="grid-cols-2"
-            aria-label="Mode de remise"
-          >
-            <RadioCard value="pickup">
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <Store className="size-4" /> Retrait
-              </span>
-              <span className="text-xs text-muted-foreground">
-                En main propre
-              </span>
-            </RadioCard>
-            <RadioCard value="delivery">
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <Truck className="size-4" /> Livraison
-              </span>
-              <span className="text-xs text-muted-foreground">
-                À une adresse
-              </span>
-            </RadioCard>
-          </RadioGroup>
-          {isDelivery && (
-            <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
-              <Field
-                label="Lieu de livraison"
-                htmlFor="place"
-                hint="Quartier ou repère : sert à regrouper les tournées."
-              >
-                <Input
-                  id="place"
-                  value={deliveryPlace}
-                  onChange={(e) => setDeliveryPlace(e.target.value)}
-                  placeholder="Analakely, Ivandry…"
-                />
-              </Field>
-              <Field label="Frais (Ar)" htmlFor="fee">
-                <Input
-                  id="fee"
-                  inputMode="numeric"
-                  value={deliveryFee}
-                  onChange={(e) => setDeliveryFee(e.target.value)}
-                  placeholder="0"
-                />
-              </Field>
-              {needsDeliveryPhone && (
-                <Field
-                  label="Téléphone pour la livraison"
-                  htmlFor="delivery-phone"
-                  hint={
-                    customer.kind === "existing"
-                      ? "Ce client n’a pas de numéro : le livreur doit pouvoir appeler."
-                      : "Client de passage : le livreur doit pouvoir appeler."
-                  }
-                  className="sm:col-span-2"
-                >
-                  <Input
-                    id="delivery-phone"
-                    type="tel"
-                    value={deliveryPhone}
-                    onChange={(e) => setDeliveryPhone(e.target.value)}
-                    placeholder="034 00 000 00"
-                  />
-                </Field>
-              )}
-              <Field
-                label="Adresse (facultatif)"
-                htmlFor="address"
-                className="sm:col-span-2"
-              >
-                <Input
-                  id="address"
-                  value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
-                  placeholder="Rue, lot, repère…"
-                />
-              </Field>
-              <Field
-                label="Précisions (facultatif)"
-                htmlFor="note"
-                className="sm:col-span-2"
-              >
-                <Input
-                  id="note"
-                  value={deliveryNote}
-                  onChange={(e) => setDeliveryNote(e.target.value)}
-                  placeholder="Ex. appeler avant, portail bleu…"
-                />
-              </Field>
-            </div>
-          )}
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium">Date prévue</span>
-            <DateChoice value={scheduledDate} onChange={setScheduledDate} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium">Heure</span>
-            <TimeSlotChoice value={timeSlot} onChange={setTimeSlot} />
-          </div>
         </Step>
 
         {/* 4. Paiement */}
         <Step n={4} title="Paiement">
-          <RadioGroup
-            value={isPaid ? "paid" : "unpaid"}
-            onValueChange={(v) => setIsPaid(v === "paid")}
-            className="grid-cols-2"
-            aria-label="Paiement"
-          >
-            <RadioCard value="unpaid">
-              <span className="text-sm font-semibold">À encaisser</span>
-              <span className="block text-xs text-muted-foreground">
-                Plus tard (ex. à la livraison)
-              </span>
-            </RadioCard>
-            <RadioCard value="paid">
+          {/* One checkbox: not ticked means still to pay. */}
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border bg-card px-4 py-3">
+            <Checkbox
+              checked={isPaid}
+              onCheckedChange={(v) => setIsPaid(v === true)}
+            />
+            <span className="flex flex-col">
               <span className="text-sm font-semibold">Déjà payée</span>
-              <span className="block text-xs text-muted-foreground">
-                Réglée en totalité
+              <span className="text-xs text-muted-foreground">
+                {isPaid ? "Le client a réglé." : "Sinon, elle reste non payée."}
               </span>
-            </RadioCard>
-          </RadioGroup>
+            </span>
+          </label>
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">Moyen de paiement</span>
             <div className="flex flex-wrap gap-2">
@@ -795,30 +843,6 @@ export function OrderForm({
                   onClick={() => setPaymentMethod(m === paymentMethod ? "" : m)}
                 >
                   {m}
-                </Chip>
-              ))}
-            </div>
-          </div>
-        </Step>
-
-        {/* 5. Détails */}
-        <Step
-          n={5}
-          title={editing ? "Source" : "Source et statut"}
-          right={
-            <span className="text-xs text-muted-foreground">Facultatif</span>
-          }
-        >
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium">Source de la commande</span>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(SOURCE_LABELS) as OrderSource[]).map((value) => (
-                <Chip
-                  key={value}
-                  active={source === value}
-                  onClick={() => setSource(value === source ? "" : value)}
-                >
-                  {SOURCE_LABELS[value]}
                 </Chip>
               ))}
             </div>
@@ -861,37 +885,26 @@ export function OrderForm({
             <p className="text-xs text-muted-foreground">
               {isPaid
                 ? `Payée${paymentMethod ? ` · ${paymentMethod}` : ""}`
-                : "À encaisser"}
+                : "Non payée"}
             </p>
           </div>
         </Card>
 
-        {!editing && (
-          <Card className="gap-3 px-5">
-            <h2 className="text-sm font-semibold">Statut à la création</h2>
-            <RadioGroup
-              value={confirmNow ? "confirmed" : "pending"}
-              onValueChange={(v) => setConfirmNow(v === "confirmed")}
-              aria-label="Statut"
-            >
-              <RadioCard value="pending">
-                <span className="text-sm font-semibold">En attente</span>
-                <span className="block text-xs text-muted-foreground">
-                  Le stock reste disponible jusqu’à confirmation.
-                </span>
-              </RadioCard>
-              <RadioCard value="confirmed">
-                <span className="text-sm font-semibold">Confirmée</span>
-                <span className="block text-xs text-muted-foreground">
-                  Le stock est retiré tout de suite.
-                </span>
-              </RadioCard>
-            </RadioGroup>
-          </Card>
-        )}
-
         {errorMessage && (
-          <InlineAlert tone="danger">{errorMessage}</InlineAlert>
+          <InlineAlert
+            tone="danger"
+            action={
+              stockFix && (
+                <Button size="sm" variant="outline" onClick={applyStockFix}>
+                  {stockFix.available > 0
+                    ? `Réduire à ${stockFix.available}`
+                    : "Retirer ce produit"}
+                </Button>
+              )
+            }
+          >
+            {errorMessage}
+          </InlineAlert>
         )}
 
         <Button

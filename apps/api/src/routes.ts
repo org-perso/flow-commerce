@@ -8,6 +8,7 @@ import { dashboardRouter } from './modules/dashboard/dashboard.routes.js';
 import { expensesRouter } from './modules/expense/expense.routes.js';
 import { deliveriesRouter } from './modules/notification/notification.routes.js';
 import { driverRouteRouter, ordersRouter } from './modules/order/order.routes.js';
+import { reportsRouter } from './modules/report/report.routes.js';
 import { productsRouter } from './modules/product/product.routes.js';
 import {
   hideCostsUnlessAllowed,
@@ -63,6 +64,7 @@ export function createApiRouter(verifyToken: TokenVerifier) {
   shopScoped.use('/deliveries', deliveriesRouter);
   shopScoped.use('/expenses', requirePermission('expenses'), expensesRouter);
   shopScoped.use('/dashboard', requirePermission('dashboard'), dashboardRouter);
+  shopScoped.use('/reports', requirePermission('orders'), reportsRouter);
   api.use('/shops/:shopId', shopScoped);
 
   return api;

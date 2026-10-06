@@ -70,12 +70,14 @@ export const parcelLabel = (order: Pick<Order, 'number'>) => `Colis ${parcelNumb
 export type OrderFilters = {
   /** today: planned today + overdue open orders; upcoming: planned later. */
   when?: 'today' | 'upcoming';
-  /** Customer name or phone, order number or product. */
+  /** Customer name or phone, order number, product or delivery place. */
   q?: string;
   status?: OrderStatus;
   customerId?: string;
   /** mine: my deliveries (driver); available: deliveries nobody has taken yet. */
   assignment?: 'mine' | 'available';
+  /** A driver's orders, or "none": deliveries with no driver yet. */
+  driverId?: string;
 };
 
 export type CreateOrderInput = {
@@ -116,6 +118,7 @@ export function listOrders(shopId: string, filters: OrderFilters, page: Page): P
   if (filters.status) params.set('status', filters.status);
   if (filters.customerId) params.set('customerId', filters.customerId);
   if (filters.assignment) params.set('assignment', filters.assignment);
+  if (filters.driverId) params.set('driverId', filters.driverId);
   return apiFetch(`${base(shopId)}?${params}`);
 }
 
@@ -130,6 +133,7 @@ export function getOrderCounts(
   if (filters.when) params.set('when', filters.when);
   if (filters.q) params.set('q', filters.q);
   if (filters.customerId) params.set('customerId', filters.customerId);
+  if (filters.driverId) params.set('driverId', filters.driverId);
   return apiFetch(`${base(shopId)}/counts?${params}`);
 }
 

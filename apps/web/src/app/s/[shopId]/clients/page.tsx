@@ -55,6 +55,7 @@ export default function CustomersPage() {
   return (
     <>
       <PageHeader
+        refresh
         title="Clients"
         actions={
           <Button asChild>

@@ -1,11 +1,14 @@
 import { pool, withTransaction } from '../../db/pool.js';
 import { seedDefaultCategories } from '../category/category.repository.js';
 import type { Role } from './permissions.js';
+import type { StatusColors } from './status-colors.js';
 
 export type Shop = {
   id: string;
   name: string;
   description: string | null;
+  /** Colors picked for the order states (see status-colors.ts); {} = defaults. */
+  statusColors: StatusColors;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -19,11 +22,13 @@ export type Member = { userId: string; role: Role };
 export type ShopInput = {
   name: string;
   description: string | null;
+  statusColors?: StatusColors;
 };
 
-const columns = `id, name, description, created_at AS "createdAt", updated_at AS "updatedAt"`;
-const shopColumns = `s.id, s.name, s.description, s.created_at AS "createdAt",
-  s.updated_at AS "updatedAt"`;
+const columns = `id, name, description, COALESCE(status_colors, '{}') AS "statusColors",
+  created_at AS "createdAt", updated_at AS "updatedAt"`;
+const shopColumns = `s.id, s.name, s.description, COALESCE(s.status_colors, '{}') AS "statusColors",
+  s.created_at AS "createdAt", s.updated_at AS "updatedAt"`;
 
 /** Shops the user is a member of, with their role. */
 export async function listShopsForUser(userId: string): Promise<ShopWithRole[]> {
@@ -72,11 +77,19 @@ export function createShop(ownerId: string, input: ShopInput): Promise<ShopWithR
 export async function updateShop(shopId: string, patch: Partial<ShopInput>): Promise<Shop> {
   const { rows } = await pool.query<Shop>(
     `UPDATE shops SET
-       name        = COALESCE($2, name),
-       description = CASE WHEN $3::boolean THEN $4 ELSE description END
+       name          = COALESCE($2, name),
+       description   = CASE WHEN $3::boolean THEN $4 ELSE description END,
+       status_colors = CASE WHEN $5::boolean THEN $6::jsonb ELSE status_colors END
      WHERE id = $1
      RETURNING ${columns}`,
-    [shopId, patch.name ?? null, patch.description !== undefined, patch.description ?? null],
+    [
+      shopId,
+      patch.name ?? null,
+      patch.description !== undefined,
+      patch.description ?? null,
+      patch.statusColors !== undefined,
+      JSON.stringify(patch.statusColors ?? {}),
+    ],
   );
   return rows[0]!;
 }

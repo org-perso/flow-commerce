@@ -15,11 +15,11 @@ export function isOverdue(
   return order.scheduledDate === today && !!end && end <= businessNow();
 }
 
-/** Where the order goes: the delivery place, else "Retrait". */
+/** Where the order goes: the delivery place, else "À récupérer". */
 export function placeOf(order: Pick<Order, "delivery">): string {
   return order.delivery
     ? (order.delivery.place ?? order.delivery.address ?? "À livrer")
-    : "Retrait";
+    : "À récupérer";
 }
 
 /** Number to call: the customer's, else the delivery one (walk-in customer). */
@@ -30,7 +30,7 @@ export function phoneOf(
 }
 
 export const customerName = (order: Pick<Order, "customer">) =>
-  order.customer?.name ?? "Client de passage";
+  order.customer?.name ?? "Client sans fiche";
 
 /** Stock errors name the product and what is left; anything else: the usual message. */
 export function orderErrorMessage(

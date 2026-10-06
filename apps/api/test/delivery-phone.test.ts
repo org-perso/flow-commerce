@@ -53,3 +53,20 @@ describe('delivery phone (walk-in customer)', () => {
     expect((await newOrder({ place: 'Analakely', phone: '123' })).status).toBe(400);
   });
 });
+
+describe('order search', () => {
+  it('finds orders by delivery place, address or walk-in phone', async () => {
+    await newOrder({ place: 'Analakely', address: 'Lot II A 45', phone: '0341234567' });
+    await newOrder({ place: 'Ivandry' });
+
+    const search = async (q: string) =>
+      (await request.get(api(`/orders?q=${encodeURIComponent(q)}`)).set(owner)).body.length;
+    expect(await search('analakely')).toBe(1);
+    expect(await search('lot ii')).toBe(1);
+    expect(await search('034 12 345')).toBe(1);
+    expect(await search('ivandry')).toBe(1);
+
+    const counts = await request.get(api('/orders/counts?q=analakely')).set(owner);
+    expect(counts.body.total).toBe(1);
+  });
+});

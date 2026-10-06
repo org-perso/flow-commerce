@@ -1,12 +1,10 @@
 import { Check } from "lucide-react";
 
-import {
-  STATUS_CLASSES,
-  STATUS_LABELS,
-  type OrderStatus,
-} from "@/features/order/order-status";
+import { STATUS_LABELS, type OrderStatus } from "@/features/order/order-status";
+import { colorVars, useStateColorKey } from "@/features/shop/state-colors";
 import { cn } from "@/lib/utils";
 
+/** In the shop's colors (Paramètres › Couleurs des états), else the defaults. */
 export function StatusBadge({
   status,
   className,
@@ -14,16 +12,16 @@ export function StatusBadge({
   status: OrderStatus;
   className?: string;
 }) {
-  const classes = STATUS_CLASSES[status];
+  const color = useStateColorKey(status);
   return (
     <span
+      style={colorVars(color)}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
-        classes.badge,
+        "state-badge inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
         className,
       )}
     >
-      <span className={cn("size-1.5 rounded-full", classes.dot)} />
+      <span className="state-dot size-1.5 rounded-full" />
       {STATUS_LABELS[status]}
     </span>
   );
@@ -36,14 +34,14 @@ export function PaymentBadge({
   isPaid: boolean;
   method?: string | null;
 }) {
-  return isPaid ? (
-    <span className="inline-flex items-center gap-1 rounded-md bg-success-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-success">
-      <Check className="size-3" />
-      Payée{method ? ` · ${method}` : ""}
-    </span>
-  ) : (
-    <span className="inline-flex items-center rounded-md border px-2 py-px text-xs font-semibold whitespace-nowrap text-muted-foreground">
-      Non payée
+  const color = useStateColorKey(isPaid ? "PAID" : "UNPAID");
+  return (
+    <span
+      style={colorVars(color)}
+      className="state-badge inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap"
+    >
+      {isPaid && <Check className="size-3" />}
+      {isPaid ? `Payée${method ? ` · ${method}` : ""}` : "Non payée"}
     </span>
   );
 }

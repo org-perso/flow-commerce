@@ -202,7 +202,7 @@ export default function CustomerPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>N°</TableHead>
-                      <TableHead>Date prévue</TableHead>
+                      <TableHead>Livrer le</TableHead>
                       <TableHead>Lieu</TableHead>
                       <TableHead>Statut</TableHead>
                       <TableHead>Paiement</TableHead>

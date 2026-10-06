@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { CalendarDays, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react-native';
+import { Bike, CalendarDays, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react-native';
 import { useCallback, useDeferredValue, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,7 +25,7 @@ import {
 import type { Order } from '@/features/order/order-api';
 import { NotifyDriversButton } from '@/features/order/notify-drivers-button';
 import { isOverdue, OrderRow } from '@/features/order/order-row';
-import { useLiveRefresh, useOrderCounts, useOrders } from '@/features/order/use-orders';
+import { useDrivers, useLiveRefresh, useOrderCounts, useOrders } from '@/features/order/use-orders';
 import { apiErrorMessage } from '@/lib/api-client';
 import { NewOrderFab } from '@/features/order/new-order-fab';
 import { theme } from '@/theme';
@@ -93,13 +93,20 @@ const emptyMessages: Record<When, string> = {
 
 export default function OrdersScreen() {
   // Filters live in the URL, so the dashboard and the header search can open this tab.
-  const params = useLocalSearchParams<{ when?: When; status?: OrderStatus; search?: string }>();
+  const params = useLocalSearchParams<{
+    when?: When;
+    status?: OrderStatus;
+    search?: string;
+    driver?: string;
+  }>();
   const when = params.when ?? 'today';
   const status = params.status ?? 'ALL';
   const [search, setSearch] = useState('');
   const q = useDeferredValue(search.trim()) || undefined;
 
-  const filters = { when: when === 'all' ? undefined : when, q };
+  const driverId = params.driver;
+  const drivers = useDrivers();
+  const filters = { when: when === 'all' ? undefined : when, q, driverId };
   const orders = useOrders({ ...filters, status: status === 'ALL' ? undefined : status });
   const counts = useOrderCounts(filters);
   // Other members (CM, drivers) change orders too: keep the list fresh.
@@ -141,7 +148,7 @@ export default function OrdersScreen() {
         }}
         right={
           <Dropdown
-            title="Date prévue"
+            title="Livrer le"
             icon={CalendarDays}
             options={whenOptions}
             value={when}
@@ -153,9 +160,23 @@ export default function OrdersScreen() {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Client, téléphone ou produit"
+          placeholder="Client, lieu, téléphone ou produit"
           autoFocus={params.search === '1'}
         />
+        {/* By driver: only once the shop has drivers. */}
+        {!!drivers.data?.length && (
+          <Dropdown
+            title="Livreur"
+            icon={Bike}
+            options={[
+              { value: 'all', label: 'Tous les livreurs' },
+              { value: 'none', label: 'Sans livreur (à prendre)' },
+              ...drivers.data.map((d) => ({ value: d.userId, label: d.name })),
+            ]}
+            value={driverId ?? 'all'}
+            onChange={(value) => router.setParams({ driver: value === 'all' ? undefined : value })}
+          />
+        )}
         <FilterChips
           options={chips}
           value={status}
