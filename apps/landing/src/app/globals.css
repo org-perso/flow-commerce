@@ -1,26 +1,139 @@
 @import "tailwindcss";
 
+/* Flow.Co brand tokens (same values as apps/web/src/app/globals.css). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --radius: 0.625rem;
+
+  --background: #f4f6fa;
+  --foreground: #16325c;
+  --card: #ffffff;
+  --muted: #eef1f6;
+  --muted-foreground: #5b6474;
+  --border: #d8dee8;
+  --ring: #1f5bc4;
+
+  --navy: #16325c;
+  --navy-soft: #e6ecf6;
+  --navy-raised: #2b4a78;
+  --on-navy-muted: #c9d6ee;
+  --link: #1f5bc4;
+  --gold: #f2b544;
+  --gold-soft: #fff4dc;
+  --gold-ink: #8a6a1c;
+  --on-gold: #16325c;
+  --gold-hover: #e9a92f;
+
+  --success: #16693a;
+  --success-soft: #ddf3e6;
+  --danger: #9b2c2c;
+  --danger-soft: #fbe3e3;
+
+  --st-pending-bg: #eceef2;
+  --st-pending-fg: #4a5261;
+  --st-confirmed-bg: #e3ecfb;
+  --st-confirmed-fg: #1e4e9e;
+  --st-preparing-bg: #fbf0d6;
+  --st-preparing-fg: #7a5608;
+  --st-shipping-bg: #ece7fd;
+  --st-shipping-fg: #4c2fb3;
+  --st-delivered-bg: #ddf3e6;
+  --st-delivered-fg: #16693a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* Dark: follows the visitor's system setting (no theme menu on the landing). */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+
+    --background: #0e1726;
+    --foreground: #e6ecf6;
+    --card: #16233a;
+    --muted: #1c2b45;
+    --muted-foreground: #9aa6b8;
+    --border: #2a3a55;
+    --ring: #6ea0f5;
+
+    --navy: #0a1220;
+    --navy-soft: #223252;
+    --navy-raised: #2b4a78;
+    --link: #6ea0f5;
+    --gold-soft: #3a2f16;
+    --gold-ink: #f2c66d;
+    --gold-hover: #f5c262;
+
+    --success: #6fd49a;
+    --success-soft: #153826;
+    --danger: #f08a8a;
+    --danger-soft: #3d1c1f;
+
+    --st-pending-bg: #26334a;
+    --st-pending-fg: #c3cad6;
+    --st-confirmed-bg: #1b3359;
+    --st-confirmed-fg: #8fb4f5;
+    --st-preparing-bg: #3a2f16;
+    --st-preparing-fg: #f2c66d;
+    --st-shipping-bg: #2c2552;
+    --st-shipping-fg: #b4a3f5;
+    --st-delivered-bg: #153826;
+    --st-delivered-fg: #6fd49a;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --font-sans:
+    var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+
+  --color-navy: var(--navy);
+  --color-navy-soft: var(--navy-soft);
+  --color-navy-raised: var(--navy-raised);
+  --color-on-navy-muted: var(--on-navy-muted);
+  --color-link: var(--link);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-ink: var(--gold-ink);
+  --color-on-gold: var(--on-gold);
+  --color-gold-hover: var(--gold-hover);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --color-st-pending-bg: var(--st-pending-bg);
+  --color-st-pending-fg: var(--st-pending-fg);
+  --color-st-confirmed-bg: var(--st-confirmed-bg);
+  --color-st-confirmed-fg: var(--st-confirmed-fg);
+  --color-st-preparing-bg: var(--st-preparing-bg);
+  --color-st-preparing-fg: var(--st-preparing-fg);
+  --color-st-shipping-bg: var(--st-shipping-bg);
+  --color-st-shipping-fg: var(--st-shipping-fg);
+  --color-st-delivered-bg: var(--st-delivered-bg);
+  --color-st-delivered-fg: var(--st-delivered-fg);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
 }
