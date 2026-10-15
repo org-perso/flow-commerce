@@ -7,6 +7,7 @@ import {
   MessageCircle,
   Pencil,
   Phone,
+  RotateCcw,
   Store,
   Truck,
   User,
@@ -42,7 +43,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCan, useShopId } from "@/features/shop/shop-context";
+import { useCan, useShop, useShopId } from "@/features/shop/shop-context";
 import { apiErrorMessage } from "@/lib/api-client";
 import {
   formatAr,
@@ -53,7 +54,8 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { parcelLabel, parcelNumber, type Order } from "./order-api";
+import { parcelNumber, type Order } from "./order-api";
+import { orderRecapMessage } from "./order-message";
 import {
   actionLabels,
   confirmTexts,
@@ -239,7 +241,7 @@ function DateDialog({ order, onClose }: { order: Order; onClose: () => void }) {
         </DialogHeader>
         {update.isError && <ErrorState error={update.error} />}
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Date prévue</span>
+          <span className="text-sm font-medium">Livrer le</span>
           <DateChoice value={date} onChange={setDate} />
         </div>
         <div className="flex flex-col gap-2">
@@ -262,6 +264,7 @@ function DateDialog({ order, onClose }: { order: Order; onClose: () => void }) {
 
 function OrderDetail({ order }: { order: Order }) {
   const shopId = useShopId();
+  const shop = useShop();
   const canCustomers = useCan("customers");
   const canCosts = useCan("costs");
   const [paying, setPaying] = useState(false);
@@ -284,9 +287,7 @@ function OrderDetail({ order }: { order: Order }) {
     <>
       <SheetHeader>
         <SheetDescription className="font-semibold text-link">
-          {order.delivery
-            ? parcelLabel(order)
-            : `Commande ${parcelNumber(order)}`}
+          {parcelNumber(order)}
         </SheetDescription>
         <SheetTitle className="flex items-baseline justify-between gap-3 text-2xl">
           <span className="tabular">{formatAr(order.totalAmount)}</span>
@@ -320,6 +321,25 @@ function OrderDetail({ order }: { order: Order }) {
               Commande terminée : plus d’action possible.
             </p>
           )}
+          {/* Send the summary to the customer, or start a new order from this one. */}
+          <div className="flex flex-wrap gap-2">
+            {phone && (
+              <Button variant="outline" size="sm" asChild>
+                <a
+                  href={`${whatsAppUrl(phone)}?text=${encodeURIComponent(orderRecapMessage(order, shop.name))}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <MessageCircle /> Envoyer le récap
+                </a>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/s/${shopId}/commandes/nouvelle?depuis=${order.id}`}>
+                <RotateCcw /> Recommander
+              </Link>
+            </Button>
+          </div>
         </Section>
 
         <Section
@@ -419,7 +439,7 @@ function OrderDetail({ order }: { order: Order }) {
               </div>
             </div>
           ) : (
-            <p className="text-sm">Retrait ou remise en main propre.</p>
+            <p className="text-sm">À récupérer en main propre.</p>
           )}
         </Section>
 

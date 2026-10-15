@@ -209,3 +209,40 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Order state colors chosen by the shop (features/shop/state-colors.ts): set --sc-bg / --sc-fg
+   inline, these classes pick the light shades, or shades derived for dark mode. */
+@layer components {
+  .state-badge {
+    background-color: var(--sc-bg);
+    color: var(--sc-fg);
+  }
+  .state-dot {
+    background-color: var(--sc-fg);
+  }
+  .state-row {
+    background-color: color-mix(in srgb, var(--sc-bg) 70%, var(--card));
+  }
+  .state-row:hover {
+    background-color: var(--sc-bg);
+  }
+  .state-stripe {
+    box-shadow: inset 4px 0 0 var(--sc-fg);
+  }
+  .dark .state-badge {
+    background-color: color-mix(in srgb, var(--sc-fg) 28%, var(--card));
+    color: color-mix(in srgb, var(--sc-fg) 45%, white);
+  }
+  .dark .state-dot {
+    background-color: color-mix(in srgb, var(--sc-fg) 45%, white);
+  }
+  .dark .state-row {
+    background-color: color-mix(in srgb, var(--sc-fg) 14%, var(--card));
+  }
+  .dark .state-row:hover {
+    background-color: color-mix(in srgb, var(--sc-fg) 22%, var(--card));
+  }
+  .dark .state-stripe {
+    box-shadow: inset 4px 0 0 color-mix(in srgb, var(--sc-fg) 60%, white);
+  }
+}

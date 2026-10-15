@@ -60,7 +60,7 @@ export function useOrder(orderId: string | undefined) {
 }
 
 /** After any change: refresh lists, counts, dashboard, stock (orders move the stock). */
-function useOrderChanged() {
+export function useOrderChanged() {
   const queryClient = useQueryClient();
   const shopId = useShopId();
   return (order?: Order) => {
@@ -152,5 +152,38 @@ export function useNotifyDrivers() {
       queryClient.invalidateQueries({
         queryKey: ["shop", shopId, "deliveries"],
       }),
+  });
+}
+
+/**
+ * Places of the last 200 orders, most used first, suggested while typing the place: faster,
+ * and the same spelling keeps the driver's round grouped by place (same as the mobile app).
+ */
+export function useRecentPlaces() {
+  const shopId = useShopId();
+  return useQuery({
+    queryKey: [...ordersKey(shopId), "places"],
+    queryFn: async () => {
+      const orders = await listOrders(shopId, {}, { limit: 200, offset: 0 });
+      const byKey = new Map<string, { label: string; count: number }>();
+      for (const o of orders) {
+        const label = o.delivery?.place?.trim();
+        if (!label) continue;
+        const key = label
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/\s+/g, " ");
+        const seen = byKey.get(key);
+        byKey.set(key, {
+          label: seen?.label ?? label,
+          count: (seen?.count ?? 0) + 1,
+        });
+      }
+      return [...byKey.values()]
+        .sort((a, b) => b.count - a.count)
+        .map((p) => p.label);
+    },
+    staleTime: 5 * 60_000,
   });
 }

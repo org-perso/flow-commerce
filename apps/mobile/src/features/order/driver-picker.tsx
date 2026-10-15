@@ -20,7 +20,7 @@ export function DriverSection({ order }: { order: Order }) {
         <View style={[styles.card, styles.row]}>
           <Bike size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
           <AppText color="inkMuted" style={styles.flex}>
-            Retrait en main propre : pas de livreur. Pour en assigner un, passez la commande en
+            Commande à récupérer : pas de livreur. Pour en assigner un, passez la commande en
             livraison (Modifier).
           </AppText>
         </View>

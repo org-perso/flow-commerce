@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText, Button, StatusBadge } from '@/components/ui';
 import { callPhone, formatPhone } from '@/features/customer/contact';
 import { hitSlopFor, theme } from '@/theme';
+import { useStateColor } from '@/theme/state-colors';
 import {
   businessNow,
   businessToday,
@@ -12,7 +13,7 @@ import {
   formatDayLabel,
 } from '@/utils/format';
 
-import { parcelLabel, type Order } from './order-api';
+import { parcelNumber, type Order } from './order-api';
 import { destructiveStatuses, OPEN_STATUSES, quickActionLabels, TRANSITIONS } from './order-status';
 import { PaymentBadge } from './payment-badge';
 import { slotLabel } from './time-slot';
@@ -40,7 +41,7 @@ function DriverLine({ order }: { order: Order }) {
         numberOfLines={1}
         style={[styles.flex, styles.strong]}
       >
-        {parcelLabel(order)}
+        {parcelNumber(order)}
         {order.driver
           ? ` · ${order.driver.name ?? 'Livreur'}`
           : toTake
@@ -85,15 +86,19 @@ export function OrderRow({
   const phone = hideCustomer ? null : (order.customer?.phone ?? order.delivery?.phone);
   const place = order.delivery
     ? (order.delivery.place ?? order.delivery.address ?? 'À livrer')
-    : 'Retrait';
+    : 'À récupérer';
   const title = hideCustomer
     ? formatDateTime(order.createdAt)
-    : (order.customer?.name ?? 'Client de passage');
+    : (order.customer?.name ?? 'Client sans fiche');
   const slot = slotLabel(order.timeSlot);
   const date =
     overdue || order.scheduledDate !== today
       ? formatDayLabel(order.scheduledDate, today).toLowerCase()
       : null;
+
+  // Card tinted with the status color; stripe with the payment color (shop settings).
+  const statusColor = useStateColor(order.status);
+  const paymentColor = useStateColor(order.isPaid ? 'PAID' : 'UNPAID');
 
   // A delivery: the place leads, then when, status, customer and driver (all readable).
   const deliveryLayout = !!order.delivery && !hideCustomer;
@@ -105,7 +110,9 @@ export function OrderRow({
     .join(' · ');
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: statusColor.bg }]}>
+      {/* Left stripe: the payment (paid / not paid), in the shop's colors. */}
+      <View style={[styles.stripe, { backgroundColor: paymentColor.fg }]} />
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
@@ -141,7 +148,7 @@ export function OrderRow({
               <StatusBadge status={order.status} size="sm" />
               <PaymentBadge isPaid={order.isPaid} />
               <AppText variant="caption" color="inkMuted" numberOfLines={1} style={styles.flex}>
-                {order.customer?.name ?? 'Client de passage'}
+                {order.customer?.name ?? 'Client sans fiche'}
               </AppText>
             </View>
             <DriverLine order={order} />
@@ -235,10 +242,17 @@ function QuickActions({ order }: { order: Order }) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.surfaceRaised,
+    overflow: 'hidden',
     borderRadius: theme.radius.md,
     borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
+  },
+  stripe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: theme.spacing[1],
   },
   body: {
     flexDirection: 'row',

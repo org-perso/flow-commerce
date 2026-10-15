@@ -10,6 +10,8 @@ type AvatarProps = {
   name: string;
   /** Product thumbnail: shown with small rounded corners instead of a circle. */
   imageUri?: string | null;
+  /** "sm": compact lists (order form). */
+  size?: 'md' | 'sm';
 };
 
 export function initials(name: string): string {
@@ -18,19 +20,20 @@ export function initials(name: string): string {
   return letters.toUpperCase();
 }
 
-export function Avatar({ name, imageUri }: AvatarProps) {
+export function Avatar({ name, imageUri, size = 'md' }: AvatarProps) {
+  const sized = size === 'sm' && styles.sm;
   if (imageUri) {
     return (
       <Image
         source={{ uri: imageUri }}
-        style={[styles.base, styles.image]}
+        style={[styles.base, sized, styles.image]}
         contentFit="cover"
         accessibilityIgnoresInvertColors
       />
     );
   }
   return (
-    <View style={[styles.base, styles.circle]} accessible={false}>
+    <View style={[styles.base, sized, styles.circle]} accessible={false}>
       <AppText variant="label" style={styles.initials}>
         {initials(name)}
       </AppText>
@@ -42,6 +45,10 @@ const styles = StyleSheet.create({
   base: {
     width: theme.layout.avatar,
     height: theme.layout.avatar,
+  },
+  sm: {
+    width: theme.layout.avatar - theme.spacing[2],
+    height: theme.layout.avatar - theme.spacing[2],
   },
   circle: {
     borderRadius: theme.radius.pill,

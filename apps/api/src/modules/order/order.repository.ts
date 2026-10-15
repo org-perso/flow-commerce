@@ -61,7 +61,7 @@ export type OrderFilters = {
    * upcoming: planned after today.
    */
   when?: 'today' | 'upcoming';
-  /** Customer name or phone, order number ("12", "#012") or product name. */
+  /** Customer name or phone, order number ("12", "#012"), product name, delivery place. */
   q?: string;
   status?: OrderStatus;
   customerId?: string;
@@ -69,6 +69,8 @@ export type OrderFilters = {
   to?: string;
   /** mine: assigned to `viewerId`; available: delivery not assigned yet, still open. */
   assignment?: 'mine' | 'available';
+  /** A driver's orders, or "none": deliveries with no driver yet. */
+  driverId?: string;
   /** The current user (for `assignment` and the driver scope). */
   viewerId?: string;
   /** Drivers only see their deliveries and the ones to take. */
@@ -154,16 +156,23 @@ function orderConditions(
        AND ($7::text IS NULL
             OR o.number = $8
             OR c.name ILIKE '%' || $7 || '%'
-            OR ($9::text IS NOT NULL AND EXISTS (
-              SELECT 1 FROM customer_phones cp
-              WHERE cp.customer_id = o.customer_id AND cp.phone LIKE '%' || $9 || '%'))
+            OR o.delivery_place ILIKE '%' || $7 || '%'
+            OR o.delivery_address ILIKE '%' || $7 || '%'
+            OR ($9::text IS NOT NULL AND (
+              o.delivery_phone LIKE '%' || $9 || '%'
+              OR EXISTS (
+                SELECT 1 FROM customer_phones cp
+                WHERE cp.customer_id = o.customer_id AND cp.phone LIKE '%' || $9 || '%')))
             OR EXISTS (
               SELECT 1 FROM order_items i JOIN products p ON p.id = i.product_id
               WHERE i.order_id = o.id AND p.name ILIKE '%' || $7 || '%'))
        AND ($10::text IS NULL
             OR ($10 = 'mine' AND o.assigned_to = $11)
             OR ($10 = 'available' AND ${AVAILABLE}))
-       AND (NOT $12::boolean OR o.assigned_to = $11 OR ${AVAILABLE})`,
+       AND (NOT $12::boolean OR o.assigned_to = $11 OR ${AVAILABLE})
+       AND ($13::text IS NULL
+            OR ($13 = 'none' AND o.is_delivery AND o.assigned_to IS NULL)
+            OR o.assigned_to::text = $13)`,
     values: [
       shopId,
       filters.when ?? null,
@@ -178,6 +187,7 @@ function orderConditions(
       filters.assignment ?? null,
       filters.viewerId ?? null,
       filters.driverScope ?? false,
+      filters.driverId ?? null,
     ],
   };
 }
@@ -190,14 +200,14 @@ export async function listOrders(shopId: string, filters: OrderFilters): Promise
   const where = orderConditions(shopId, filters);
   const { rows } = await pool.query<Omit<Order, 'items'>>(
     `SELECT ${orderColumns} FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
-     WHERE ${where.sql} AND ($13::text IS NULL OR o.status = $13)
+     WHERE ${where.sql} AND ($14::text IS NULL OR o.status = $14)
      ORDER BY
        CASE WHEN $2::text IS NULL THEN NULL ELSE o.scheduled_date END,
        -- Within a day: the slot ending first; "any time" last.
        CASE WHEN $2::text IS NULL THEN NULL ELSE o.slot_to END NULLS LAST,
        CASE WHEN $2::text IS NULL THEN NULL ELSE o.slot_from END NULLS LAST,
        o.created_at DESC, o.id
-     LIMIT $14 OFFSET $15`,
+     LIMIT $15 OFFSET $16`,
     [...where.values, filters.status ?? null, filters.limit, filters.offset],
   );
   return attachItems(pool, rows);

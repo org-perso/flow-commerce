@@ -96,6 +96,8 @@ const driverSchema = z.object({ userId: z.uuid() }).strict();
 
 const filtersQuery = z.object({
   assignment: z.enum(['mine', 'available']).optional(),
+  /** A driver's id, or "none" for deliveries with no driver (owner, manager, CM). */
+  driverId: z.union([z.uuid(), z.literal('none')]).optional(),
   when: z.enum(['today', 'upcoming']).optional(),
   q: z.string().trim().max(150).optional(),
   customerId: z.uuid().optional(),

@@ -77,6 +77,7 @@ export default function ExpensesPage() {
   return (
     <>
       <PageHeader
+        refresh
         title="Dépenses"
         description="Publicité, emballage, transport… déduits du bénéfice estimé. Les achats de produits n’en font pas partie."
         actions={

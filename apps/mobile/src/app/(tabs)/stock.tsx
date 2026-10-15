@@ -48,7 +48,7 @@ export default function StockScreen() {
   return (
     <Screen scroll={false} header={<ScreenHeader />}>
       <PageTitle
-        title="Stock"
+        title="Produits"
         action={canEdit ? { label: 'Ajouter', icon: Plus, onPress: openNew } : undefined}
       />
       <View style={styles.controls}>

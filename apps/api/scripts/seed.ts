@@ -1,6 +1,7 @@
 /**
- * Test data for one shop: 5 products, 3 customers, 16 orders planned today
- * (varied status, payment, delivery, slot and place), plus 1 overdue and 2 upcoming orders,
+ * Test data for one shop: 5 products, 3 customers, 20 orders, dates relative to the day it runs:
+ * 16 planned today (varied status, payment, delivery, slot and place), 1 overdue (yesterday)
+ * and 3 deliveries tomorrow,
  * 2 expenses. Open deliveries are shared between the shop's drivers, if it has any.
  *
  *   yarn seed                 (the only shop in the database)
@@ -189,7 +190,7 @@ const ORDERS: Seed[] = [
     source: 'FACEBOOK',
     delivery: delivery(place, 3000),
   })),
-  // Overdue (planned yesterday, still open) and upcoming
+  // Overdue (planned yesterday, still open)
   {
     customer: 1,
     items: [[4, 2]],
@@ -200,6 +201,7 @@ const ORDERS: Seed[] = [
     delivery: delivery('Isotry', 3000),
     scheduledDate: day(-1),
   },
+  // Tomorrow's deliveries (3)
   {
     customer: 2,
     items: [[2, 1]],
@@ -211,14 +213,27 @@ const ORDERS: Seed[] = [
     scheduledDate: day(1),
   },
   {
+    customer: 0,
+    items: [
+      [0, 1],
+      [4, 2],
+    ],
+    status: 'CONFIRMEE',
+    isPaid: true,
+    paymentMethod: 'MVola',
+    source: 'FACEBOOK',
+    delivery: delivery('Ivandry', 3000, 'Portail bleu'),
+    scheduledDate: day(1),
+  },
+  {
     customer: null,
-    items: [[1, 2]],
+    items: [[3, 1]],
     status: 'EN_ATTENTE',
     isPaid: false,
     paymentMethod: null,
-    source: 'FACEBOOK',
-    delivery: null,
-    scheduledDate: day(3),
+    source: 'TIKTOK',
+    delivery: delivery('Analakely', 3000),
+    scheduledDate: day(1),
   },
 ];
 
@@ -281,7 +296,11 @@ for (const [index, seed] of ORDERS.entries()) {
     items: seed.items.map(([p, quantity]) => ({ productId: productIds[p]!, quantity })),
     source: seed.source,
     scheduledDate: seed.scheduledDate ?? null,
-    delivery: seed.delivery,
+    // A delivery always has a number to call: walk-in customers give one on the delivery.
+    delivery:
+      seed.delivery && seed.customer === null
+        ? { ...seed.delivery, phone: '0340000000' }
+        : seed.delivery,
     paymentMethod: seed.paymentMethod,
     isPaid: seed.isPaid,
     status: 'EN_ATTENTE',
@@ -314,6 +333,6 @@ await insertExpense(shop.id, {
 });
 
 console.log(
-  `« ${shop.name} » : ${PRODUCTS.length} produits, ${CUSTOMERS.length} clients, ${ORDERS.length} commandes (16 aujourd'hui, 1 en retard, 2 à venir), ${assigned} livraisons données à ${drivers.length} livreur(s), 2 dépenses.`,
+  `« ${shop.name} » : ${PRODUCTS.length} produits, ${CUSTOMERS.length} clients, ${ORDERS.length} commandes (16 aujourd'hui, 1 en retard, 3 livraisons demain), ${assigned} livraisons données à ${drivers.length} livreur(s), 2 dépenses.`,
 );
 await pool.end();

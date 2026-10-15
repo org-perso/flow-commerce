@@ -1,17 +1,5 @@
 import { router, Stack } from 'expo-router';
-import {
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Plus,
-  Store,
-  TriangleAlert,
-  Truck,
-  UserPlus,
-  X,
-  type LucideIcon,
-} from 'lucide-react-native';
+import { Check, MapPin, Plus, Store, TriangleAlert, Truck, UserPlus, X } from 'lucide-react-native';
 import { useDeferredValue, useState, type ReactNode } from 'react';
 import { Keyboard, Pressable, StyleSheet, Switch, View } from 'react-native';
 
@@ -28,13 +16,18 @@ import {
 } from '@/components/ui';
 import type { Customer } from '@/features/customer/customer-api';
 import { useCustomer, useCustomers } from '@/features/customer/use-customers';
-import type { Order, OrderPatch, OrderSource } from '@/features/order/order-api';
+import type { Order, OrderPatch } from '@/features/order/order-api';
 import { DateChoice } from '@/features/order/date-choice';
 import type { TimeSlot } from '@/features/order/time-slot';
 import { TimeSlotChoice } from '@/features/order/time-slot-choice';
-import { PAYMENT_METHODS, SOURCE_LABELS } from '@/features/order/order-status';
+import { PAYMENT_METHODS } from '@/features/order/order-status';
 import { QuantityStepper } from '@/features/order/quantity-stepper';
-import { useCreateOrder, useUpdateOrder } from '@/features/order/use-orders';
+import {
+  placeSearchKey,
+  useCreateOrder,
+  useRecentPlaces,
+  useUpdateOrder,
+} from '@/features/order/use-orders';
 import type { Product } from '@/features/product/product-api';
 import { useProducts } from '@/features/product/use-products';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
@@ -47,14 +40,6 @@ type CustomerChoice =
   | { kind: 'existing'; customer: Customer }
   | { kind: 'new'; name: string; phone: string };
 
-const sourceOptions = [
-  { value: '', label: 'Non précisée' },
-  ...(Object.keys(SOURCE_LABELS) as OrderSource[]).map((value) => ({
-    value,
-    label: SOURCE_LABELS[value],
-  })),
-];
-
 const toInt = (text: string) => {
   const digits = text.replace(/\s/g, '');
   return /^\d+$/.test(digits) ? Number(digits) : null;
@@ -65,6 +50,8 @@ type OrderFormProps = {
   order?: Order;
   /** New order opened from a customer's page: that customer is preselected. */
   customerId?: string;
+  /** "Recommander": a new order prefilled from this one (products, delivery, customer). */
+  template?: Order;
 };
 
 /** A product known only from an order line (until the product list has loaded). */
@@ -87,16 +74,17 @@ const lineProduct = (item: NonNullable<Order['items']>[number]): Product => ({
  * New order (F-06) or edit of an existing one. Lines can only change while the order is
  * pending (RG-24): after confirmation the stock is taken, so they are shown locked.
  */
-export function OrderForm({ order, customerId }: OrderFormProps) {
+export function OrderForm({ order, customerId, template }: OrderFormProps) {
   const createOrder = useCreateOrder();
   const updateOrder = useUpdateOrder(order?.id ?? '');
   const editing = !!order;
   const linesEditable = !order || order.status === 'EN_ATTENTE';
+  // Starting values: the edited order, or the order copied by "Recommander" (current prices,
+  // planned today, not paid yet).
+  const base = order ?? template;
 
-  const prefill = useCustomer(order ? (order.customer?.id ?? undefined) : customerId);
+  const prefill = useCustomer(base ? (base.customer?.id ?? undefined) : customerId);
   const [prefillDismissed, setPrefillDismissed] = useState(false);
-
-  const [source, setSource] = useState<OrderSource | ''>(order?.source ?? '');
 
   // Customer
   const [choice, setChoice] = useState<CustomerChoice>({ kind: 'none' });
@@ -112,7 +100,7 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
 
   // Products
   const [lineState, setLines] = useState<Line[]>(
-    () => order?.items?.map((i) => ({ product: lineProduct(i), quantity: i.quantity })) ?? [],
+    () => base?.items?.map((i) => ({ product: lineProduct(i), quantity: i.quantity })) ?? [],
   );
   const [productSearch, setProductSearch] = useState('');
   const productQuery = useDeferredValue(productSearch.trim());
@@ -128,25 +116,32 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
   const [scheduledDate, setScheduledDate] = useState<string | null>(
     order?.scheduledDate ?? businessToday(),
   );
-  const [timeSlot, setTimeSlot] = useState<TimeSlot | null>(order?.timeSlot ?? null);
+  const [timeSlot, setTimeSlot] = useState<TimeSlot | null>(base?.timeSlot ?? null);
 
   // Delivery
-  const [isDelivery, setIsDelivery] = useState(!!order?.delivery);
-  const [deliveryPlace, setDeliveryPlace] = useState(order?.delivery?.place ?? '');
-  const [deliveryAddress, setDeliveryAddress] = useState(order?.delivery?.address ?? '');
-  const [deliveryNote, setDeliveryNote] = useState(order?.delivery?.note ?? '');
-  const [deliveryPhone, setDeliveryPhone] = useState(order?.delivery?.phone ?? '');
+  // New orders start as a delivery, the most common case; an edited order keeps its mode.
+  const [isDelivery, setIsDelivery] = useState(base ? !!base.delivery : true);
+  const [deliveryPlace, setDeliveryPlace] = useState(base?.delivery?.place ?? '');
+  const [deliveryAddress, setDeliveryAddress] = useState(base?.delivery?.address ?? '');
+  const [deliveryNote, setDeliveryNote] = useState(base?.delivery?.note ?? '');
+  const [deliveryPhone, setDeliveryPhone] = useState(base?.delivery?.phone ?? '');
   const [deliveryMore, setDeliveryMore] = useState(false);
   const showDeliveryMore = deliveryMore || !!deliveryAddress || !!deliveryNote;
-  const [deliveryFee, setDeliveryFee] = useState(
-    order?.deliveryFee ? String(order.deliveryFee) : '',
-  );
+  const [deliveryFee, setDeliveryFee] = useState(base?.deliveryFee ? String(base.deliveryFee) : '');
 
-  const [paymentMethod, setPaymentMethod] = useState(order?.paymentMethod ?? '');
-  const [confirmNow, setConfirmNow] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState(base?.paymentMethod ?? '');
   const [isPaid, setIsPaid] = useState(order?.isPaid ?? false);
   const [formError, setFormError] = useState<string>();
+
+  // Places already used, matching what is typed (4 at most); hidden once one is picked.
+  const recentPlaces = useRecentPlaces();
+  const typedPlace = placeSearchKey(deliveryPlace);
+  const placeSuggestions = (recentPlaces.data ?? [])
+    .filter((place) => {
+      const key = placeSearchKey(place);
+      return key !== typedPlace && key.includes(typedPlace);
+    })
+    .slice(0, 4);
 
   const itemsAmount = lines.reduce((sum, l) => sum + l.quantity * l.product.sellingPrice, 0);
   const fee = isDelivery ? (toInt(deliveryFee) ?? 0) : 0;
@@ -219,7 +214,6 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
             : !prefillDismissed
               ? (order.customer?.id ?? null)
               : null,
-        source: source || null,
         scheduledDate,
         timeSlot,
         delivery,
@@ -246,13 +240,13 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
             ? { name: customer.name.trim(), phone: customer.phone.trim() || null }
             : null,
         items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
-        source: source || null,
+        source: null,
         scheduledDate,
         timeSlot,
         delivery,
         paymentMethod: paymentMethod || null,
         isPaid,
-        status: confirmNow ? 'CONFIRMEE' : 'EN_ATTENTE',
+        status: 'EN_ATTENTE',
       });
       router.replace(`/orders/${created.id}`);
     } catch {
@@ -261,6 +255,23 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
   };
 
   const apiError = editing ? updateOrder.error : createOrder.error;
+  // "Stock insuffisant": offer the fix in one tap (reduce to what is left, or remove the line).
+  const stockFix =
+    linesEditable &&
+    apiError instanceof ApiError &&
+    apiError.title === 'Insufficient Stock' &&
+    lines.some((l) => l.product.id === apiError.body.productId)
+      ? {
+          productId: String(apiError.body.productId),
+          available: Number(apiError.body.available ?? 0),
+        }
+      : null;
+  const applyStockFix = () => {
+    if (!stockFix) return;
+    setQuantity(stockFix.productId, stockFix.available);
+    createOrder.reset();
+    updateOrder.reset();
+  };
   const errorMessage =
     formError ??
     (apiError instanceof ApiError && apiError.title === 'Insufficient Stock'
@@ -269,9 +280,12 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
         ? apiErrorMessage(apiError)
         : undefined);
 
-  const suggestions = (products.data ?? [])
-    .filter((p) => !lines.some((l) => l.product.id === p.id))
-    .slice(0, 6);
+  // 5 products at a time ("Voir plus" adds 5); back to 5 when the search changes.
+  const [more, setMore] = useState({ query: '', shown: PRODUCTS_STEP });
+  const shown = more.query === productQuery ? more.shown : PRODUCTS_STEP;
+  const matching = (products.data ?? []).filter((p) => !lines.some((l) => l.product.id === p.id));
+  const suggestions = matching.slice(0, shown);
+  const hiddenCount = matching.length - suggestions.length;
   // Suggestions while searching, or to start an empty order.
   const showSuggestions = productQuery !== '' || lines.length === 0;
 
@@ -285,12 +299,6 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
         : l.quantity * (l.product.sellingPrice - l.product.purchasePrice)),
     0,
   );
-  const moreSummary = [
-    source ? SOURCE_LABELS[source] : null,
-    editing ? null : confirmNow ? 'Confirmée' : 'En attente',
-  ]
-    .filter(Boolean)
-    .join(' · ');
 
   return (
     <Screen
@@ -299,7 +307,7 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
         <View style={styles.footer}>
           <View style={styles.footerLine}>
             <AppText variant="caption" color="inkMuted" style={styles.flex} numberOfLines={1}>
-              {itemCount} article{itemCount > 1 ? 's' : ''} · {isPaid ? 'Payée' : 'À encaisser'}
+              {itemCount} article{itemCount > 1 ? 's' : ''} · {isPaid ? 'Payée' : 'Non payée'}
               {profit > 0 && (
                 <AppText variant="caption" color="statusDeliveredFg" style={styles.strong}>
                   {` · +${formatAr(profit)} bénéfice`}
@@ -335,12 +343,182 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
         }}
       />
 
-      {/* 1. Client */}
-      <View style={styles.section}>
-        <StepHeader step={1} title="Client" />
+      {/* 1. Produits */}
+      <View style={styles.stepCard}>
+        <StepHeader
+          step={1}
+          title="Produits"
+          right={
+            itemCount > 0 ? (
+              <AppText variant="caption" color="inkMuted">
+                {itemCount} article{itemCount > 1 ? 's' : ''}
+              </AppText>
+            ) : undefined
+          }
+        />
+        {!linesEditable && (
+          <AlertBanner message="Produits verrouillés : la commande est confirmée. Annulez-la et recréez-la pour changer les produits." />
+        )}
+        {linesEditable && (
+          <SearchBar
+            value={productSearch}
+            onChangeText={setProductSearch}
+            placeholder="Ajouter un produit"
+          />
+        )}
+        {linesEditable && showSuggestions && suggestions.length > 0 && (
+          <View>
+            {suggestions.map((p, index) => (
+              <Pressable
+                key={p.id}
+                onPress={() => addProduct(p)}
+                accessibilityRole="button"
+                accessibilityLabel={`Ajouter ${p.name}`}
+                style={({ pressed }) => [
+                  styles.pickRow,
+                  index > 0 && styles.lineDivider,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Avatar name={p.name} imageUri={p.image} size="sm" />
+                <View style={styles.flex}>
+                  <AppText variant="label" style={styles.strong} numberOfLines={1}>
+                    {p.name}
+                  </AppText>
+                  <AppText variant="caption" color="inkMuted">
+                    {formatAr(p.sellingPrice)} · {p.stockQuantity} en stock
+                  </AppText>
+                </View>
+                <Plus size={theme.layout.iconMd} color={theme.colors.blue} strokeWidth={2} />
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {linesEditable && showSuggestions && hiddenCount > 0 && (
+          <Button
+            label={`Voir plus de produits (${hiddenCount})`}
+            variant="ghost"
+            compact
+            onPress={() => setMore({ query: productQuery, shown: shown + PRODUCTS_STEP })}
+          />
+        )}
+        {linesEditable && products.data?.length === 0 && (
+          <AppText color="inkMuted">
+            {productQuery
+              ? 'Aucun produit trouvé.'
+              : "Ajoutez d'abord des produits dans l'onglet Produits."}
+          </AppText>
+        )}
+        {lines.length > 0 && (
+          <View style={styles.lines}>
+            {lines.map((line, index) => (
+              <OrderLine
+                key={line.product.id}
+                line={line}
+                divider={index > 0}
+                onQuantity={linesEditable ? (q) => setQuantity(line.product.id, q) : undefined}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* 2. Livraison */}
+      <View style={styles.stepCard}>
+        <StepHeader step={2} title="Livraison" />
+        <ModeToggle isDelivery={isDelivery} onChange={setIsDelivery} />
+        {isDelivery && (
+          <>
+            <View style={styles.fieldsRow}>
+              <View style={styles.wide}>
+                <TextField
+                  label="Lieu de livraison"
+                  value={deliveryPlace}
+                  onChangeText={setDeliveryPlace}
+                  placeholder="Analakely, Ivandry…"
+                  maxLength={150}
+                />
+              </View>
+              <View style={styles.flex}>
+                <TextField
+                  label="Frais (Ar)"
+                  value={deliveryFee}
+                  onChangeText={setDeliveryFee}
+                  placeholder="0"
+                  keyboardType="number-pad"
+                />
+              </View>
+            </View>
+            {placeSuggestions.length > 0 && (
+              <View style={styles.chips}>
+                {placeSuggestions.map((place) => (
+                  <Pressable
+                    key={place}
+                    onPress={() => setDeliveryPlace(place)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Lieu : ${place}`}
+                    style={({ pressed }) => [styles.placeChip, pressed && styles.pressed]}
+                  >
+                    <MapPin
+                      size={theme.layout.iconSm}
+                      color={theme.colors.inkMuted}
+                      strokeWidth={2}
+                    />
+                    <AppText variant="label">{place}</AppText>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            {/* Rarely needed: folded, unless already filled. */}
+            {showDeliveryMore ? (
+              <>
+                <TextField
+                  label="Adresse (facultatif)"
+                  value={deliveryAddress}
+                  onChangeText={setDeliveryAddress}
+                  placeholder="Rue, lot, repère…"
+                  multiline
+                  maxLength={1000}
+                />
+                <TextField
+                  label="Précisions (facultatif)"
+                  value={deliveryNote}
+                  onChangeText={setDeliveryNote}
+                  placeholder="Ex. appeler avant, portail bleu…"
+                  multiline
+                  maxLength={1000}
+                />
+              </>
+            ) : (
+              <View style={styles.links}>
+                <Button
+                  label="Adresse et précisions"
+                  icon={Plus}
+                  variant="ghost"
+                  compact
+                  onPress={() => setDeliveryMore(true)}
+                />
+              </View>
+            )}
+          </>
+        )}
+        <View style={styles.divider} />
+        <AppText variant="caption" color="inkMuted" style={styles.fieldLabel}>
+          Livrer le
+        </AppText>
+        <DateChoice value={scheduledDate} onChange={setScheduledDate} />
+        <AppText variant="caption" color="inkMuted" style={styles.fieldLabel}>
+          Heure
+        </AppText>
+        <TimeSlotChoice value={timeSlot} onChange={setTimeSlot} />
+      </View>
+
+      {/* 3. Client: after the delivery, once the order itself is known. */}
+      <View style={styles.stepCard}>
+        <StepHeader step={3} title="Client (optionnel)" />
         {customer.kind === 'existing' && (
-          <View style={[styles.card, styles.row]}>
-            <Avatar name={customer.customer.name} />
+          <View style={[styles.inset, styles.row]}>
+            <Avatar name={customer.customer.name} size="sm" />
             <View style={styles.flex}>
               <AppText style={styles.strong} numberOfLines={1}>
                 {customer.customer.name}
@@ -358,7 +536,7 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
           </View>
         )}
         {customer.kind === 'new' && (
-          <View style={[styles.card, styles.section]}>
+          <View style={styles.section}>
             <TextField
               label="Nom du client"
               value={customer.name}
@@ -398,13 +576,28 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
             )}
           </>
         )}
+        {/* For a delivery, a number to call when the customer has none. */}
+        {needsDeliveryPhone && (
+          <TextField
+            label="Téléphone pour la livraison"
+            value={deliveryPhone}
+            onChangeText={setDeliveryPhone}
+            placeholder="034 00 000 00"
+            keyboardType="phone-pad"
+            hint={
+              customer.kind === 'existing'
+                ? 'Ce client n’a pas de numéro : celui que le livreur appellera.'
+                : 'Client sans fiche : le numéro que le livreur appellera.'
+            }
+          />
+        )}
         <View style={styles.links}>
           {customer.kind === 'none' ? (
             <AppText variant="caption" color="inkMuted">
               Sans client choisi : client de passage.
             </AppText>
           ) : (
-            <Button label="Client de passage" variant="ghost" compact onPress={resetCustomer} />
+            <Button label="Sans fiche" variant="ghost" compact onPress={resetCustomer} />
           )}
           {customer.kind !== 'new' && !editing && (
             <Button
@@ -418,176 +611,29 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
         </View>
       </View>
 
-      {/* 2. Produits */}
-      <View style={styles.section}>
-        <StepHeader
-          step={2}
-          title="Produits"
-          right={
-            itemCount > 0 ? (
-              <AppText variant="caption" color="inkMuted">
-                {itemCount} article{itemCount > 1 ? 's' : ''}
-              </AppText>
-            ) : undefined
-          }
-        />
-        {!linesEditable && (
-          <AlertBanner message="Produits verrouillés : la commande est confirmée. Annulez-la et recréez-la pour changer les produits." />
-        )}
-        {linesEditable && (
-          <SearchBar
-            value={productSearch}
-            onChangeText={setProductSearch}
-            placeholder="Ajouter un produit"
-          />
-        )}
-        {linesEditable && showSuggestions && suggestions.length > 0 && (
-          <ListGroup>
-            {suggestions.map((p) => (
-              <ListRow
-                key={p.id}
-                leading={<Avatar name={p.name} imageUri={p.image} />}
-                title={p.name}
-                subtitle={`${formatAr(p.sellingPrice)} · ${p.stockQuantity} en stock`}
-                onPress={() => addProduct(p)}
-              />
-            ))}
-          </ListGroup>
-        )}
-        {linesEditable && products.data?.length === 0 && (
-          <AppText color="inkMuted">
-            {productQuery
-              ? 'Aucun produit trouvé.'
-              : "Ajoutez d'abord des produits dans l'onglet Stock."}
-          </AppText>
-        )}
-        {lines.length > 0 && (
-          <View style={styles.card}>
-            {lines.map((line, index) => (
-              <OrderLine
-                key={line.product.id}
-                line={line}
-                divider={index > 0}
-                onQuantity={linesEditable ? (q) => setQuantity(line.product.id, q) : undefined}
-              />
-            ))}
-          </View>
-        )}
-      </View>
-
-      {/* 3. Remise et date */}
-      <View style={styles.section}>
-        <StepHeader step={3} title="Remise et date" />
-        <View style={styles.row}>
-          <ChoiceCard
-            icon={Store}
-            title="Retrait"
-            subtitle="En main propre"
-            selected={!isDelivery}
-            onPress={() => setIsDelivery(false)}
-          />
-          <ChoiceCard
-            icon={Truck}
-            title="Livraison"
-            subtitle="À une adresse"
-            selected={isDelivery}
-            onPress={() => setIsDelivery(true)}
-          />
-        </View>
-        {isDelivery && (
-          <>
-            <View style={styles.fieldsRow}>
-              <View style={styles.wide}>
-                <TextField
-                  label="Lieu de livraison"
-                  value={deliveryPlace}
-                  onChangeText={setDeliveryPlace}
-                  placeholder="Analakely, Ivandry…"
-                  maxLength={150}
-                />
-              </View>
-              <View style={styles.flex}>
-                <TextField
-                  label="Frais (Ar)"
-                  value={deliveryFee}
-                  onChangeText={setDeliveryFee}
-                  placeholder="0"
-                  keyboardType="number-pad"
-                />
-              </View>
-            </View>
-            {needsDeliveryPhone && (
-              <TextField
-                label="Téléphone pour la livraison"
-                value={deliveryPhone}
-                onChangeText={setDeliveryPhone}
-                placeholder="034 00 000 00"
-                keyboardType="phone-pad"
-                hint={
-                  customer.kind === 'existing'
-                    ? 'Ce client n’a pas de numéro : celui que le livreur appellera.'
-                    : 'Client de passage : le numéro que le livreur appellera.'
-                }
-              />
-            )}
-            {/* Rarely needed: folded, unless already filled. */}
-            {showDeliveryMore ? (
-              <>
-                <TextField
-                  label="Adresse (facultatif)"
-                  value={deliveryAddress}
-                  onChangeText={setDeliveryAddress}
-                  placeholder="Rue, lot, repère…"
-                  multiline
-                  maxLength={1000}
-                />
-                <TextField
-                  label="Précisions (facultatif)"
-                  value={deliveryNote}
-                  onChangeText={setDeliveryNote}
-                  placeholder="Ex. appeler avant, portail bleu…"
-                  multiline
-                  maxLength={1000}
-                />
-              </>
-            ) : (
-              <View style={styles.links}>
-                <Button
-                  label="Adresse et précisions"
-                  icon={Plus}
-                  variant="ghost"
-                  compact
-                  onPress={() => setDeliveryMore(true)}
-                />
-              </View>
-            )}
-          </>
-        )}
-        <AppText variant="label">Date prévue</AppText>
-        <DateChoice value={scheduledDate} onChange={setScheduledDate} />
-        <AppText variant="label">Heure</AppText>
-        <TimeSlotChoice value={timeSlot} onChange={setTimeSlot} />
-      </View>
-
       {/* 4. Paiement */}
-      <View style={styles.section}>
+      <View style={styles.stepCard}>
         <StepHeader step={4} title="Paiement" />
-        <View style={styles.row}>
-          <ChoiceCard
-            icon={Clock}
-            title="À encaisser"
-            subtitle="Plus tard"
-            selected={!isPaid}
-            onPress={() => setIsPaid(false)}
+        {/* One switch: not ticked means still to pay. */}
+        <Pressable
+          onPress={() => setIsPaid((v) => !v)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: isPaid }}
+          style={styles.row}
+        >
+          <View style={styles.flex}>
+            <AppText style={styles.strong}>Déjà payée</AppText>
+            <AppText variant="caption" color="inkMuted">
+              {isPaid ? 'Le client a réglé.' : 'Sinon, elle reste non payée.'}
+            </AppText>
+          </View>
+          <Switch
+            value={isPaid}
+            onValueChange={setIsPaid}
+            trackColor={{ true: theme.colors.blue, false: theme.colors.line }}
+            accessibilityLabel="Déjà payée"
           />
-          <ChoiceCard
-            icon={Check}
-            title="Déjà payée"
-            subtitle="Réglée"
-            selected={isPaid}
-            onPress={() => setIsPaid(true)}
-          />
-        </View>
+        </Pressable>
         <ChipGroup
           options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))}
           value={paymentMethod}
@@ -596,56 +642,15 @@ export function OrderForm({ order, customerId }: OrderFormProps) {
         />
       </View>
 
-      {/* Less frequent options, folded. */}
-      <View style={styles.card}>
-        <Pressable
-          onPress={() => setMoreOpen((v) => !v)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: moreOpen }}
-          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-        >
-          <Plus size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
-          <View style={styles.flex}>
-            <AppText style={styles.strong}>{editing ? 'Source' : 'Source et statut'}</AppText>
-            <AppText variant="caption" color="inkMuted">
-              {moreSummary}
-            </AppText>
-          </View>
-          {moreOpen ? (
-            <ChevronUp size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
-          ) : (
-            <ChevronDown size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
-          )}
-        </Pressable>
-        {moreOpen && (
-          <View style={[styles.section, styles.more]}>
-            <AppText variant="label">Source de la commande</AppText>
-            <ChipGroup
-              options={sourceOptions.filter((o) => o.value !== '')}
-              value={source}
-              onChange={(value) => setSource(value === source ? '' : (value as OrderSource))}
-            />
-            {!editing && (
-              <View style={styles.row}>
-                <View style={styles.flex}>
-                  <AppText style={styles.strong}>Commande confirmée</AppText>
-                  <AppText variant="caption" color="inkMuted">
-                    Retire le stock tout de suite. Sinon, la commande reste en attente.
-                  </AppText>
-                </View>
-                <Switch
-                  value={confirmNow}
-                  onValueChange={setConfirmNow}
-                  trackColor={{ true: theme.colors.blue, false: theme.colors.line }}
-                  accessibilityLabel="Commande confirmée"
-                />
-              </View>
-            )}
-          </View>
-        )}
-      </View>
-
       {errorMessage && <AlertBanner tone="danger" message={errorMessage} />}
+      {stockFix && (
+        <Button
+          label={stockFix.available > 0 ? `Réduire à ${stockFix.available}` : 'Retirer ce produit'}
+          variant="dark"
+          fullWidth
+          onPress={applyStockFix}
+        />
+      )}
     </Screen>
   );
 }
@@ -659,57 +664,51 @@ function StepHeader({ step, title, right }: { step: number; title: string; right
           {step}
         </AppText>
       </View>
-      <AppText variant="heading" style={styles.flex}>
-        {title}
-      </AppText>
+      <AppText style={[styles.flex, styles.stepTitle]}>{title}</AppText>
       {right}
     </View>
   );
 }
 
-/** One of two exclusive options, as a card with a radio dot. */
-function ChoiceCard({
-  icon: Icon,
-  title,
-  subtitle,
-  selected,
-  onPress,
+/** Livraison / À récupérer: one compact two-way toggle (delivery first, the usual case). */
+function ModeToggle({
+  isDelivery,
+  onChange,
 }: {
-  icon: LucideIcon;
-  title: string;
-  subtitle: string;
-  selected: boolean;
-  onPress: () => void;
+  isDelivery: boolean;
+  onChange: (isDelivery: boolean) => void;
 }) {
+  const options = [
+    { value: true, label: 'Livraison', icon: Truck },
+    { value: false, label: 'À récupérer', icon: Store },
+  ];
   return (
-    <Pressable
-      onPress={() => {
-        Keyboard.dismiss();
-        onPress();
-      }}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      style={({ pressed }) => [
-        styles.choice,
-        selected && styles.choiceSelected,
-        pressed && styles.pressed,
-      ]}
-    >
-      <View style={[styles.radio, selected && styles.radioSelected]}>
-        {selected && <View style={styles.radioDot} />}
-      </View>
-      <View style={styles.flex}>
-        <View style={styles.choiceTitle}>
-          <Icon size={theme.layout.iconSm} color={theme.colors.ink} strokeWidth={2} />
-          <AppText style={styles.strong} numberOfLines={1}>
-            {title}
-          </AppText>
-        </View>
-        <AppText variant="caption" color="inkMuted" numberOfLines={1}>
-          {subtitle}
-        </AppText>
-      </View>
-    </Pressable>
+    <View style={styles.toggle} accessibilityRole="radiogroup">
+      {options.map(({ value, label, icon: Icon }) => {
+        const selected = value === isDelivery;
+        return (
+          <Pressable
+            key={label}
+            onPress={() => {
+              Keyboard.dismiss();
+              onChange(value);
+            }}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            style={[styles.toggleItem, selected && styles.toggleItemSelected]}
+          >
+            <Icon
+              size={theme.layout.iconSm}
+              color={selected ? theme.colors.onNavy : theme.colors.inkMuted}
+              strokeWidth={2}
+            />
+            <AppText variant="label" color={selected ? 'onNavy' : 'ink'} style={styles.strong}>
+              {label}
+            </AppText>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -844,6 +843,9 @@ function insufficientStockMessage(error: ApiError, lines: Line[]): string {
   return `Stock insuffisant${name ? ` pour « ${name} »` : ''} : il en reste ${String(error.body.available)}.`;
 }
 
+/** Products listed at a time under the search field. */
+const PRODUCTS_STEP = 5;
+
 const styles = StyleSheet.create({
   section: {
     gap: theme.spacing[3],
@@ -853,12 +855,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing[3],
   },
-  card: {
+  stepCard: {
+    gap: theme.spacing[3],
     padding: theme.spacing[3],
     borderRadius: theme.radius.md,
     borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
     backgroundColor: theme.colors.surfaceRaised,
+  },
+  stepTitle: {
+    fontFamily: theme.typography.heading.fontFamily,
+    fontSize: theme.typography.body.fontSize,
+  },
+  inset: {
+    padding: theme.spacing[2],
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+  },
+  divider: {
+    height: theme.layout.border,
+    backgroundColor: theme.colors.line,
+  },
+  fieldLabel: {
+    fontFamily: theme.typography.label.fontFamily,
+    marginBottom: -theme.spacing[1],
+  },
+  placeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[1],
+    minHeight: theme.layout.controlHeight - theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surface,
+  },
+  pickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing[3],
+    minHeight: theme.layout.controlHeight,
+    paddingVertical: theme.spacing[2],
+  },
+  lines: {
+    marginTop: -theme.spacing[1],
+  },
+  toggle: {
+    flexDirection: 'row',
+    padding: theme.spacing[1] / 2,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
+  },
+  toggleItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing[2],
+    minHeight: theme.layout.controlHeight,
+    borderRadius: theme.radius.sm,
+  },
+  toggleItemSelected: {
+    backgroundColor: theme.colors.navy,
   },
   fieldsRow: {
     flexDirection: 'row',
@@ -875,53 +932,12 @@ const styles = StyleSheet.create({
     gap: theme.spacing[4],
   },
   stepDisc: {
-    width: theme.spacing[6],
-    height: theme.spacing[6],
+    width: theme.spacing[4] + theme.spacing[1],
+    height: theme.spacing[4] + theme.spacing[1],
     borderRadius: theme.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.navy,
-  },
-  choice: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing[3],
-    minHeight: theme.layout.rowMinHeight,
-    padding: theme.spacing[3],
-    borderRadius: theme.radius.md,
-    borderWidth: theme.layout.border,
-    borderColor: theme.colors.line,
-    backgroundColor: theme.colors.surfaceRaised,
-  },
-  choiceSelected: {
-    borderWidth: 2,
-    borderColor: theme.colors.navy,
-    backgroundColor: theme.colors.navySoft,
-  },
-  choiceTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing[1],
-  },
-  radio: {
-    width: theme.layout.iconMd,
-    height: theme.layout.iconMd,
-    borderRadius: theme.radius.pill,
-    borderWidth: 2,
-    borderColor: theme.colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioSelected: {
-    borderColor: theme.colors.navy,
-    backgroundColor: theme.colors.navy,
-  },
-  radioDot: {
-    width: theme.layout.dot + 2,
-    height: theme.layout.dot + 2,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.onNavy,
   },
   chips: {
     flexDirection: 'row',
@@ -933,7 +949,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing[1],
     minHeight: theme.layout.controlHeight,
-    paddingHorizontal: theme.spacing[4],
+    paddingHorizontal: theme.spacing[3],
     borderRadius: theme.radius.pill,
     borderWidth: theme.layout.border,
     borderColor: theme.colors.line,
@@ -942,12 +958,6 @@ const styles = StyleSheet.create({
   chipSelected: {
     borderColor: theme.colors.navy,
     backgroundColor: theme.colors.navy,
-  },
-  more: {
-    marginTop: theme.spacing[3],
-    paddingTop: theme.spacing[3],
-    borderTopWidth: theme.layout.border,
-    borderTopColor: theme.colors.line,
   },
   line: {
     gap: theme.spacing[2],

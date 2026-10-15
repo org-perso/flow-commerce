@@ -7,6 +7,7 @@ import { TabIconSvg, type TabIconName } from '@/components/ui/tab-icons';
 import type { Role } from '@/features/shop/roles';
 import { useActiveShop } from '@/features/shop/use-shop';
 import { theme } from '@/theme';
+import { useSyncStatusColors } from '@/theme/state-colors';
 
 function TabIcon({ icon, focused }: { icon: TabIconName; focused: boolean }) {
   return (
@@ -58,7 +59,7 @@ function NewOrderButton() {
 const tabs = [
   { name: 'index', label: 'Accueil', icon: 'home' },
   { name: 'orders', label: 'Commandes', icon: 'receiptLong' },
-  { name: 'stock', label: 'Stock', icon: 'inventory' },
+  { name: 'stock', label: 'Produits', icon: 'inventory' },
   { name: 'customers', label: 'Clients', icon: 'group' },
   // Driver space (F-13).
   { name: 'deliveries', label: 'Livraisons', icon: 'receiptLong' },
@@ -92,7 +93,8 @@ function tabScreen({ name, label, icon }: (typeof tabs)[number], visible: boolea
 }
 
 export default function TabsLayout() {
-  const { role } = useActiveShop();
+  const { role, statusColors } = useActiveShop();
+  useSyncStatusColors(statusColors);
   const visible = TABS_BY_ROLE[role];
   const screen = (tab: (typeof tabs)[number]) => tabScreen(tab, visible.includes(tab.name));
   return (

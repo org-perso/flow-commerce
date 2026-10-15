@@ -2,9 +2,11 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import {
   ArrowLeftRight,
+  ChartColumn,
   ChevronRight,
   DoorOpen,
   LogOut,
+  Palette,
   Store,
   UserPen,
   Users,
@@ -57,6 +59,7 @@ export default function AccountScreen() {
   const canEditShop = useCan('shop.settings');
   const canSeeExpenses = useCan('expenses');
   const canManageTeam = useCan('team');
+  const canSeeSales = useCan('orders');
   const leave = useLeaveShop();
   const [error, setError] = useState<string>();
   const [signingOut, setSigningOut] = useState(false);
@@ -121,6 +124,16 @@ export default function AccountScreen() {
             trailing={canEditShop ? chevron : undefined}
             onPress={canEditShop ? () => router.push('/shop-settings') : undefined}
           />
+          {canEditShop && (
+            <ListRow
+              divider
+              leading={<RowIcon icon={Palette} />}
+              title="Couleurs des états"
+              subtitle="Fond des commandes et paiement"
+              trailing={chevron}
+              onPress={() => router.push('/status-colors')}
+            />
+          )}
           <ListRow
             divider
             leading={<RowIcon icon={UserPen} />}
@@ -139,12 +152,21 @@ export default function AccountScreen() {
         </ListGroup>
       </View>
 
-      {(canManageTeam || canSeeExpenses) && (
+      {(canManageTeam || canSeeExpenses || canSeeSales) && (
         <View style={styles.section}>
           <GroupLabel>Gestion</GroupLabel>
           <ListGroup>
-            {canManageTeam && <TeamRow />}
-            {canSeeExpenses && <ExpensesRow divider={canManageTeam} />}
+            {canSeeSales && (
+              <ListRow
+                leading={<RowIcon icon={ChartColumn} />}
+                title="Recap des ventes"
+                subtitle="Quantités vendues sur une période"
+                trailing={chevron}
+                onPress={() => router.push('/sales-report')}
+              />
+            )}
+            {canManageTeam && <TeamRow divider={canSeeSales} />}
+            {canSeeExpenses && <ExpensesRow divider={canManageTeam || canSeeSales} />}
           </ListGroup>
         </View>
       )}
@@ -176,11 +198,12 @@ export default function AccountScreen() {
   );
 }
 
-function TeamRow() {
+function TeamRow({ divider }: { divider: boolean }) {
   const members = useMembers();
   const count = members.data?.length;
   return (
     <ListRow
+      divider={divider}
       leading={<RowIcon icon={Users} />}
       title="Équipe"
       subtitle={count ? `${count} membre${count > 1 ? 's' : ''}` : undefined}

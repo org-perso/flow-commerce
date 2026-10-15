@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { theme } from '@/theme';
+import { useStateColor } from '@/theme/state-colors';
 
 import { AppText } from './app-text';
 
@@ -9,7 +10,9 @@ export type OrderStatus = keyof typeof theme.statusColors;
 type StatusBadgeProps = { status: OrderStatus; size?: 'sm' | 'md' };
 
 export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
-  const { label, bg, fg } = theme.statusColors[status];
+  const { label } = theme.statusColors[status];
+  // Colors chosen by the shop (Paramètres > Couleurs des états), else the defaults.
+  const { bg, fg } = useStateColor(status);
 
   return (
     <View style={[styles.badge, size === 'sm' && styles.sm, { backgroundColor: bg }]}>

@@ -5,7 +5,8 @@ import { createContext, useContext, type ReactNode } from "react";
 import { can, type Permission, type Role } from "./roles";
 import type { Shop } from "./shop-api";
 
-const ShopContext = createContext<Shop | null>(null);
+/** Exported for optional reads (state colors); prefer useShop() inside the shop layout. */
+export const ShopContext = createContext<Shop | null>(null);
 
 export function ShopProvider({
   shop,

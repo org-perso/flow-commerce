@@ -1,4 +1,5 @@
 import {
+  ChartColumn,
   LayoutDashboard,
   Package,
   ReceiptText,
@@ -38,6 +39,13 @@ export const NAV_ITEMS: NavItem[] = [
     key: "c",
   },
   {
+    path: "/rapports",
+    label: "Recap des ventes",
+    icon: ChartColumn,
+    permission: "orders",
+    key: "r",
+  },
+  {
     path: "/livraisons",
     label: "Livraisons",
     icon: Truck,
@@ -46,7 +54,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     path: "/stock",
-    label: "Stock",
+    label: "Produits",
     icon: Package,
     permission: "catalog.read",
     key: "s",

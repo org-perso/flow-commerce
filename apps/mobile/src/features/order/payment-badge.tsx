@@ -2,10 +2,11 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/ui';
 import { theme } from '@/theme';
+import { useStateColor } from '@/theme/state-colors';
 
-/** "Payée" (green) or "Non payée" (orange), same look as the status badge. */
+/** "Payée" or "Non payée", in the shop's colors, same look as the status badge. */
 export function PaymentBadge({ isPaid }: { isPaid: boolean }) {
-  const { bg, fg } = theme.statusColors[isPaid ? 'LIVREE' : 'EN_ATTENTE'];
+  const { bg, fg } = useStateColor(isPaid ? 'PAID' : 'UNPAID');
   return (
     <View style={[styles.badge, { backgroundColor: bg }]}>
       <AppText variant="caption" style={[styles.text, { color: fg }]}>
