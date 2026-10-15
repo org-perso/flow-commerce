@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { BrandMark, BrandName } from "@/components/brand";
 import { LEGAL, LEGAL_NOTICE_PATH, PRIVACY_PATH } from "@/lib/legal";
-import { PLAY_STORE_URL, SIGN_IN_URL } from "@/lib/links";
+import { GooglePlayIcon } from "@/components/google-play-icon";
+import { PLAY_STORE_URL, SIGN_IN_URL, SIGN_UP_URL } from "@/lib/links";
 
 /** Page width: wide like the web app, but capped so big screens keep a readable line. */
 export const container = "mx-auto w-full max-w-[1680px] px-4 sm:px-6 lg:px-12";
@@ -43,12 +44,20 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           <a
             href={SIGN_IN_URL}
-            className={`${btn.base} ${btn.outline} ${btn.sm} hidden sm:inline-flex`}
+            className={`${btn.base} ${btn.outline} ${btn.sm} hidden md:inline-flex`}
           >
             Se connecter
           </a>
-          <a href={PLAY_STORE_URL} className={`${btn.base} ${btn.gold} ${btn.sm}`}>
-            Télécharger l’app
+          <a href={SIGN_UP_URL} className={`${btn.base} ${btn.navy} ${btn.sm}`}>
+            Essayer gratuitement
+          </a>
+          <a
+            href={PLAY_STORE_URL}
+            aria-label="Télécharger l’app sur Google Play"
+            className={`${btn.base} ${btn.gold} ${btn.sm} px-2.5 sm:px-4`}
+          >
+            <GooglePlayIcon className="size-4" />
+            <span className="hidden sm:inline">Télécharger l’app</span>
           </a>
         </div>
       </div>

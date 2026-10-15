@@ -1,4 +1,7 @@
 import {
+  ArrowRight,
+  Check,
+  Plus,
   BarChart3,
   Boxes,
   ClipboardList,
@@ -16,9 +19,10 @@ import {
 
 import Image from "next/image";
 
+import { GooglePlayIcon } from "@/components/google-play-icon";
 import { PhoneFrame } from "@/components/phone-preview";
 import { SiteFooter, SiteHeader, btn, container } from "@/components/site-chrome";
-import { APP_URL, PLAY_STORE_URL, SIGN_UP_URL } from "@/lib/links";
+import { PLAY_STORE_URL, SIGN_UP_URL } from "@/lib/links";
 
 const PROBLEMS: { icon: LucideIcon; title: string; text: string }[] = [
   {
@@ -87,10 +91,58 @@ const ROLES = [
   { role: "Livreur", text: "Voit ses livraisons, organise sa tournée, marque livré et payé." },
 ];
 
+const PLANS = [
+  {
+    name: "Gratuit",
+    tagline: "Pour démarrer et tester",
+    price: "0 Ar",
+    period: "",
+    features: [
+      "1 boutique",
+      "Jusqu’à 50 commandes par mois",
+      "Stock, clients et dépenses",
+      "Bénéfice du jour",
+      "App Android et version web",
+    ],
+    cta: "Commencer gratuitement",
+    featured: false,
+  },
+  {
+    name: "Pro",
+    tagline: "Pour le vendeur qui fait tout seul",
+    price: "20 000 Ar",
+    period: "/ mois",
+    features: [
+      "Tout le Gratuit, plus :",
+      "Commandes illimitées",
+      "Recap des ventes par produit",
+      "Récap WhatsApp au client",
+      "Couleurs et filtres personnalisés",
+    ],
+    cta: "Choisir Pro",
+    featured: true,
+  },
+  {
+    name: "Business",
+    tagline: "Pour travailler en équipe",
+    price: "30 000 Ar",
+    period: "/ mois",
+    features: [
+      "Tout le Pro, plus :",
+      "Équipe : gérant, community managers",
+      "Livreurs, tournées et notifications",
+      "Plusieurs boutiques",
+      "Coûts et marges cachés à l’équipe",
+    ],
+    cta: "Choisir Business",
+    featured: false,
+  },
+];
+
 const FAQ = [
   {
     q: "Est-ce que c’est payant ?",
-    a: "Flow.Co est gratuit pendant la période de lancement.",
+    a: "Non, la formule Gratuit est disponible sans limite de durée. Les formules Pro et Business ajoutent les commandes illimitées et le travail en équipe.",
   },
   {
     q: "Faut-il un ordinateur ?",
@@ -134,10 +186,10 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <a href={PLAY_STORE_URL} className={`${btn.base} ${btn.gold} ${btn.lg}`}>
-                  <Smartphone className="size-4" /> Télécharger sur Google Play
+                  <GooglePlayIcon /> Télécharger sur Google Play
                 </a>
-                <a href={APP_URL} className={`${btn.base} ${btn.ghostOnNavy} ${btn.lg}`}>
-                  <Monitor className="size-4" /> Utiliser sur ordinateur
+                <a href={SIGN_UP_URL} className={`${btn.base} ${btn.ghostOnNavy} ${btn.lg}`}>
+                  Essayer gratuitement <ArrowRight className="size-4" />
                 </a>
               </div>
               <p className="mt-6 text-sm text-on-navy-muted">
@@ -224,8 +276,8 @@ export default function Home() {
                 <Image
                   src="/images/screen-web-orders.png"
                   alt="Tableau des commandes de la version web"
-                  width={1440}
-                  height={900}
+                  width={3580}
+                  height={1852}
                   sizes="(min-width: 1024px) 640px, 100vw"
                   className="h-auto w-full"
                 />
@@ -292,16 +344,48 @@ export default function Home() {
 
         {/* Pricing */}
         <Section id="tarifs" title="Tarifs">
-          <div className="max-w-md rounded-2xl border-2 border-gold bg-card p-8">
-            <p className="text-sm font-semibold text-gold-ink">Offre de lancement</p>
-            <p className="mt-2 text-4xl font-bold">Gratuit</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Toutes les fonctionnalités, toute l’équipe, sans carte bancaire.
-            </p>
-            <a href={SIGN_UP_URL} className={`${btn.base} ${btn.navy} ${btn.lg} mt-6 w-full`}>
-              Créer ma boutique
-            </a>
+          <div className="grid gap-6 lg:grid-cols-3">
+            {PLANS.map((plan) => (
+              <div
+                key={plan.name}
+                className={`relative flex flex-col rounded-2xl bg-card p-8 ${
+                  plan.featured ? "border-2 border-gold shadow-xl shadow-navy/10" : "border"
+                }`}
+              >
+                {plan.featured && (
+                  <span className="absolute -top-3 left-8 rounded-full bg-gold px-3 py-1 text-xs font-semibold text-on-gold">
+                    Le plus choisi
+                  </span>
+                )}
+                <h3 className="text-lg font-bold">{plan.name}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{plan.tagline}</p>
+                <p className="mt-6 flex items-baseline gap-1">
+                  <span className="text-4xl font-bold tracking-tight">{plan.price}</span>
+                  {plan.period && (
+                    <span className="text-sm text-muted-foreground">{plan.period}</span>
+                  )}
+                </p>
+                <ul className="mt-6 flex-1 space-y-3 text-sm">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex gap-2">
+                      <Check className="mt-0.5 size-4 shrink-0 text-success" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href={SIGN_UP_URL}
+                  className={`${btn.base} ${plan.featured ? btn.gold : btn.navy} ${btn.lg} mt-8 w-full`}
+                >
+                  {plan.cta}
+                </a>
+              </div>
+            ))}
           </div>
+          <p className="mt-6 text-sm text-muted-foreground">
+            Paiement mensuel par MVola, Orange Money ou Airtel Money. Sans engagement : changez de
+            formule ou arrêtez quand vous voulez.
+          </p>
         </Section>
 
         {/* FAQ */}
@@ -311,9 +395,7 @@ export default function Home() {
               <details key={q} className="group p-5">
                 <summary className="flex cursor-pointer list-none items-center justify-between font-medium">
                   {q}
-                  <span className="text-muted-foreground transition-transform group-open:rotate-45">
-                    +
-                  </span>
+                  <Plus className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-45" />
                 </summary>
                 <p className="mt-2 text-sm text-muted-foreground">{a}</p>
               </details>
@@ -327,10 +409,10 @@ export default function Home() {
             <h2 className="text-3xl font-bold">Prêt à y voir clair dans votre commerce ?</h2>
             <div className="flex flex-wrap gap-3">
               <a href={PLAY_STORE_URL} className={`${btn.base} ${btn.gold} ${btn.lg}`}>
-                Télécharger l’app
+                <GooglePlayIcon /> Télécharger l’app
               </a>
-              <a href={APP_URL} className={`${btn.base} ${btn.ghostOnNavy} ${btn.lg}`}>
-                Se connecter
+              <a href={SIGN_UP_URL} className={`${btn.base} ${btn.ghostOnNavy} ${btn.lg}`}>
+                Essayer gratuitement <ArrowRight className="size-4" />
               </a>
             </div>
           </div>
@@ -355,7 +437,7 @@ function Section({
   return (
     <section id={id} className={`scroll-mt-16 ${className}`}>
       <div className={`${container} py-16 lg:py-20`}>
-        <h2 className="mb-10 text-2xl font-bold tracking-tight sm:text-3xl">
+        <h2 className="mb-10 text-center text-2xl font-bold tracking-tight sm:text-3xl">
           {title}
         </h2>
         {children}

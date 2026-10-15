@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 
+import { SITE_URL } from "@/lib/links";
+
 import "./globals.css";
 
 // Inter (variable, SIL OFL), same files as apps/web.
@@ -14,9 +16,7 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://flow-commerce.com",
-  ),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Flow.Co - Gestion des ventes en ligne à Madagascar",
     template: "%s · Flow.Co",
@@ -27,9 +27,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: "fr_FR",
     siteName: "Flow.Co",
-    images: [{ url: "/images/og-image.png", width: 1200, height: 630 }],
   },
-  twitter: { card: "summary_large_image", images: ["/images/og-image.png"] },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
