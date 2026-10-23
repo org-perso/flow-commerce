@@ -1,16 +1,16 @@
 import { ApiError } from "@/lib/api-client";
-import { env } from "@/lib/env";
 
-// Admin space client: the session is an HttpOnly cookie set by the API (never Firebase),
-// so every call is made with credentials and no Authorization header.
+// Admin space client: the session is an HttpOnly cookie set by the API (never Firebase).
+// Calls go to this site's own /api/v1/admin, which next.config.ts forwards to the API: for the
+// browser the cookie is first-party, whatever domains the site and the API are on.
 
 export async function adminFetch<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${env.apiUrl}/api/v1/admin${path}`, {
+  const response = await fetch(`/api/v1/admin${path}`, {
     ...init,
-    credentials: "include",
+    credentials: "same-origin",
     headers: {
       Accept: "application/json",
       ...(init.body ? { "Content-Type": "application/json" } : {}),
