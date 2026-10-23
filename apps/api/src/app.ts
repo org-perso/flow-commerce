@@ -22,8 +22,9 @@ export function createApp({ verifyToken = verifyFirebaseToken, sendPush }: AppDe
   const app = express();
 
   app.disable('x-powered-by');
-  // Behind Render's proxy: req.ip is the client's address (admin lockout and audit).
-  app.set('trust proxy', 1);
+  // req.ip is the client's address (admin lockout and audit): admin calls come through the
+  // web app's rewrite (Vercel), then Render's proxy, hence two trusted hops.
+  app.set('trust proxy', 2);
   app.use(helmet());
   app.use(express.json({ limit: '1mb' }));
 
