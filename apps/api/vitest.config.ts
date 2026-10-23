@@ -11,6 +11,8 @@ export default defineConfig({
         process.env.TEST_DATABASE_URL ??
         'postgres://flowcommerce:flowcommerce@localhost:5432/flowcommerce_test',
       FIREBASE_PROJECT_ID: 'flowcommerce-test',
+      // Test-only key (32 zero bytes): never used outside the test database.
+      ADMIN_MFA_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
     },
   },
 });
