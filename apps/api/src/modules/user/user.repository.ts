@@ -16,10 +16,13 @@ const columns = `id, email, name, phone, created_at AS "createdAt", updated_at A
  * Returns the user for this Firebase identity, creating it on first sight
  * (sign-up happens in Firebase, the API learns about users lazily).
  */
-export async function findOrCreateUser(identity: AuthIdentity): Promise<User> {
-  const existing = await pool.query<User>(`SELECT ${columns} FROM users WHERE firebase_uid = $1`, [
-    identity.firebaseUid,
-  ]);
+export async function findOrCreateUser(
+  identity: AuthIdentity,
+): Promise<User & { suspended: boolean }> {
+  const existing = await pool.query<User & { suspended: boolean }>(
+    `SELECT ${columns}, suspended_at IS NOT NULL AS suspended FROM users WHERE firebase_uid = $1`,
+    [identity.firebaseUid],
+  );
   if (existing.rows[0]) return existing.rows[0];
 
   // ON CONFLICT covers two concurrent first requests for the same user.
@@ -29,7 +32,7 @@ export async function findOrCreateUser(identity: AuthIdentity): Promise<User> {
      RETURNING ${columns}`,
     [identity.firebaseUid, identity.email, identity.name],
   );
-  return rows[0]!;
+  return { ...rows[0]!, suspended: false };
 }
 
 export async function updateUser(

@@ -9,6 +9,8 @@ export type Shop = {
   description: string | null;
   /** Colors picked for the order states (see status-colors.ts); {} = defaults. */
   statusColors: StatusColors;
+  /** Set by the platform admins: a SUSPENDED shop is read-only (af-v3-admin RG-73). */
+  status: 'ACTIVE' | 'SUSPENDED';
   createdAt: Date;
   updatedAt: Date;
 };
@@ -25,10 +27,10 @@ export type ShopInput = {
   statusColors?: StatusColors;
 };
 
-const columns = `id, name, description, COALESCE(status_colors, '{}') AS "statusColors",
+const columns = `id, name, description, COALESCE(status_colors, '{}') AS "statusColors", status,
   created_at AS "createdAt", updated_at AS "updatedAt"`;
 const shopColumns = `s.id, s.name, s.description, COALESCE(s.status_colors, '{}') AS "statusColors",
-  s.created_at AS "createdAt", s.updated_at AS "updatedAt"`;
+  s.status, s.created_at AS "createdAt", s.updated_at AS "updatedAt"`;
 
 /** Shops the user is a member of, with their role. */
 export async function listShopsForUser(userId: string): Promise<ShopWithRole[]> {

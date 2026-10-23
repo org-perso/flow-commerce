@@ -4,6 +4,10 @@
  */
 export const env = {
   apiUrl: (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, ""),
+  /** Android app on the Play Store (optional: defaults to the published app). */
+  playStoreUrl:
+    process.env.NEXT_PUBLIC_PLAY_STORE_URL ||
+    "https://play.google.com/store/apps/details?id=com.flowcommerce.app",
   firebase: {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
