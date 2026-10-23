@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { pool } from '../../db/pool.js';
 import { currentUser } from '../../http/context.js';
+import { idParam, notFound } from '../../http/params.js';
 import { deleteAccount } from './account.service.js';
 import { updateUser } from './user.repository.js';
 
@@ -37,6 +38,37 @@ meRouter.patch('/', async (req, res) => {
  */
 meRouter.delete('/', async (req, res) => {
   res.json(await deleteAccount(currentUser(req).id));
+});
+
+/** Warnings from Flow.Co to the shops the user owns, not read yet (af-v3-admin RG-77). */
+meRouter.get('/notices', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT n.id, n.shop_id AS "shopId", s.name AS "shopName", n.reason, n.message,
+            n.created_at AS "createdAt"
+     FROM shop_notices n
+     JOIN shops s ON s.id = n.shop_id
+     JOIN shop_members m ON m.shop_id = n.shop_id AND m.user_id = $1 AND m.role = 'OWNER'
+     WHERE n.read_at IS NULL
+     ORDER BY n.created_at DESC`,
+    [currentUser(req).id],
+  );
+  res.json(rows);
+});
+
+/** An owner marks a warning as read: it stops showing for all the shop's owners. */
+meRouter.post('/notices/:noticeId/read', async (req, res) => {
+  const noticeId = idParam(req.params.noticeId, 'Notice');
+  const userId = currentUser(req).id;
+  const { rowCount } = await pool.query(
+    `UPDATE shop_notices n SET read_at = COALESCE(n.read_at, now()), read_by = COALESCE(n.read_by, $2)
+     WHERE n.id = $1 AND EXISTS (
+       SELECT 1 FROM shop_members m
+       WHERE m.shop_id = n.shop_id AND m.user_id = $2 AND m.role = 'OWNER'
+     )`,
+    [noticeId, userId],
+  );
+  if (!rowCount) throw notFound('Notice');
+  res.status(204).end();
 });
 
 const pushTokenSchema = z

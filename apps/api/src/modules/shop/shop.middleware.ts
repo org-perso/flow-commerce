@@ -18,6 +18,15 @@ export const requireShop: RequestHandler = async (req, _res, next) => {
   const shopId = shopIdSchema.safeParse(req.params.shopId);
   const found = shopId.success ? await findShopForMember(shopId.data, user.id) : null;
   if (!found) throw new ProblemError(404, 'Not Found', 'Shop not found.');
+  // RG-73: a suspended shop stays readable, but nothing can be created or changed.
+  if (found.shop.status === 'SUSPENDED' && req.method !== 'GET' && req.method !== 'HEAD') {
+    throw new ProblemError(
+      403,
+      'Shop Suspended',
+      'Cette boutique est suspendue par Flow.Co : consultation seulement. Contactez le support.',
+      { code: 'SHOP_SUSPENDED' },
+    );
+  }
   req.shop = found.shop;
   req.member = { userId: user.id, role: found.role };
   next();

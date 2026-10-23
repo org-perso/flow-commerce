@@ -1,3 +1,4 @@
+import { LogIn } from "lucide-react";
 import Link from "next/link";
 
 import { BrandMark, BrandName } from "@/components/brand";
@@ -46,7 +47,8 @@ export function SiteHeader() {
             href={SIGN_IN_URL}
             className={`${btn.base} ${btn.outline} ${btn.sm} hidden md:inline-flex`}
           >
-            Se connecter
+            <LogIn className="size-4" />
+            Connexion
           </a>
           <a href={SIGN_UP_URL} className={`${btn.base} ${btn.navy} ${btn.sm}`}>
             Essayer gratuitement
