@@ -19,7 +19,7 @@ export default function ShopSwitcherScreen() {
         {shops.map((shop) => (
           <ListRow
             key={shop.id}
-            leading={<Avatar name={shop.name} />}
+            leading={<Avatar name={shop.name} imageUri={shop.logo} />}
             title={shop.name}
             subtitle={ROLE_LABELS[shop.role]}
             trailing={

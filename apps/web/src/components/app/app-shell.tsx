@@ -60,6 +60,7 @@ import { useShops } from "@/features/shop/use-shops";
 import { THEME_LABELS, useTheme } from "@/features/theme/theme";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { sizedImage } from "@/lib/product-image";
 import { cn } from "@/lib/utils";
 
 function useNavItems(): NavItem[] {
@@ -134,6 +135,37 @@ function SidebarNav({
   );
 }
 
+/** The shop's logo, or its initial when it has none. */
+function ShopLogo({
+  name,
+  logo,
+  className,
+}: {
+  name: string;
+  logo?: string | null;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "flex shrink-0 items-center justify-center overflow-hidden rounded font-bold",
+        className,
+      )}
+    >
+      {logo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={sizedImage(logo, 64)}
+          alt=""
+          className="size-full object-cover"
+        />
+      ) : (
+        name.slice(0, 1).toUpperCase()
+      )}
+    </span>
+  );
+}
+
 function ShopSwitcher({ compact = false }: { compact?: boolean }) {
   const shop = useShop();
   const shops = useShops();
@@ -146,9 +178,11 @@ function ShopSwitcher({ compact = false }: { compact?: boolean }) {
           className="flex h-9 max-w-64 items-center gap-2 rounded-md border bg-card px-2 text-left text-sm shadow-xs hover:bg-accent"
           aria-label={`Boutique ${shop.name}, changer de boutique`}
         >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded bg-gold text-[11px] font-bold text-on-gold">
-            {shop.name.slice(0, 1).toUpperCase()}
-          </span>
+          <ShopLogo
+            name={shop.name}
+            logo={shop.logo}
+            className="size-6 bg-gold text-[11px] text-on-gold"
+          />
           <span
             className={cn(
               "min-w-0 flex-1 truncate font-semibold",
@@ -168,9 +202,11 @@ function ShopSwitcher({ compact = false }: { compact?: boolean }) {
             onSelect={() => router.push(`/s/${s.id}`)}
             className="gap-3"
           >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded bg-navy-soft text-xs font-bold text-navy">
-              {s.name.slice(0, 1).toUpperCase()}
-            </span>
+            <ShopLogo
+              name={s.name}
+              logo={s.logo}
+              className="size-7 bg-navy-soft text-xs text-navy"
+            />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate font-medium">{s.name}</span>
               <span className="text-xs text-muted-foreground">

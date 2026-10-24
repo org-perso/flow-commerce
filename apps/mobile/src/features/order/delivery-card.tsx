@@ -3,11 +3,12 @@ import { useState } from 'react';
 import { LayoutAnimation, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, StatusBadge } from '@/components/ui';
-import { callPhone, formatPhone, openWhatsApp } from '@/features/customer/contact';
-import { hitSlopFor, textStyles, theme } from '@/theme';
+import { callPhone, openWhatsApp } from '@/features/customer/contact';
+import { textStyles, theme } from '@/theme';
 import { useStateColor } from '@/theme/state-colors';
 import { businessToday, formatAr, formatDayLabel } from '@/utils/format';
 
+import { CallButton } from './call-button';
 import { DriverActions } from './driver-actions';
 import { parcelNumber, type Order } from './order-api';
 import { isOverdue } from './order-row';
@@ -32,7 +33,7 @@ export function DeliveryCard({
 }) {
   const [open, setOpen] = useState(false);
   const today = businessToday();
-  const phone = order.customer?.phone ?? order.delivery?.phone;
+  const phone = order.phones?.[0] ?? order.customer?.phone ?? order.delivery?.phone;
   const place = order.delivery?.place ?? order.delivery?.address ?? 'À livrer';
   const toggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -107,15 +108,7 @@ export function DeliveryCard({
         </View>
         {/* Same call button as on the order cards. */}
         {phone && (
-          <Pressable
-            onPress={() => callPhone(phone)}
-            accessibilityRole="button"
-            accessibilityLabel={`Appeler ${formatPhone(phone)}`}
-            hitSlop={hitSlopFor(theme.layout.controlHeight)}
-            style={({ pressed }) => [styles.phone, pressed && styles.pressed]}
-          >
-            <Phone size={theme.layout.iconSm} color={theme.colors.blue} strokeWidth={2} />
-          </Pressable>
+          <CallButton phone={phone} others={Math.max(0, (order.phones?.length ?? 0) - 1)} />
         )}
       </Pressable>
 
@@ -251,14 +244,6 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
-  },
-  phone: {
-    width: theme.layout.controlHeight,
-    height: theme.layout.controlHeight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.navySoft,
   },
   strong: {
     fontFamily: theme.typography.heading.fontFamily,

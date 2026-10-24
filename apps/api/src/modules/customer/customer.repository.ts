@@ -207,20 +207,53 @@ export async function deleteCustomer(
  * or creates it. An existing customer is not modified by the typed name.
  * Serialized per (shop, phone) so two concurrent orders cannot create it twice.
  */
+/** A customer keeps at most this many numbers (same limit as the customer form). */
+const MAX_CUSTOMER_PHONES = 5;
+
+/**
+ * The customer typed in an order form: found by ANY of its numbers (first match wins), or
+ * created. A returning customer gets the order's new numbers added to their card, except
+ * numbers already used by another customer of the shop (one number = one customer).
+ */
 export async function findOrCreateCustomer(
   client: pg.PoolClient,
   shopId: string,
-  input: { name: string; phone: string | null },
+  input: { name: string; phones: string[] },
 ): Promise<Customer> {
-  const phone = normalizePhone(input.phone);
-  if (phone) {
+  const phones = [
+    ...new Set(input.phones.map((p) => normalizePhone(p)).filter((p): p is string => !!p)),
+  ];
+  // Same lock order for every request: two forms with the same numbers never both create.
+  for (const phone of [...phones].sort()) {
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${shopId}:${phone}`]);
-    const existing = await findCustomerByPhone(shopId, phone, client);
-    if (existing) return existing;
+  }
+  const { rows: owners } = await client.query<{ customerId: string; phone: string }>(
+    `SELECT customer_id AS "customerId", phone FROM customer_phones
+     WHERE shop_id = $1 AND phone = ANY($2)`,
+    [shopId, phones],
+  );
+  const ownerOf = new Map(owners.map((o) => [o.phone, o.customerId]));
+  const existingId = phones.map((p) => ownerOf.get(p)).find(Boolean);
+
+  if (existingId) {
+    const free = phones.filter((p) => !ownerOf.has(p));
+    if (free.length > 0) {
+      await client.query(
+        `INSERT INTO customer_phones (shop_id, customer_id, phone, position)
+         SELECT $1, $2, p.phone, base.n + p.position
+         FROM unnest($3::text[]) WITH ORDINALITY AS p (phone, position),
+              (SELECT COALESCE(max(position), 0) AS n, count(*) AS c
+               FROM customer_phones WHERE customer_id = $2) base
+         WHERE base.c + p.position <= $4
+         ON CONFLICT (shop_id, phone) DO NOTHING`,
+        [shopId, existingId, free, MAX_CUSTOMER_PHONES],
+      );
+    }
+    return (await findCustomer(shopId, existingId, client))!;
   }
   const id = await insertCustomerRow(client, shopId, {
     name: input.name,
-    phones: phone ? [phone] : [],
+    phones: phones.slice(0, MAX_CUSTOMER_PHONES),
     socialProfile: null,
   });
   return (await findCustomer(shopId, id, client))!;

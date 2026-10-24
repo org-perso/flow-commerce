@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 
+import { LogoField } from '@/features/shop/logo-field';
 import { ShopForm } from '@/features/shop/shop-form';
 import { useActiveShop, useUpdateShop } from '@/features/shop/use-shop';
 
@@ -16,6 +17,7 @@ export default function ShopSettingsScreen() {
         router.back();
       }}
       error={updateShop.error}
+      extra={<LogoField />}
     />
   );
 }

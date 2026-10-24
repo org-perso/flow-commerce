@@ -3,12 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { joinShop } from "@/features/team/team-api";
+import { uploadImage } from "@/lib/product-image";
 
 import {
   createShop,
   listShops,
   setMyNickname,
   updateShop,
+  updateShopLogo,
   type Shop,
   type ShopInput,
   updateStatusColors,
@@ -37,6 +39,19 @@ export function useJoinShop() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: joinShop,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: shopsKey }),
+  });
+}
+
+/** A picked file is uploaded to Cloudinary then saved as the logo; null removes it. */
+export function useUpdateShopLogo(shopId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File | null) =>
+      updateShopLogo(
+        shopId,
+        file ? await uploadImage(shopId, "logo", file) : null,
+      ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: shopsKey }),
   });
 }

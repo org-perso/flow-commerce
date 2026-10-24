@@ -2,6 +2,7 @@ import type pg from 'pg';
 
 import { withTransaction } from '../../db/pool.js';
 import { deleteMember } from '../team/team.service.js';
+import { deleteShopFiles } from '../upload/cloudinary.js';
 
 /** Tables of a shop, children first (foreign keys). */
 const SHOP_TABLES = [
@@ -35,8 +36,9 @@ async function deleteShop(client: pg.PoolClient, shopId: string): Promise<string
  * to "à prendre"), and a shop they created passes to another owner.
  * Returns the photo URLs of the deleted shops: the app removes them from Firebase Storage.
  */
-export function deleteAccount(userId: string): Promise<{ images: string[] }> {
-  return withTransaction(async (client) => {
+export async function deleteAccount(userId: string): Promise<{ images: string[] }> {
+  const deletedShops: string[] = [];
+  const result = await withTransaction(async (client) => {
     const { rows: memberships } = await client.query<{ shopId: string; soleOwner: boolean }>(
       `SELECT m.shop_id AS "shopId",
               m.role = 'OWNER' AND NOT EXISTS (
@@ -53,6 +55,7 @@ export function deleteAccount(userId: string): Promise<{ images: string[] }> {
     for (const { shopId, soleOwner } of memberships) {
       if (soleOwner) {
         images.push(...(await deleteShop(client, shopId)));
+        deletedShops.push(shopId);
         continue;
       }
       await deleteMember(client, shopId, userId);
@@ -72,4 +75,8 @@ export function deleteAccount(userId: string): Promise<{ images: string[] }> {
     await client.query('DELETE FROM users WHERE id = $1', [userId]);
     return { images };
   });
+  // Cloudinary photos (products, logo) of the deleted shops, once the data is really gone.
+  // Firebase photos (older app versions) are still returned for the app to remove.
+  await Promise.all(deletedShops.map(deleteShopFiles));
+  return result;
 }

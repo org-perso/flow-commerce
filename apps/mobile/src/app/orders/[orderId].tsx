@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   AlertBanner,
+  Avatar,
   AppText,
   Button,
   Dropdown,
@@ -94,7 +95,7 @@ export default function OrderScreen() {
   }
 
   const o = order.data;
-  const recapPhone = o.customer?.phone ?? o.delivery?.phone ?? null;
+  const recapPhone = o.phones?.[0] ?? o.customer?.phone ?? o.delivery?.phone ?? null;
   const overdue = isOverdue(o);
   const next = TRANSITIONS[o.status];
   const forward = next.filter((s) => !destructiveStatuses.includes(s));
@@ -295,6 +296,7 @@ export default function OrderScreen() {
           )}
           {o.items?.map((item, index) => (
             <View key={item.id} style={[styles.line, index > 0 && styles.lineBorder]}>
+              <Avatar name={item.productName} imageUri={item.productImage} size="sm" />
               <AppText variant="label" style={styles.qty}>
                 {item.quantity} ×
               </AppText>
@@ -453,32 +455,58 @@ function RoundAction({
 
 function CustomerLine({ order, pressable }: { order: Order; pressable: boolean }) {
   const customer = order.customer;
-  // A walk-in customer has no card: the delivery keeps the number to call.
-  const phone = customer?.phone ?? order.delivery?.phone ?? null;
+  // The order's numbers (main first); older orders: the customer's or the delivery's.
+  const phone = order.phones?.[0] ?? customer?.phone ?? order.delivery?.phone ?? null;
+  const others = order.phones?.slice(1) ?? [];
   return (
-    <InfoLine
-      divider
-      icon={User}
-      title={customer?.name ?? 'Client sans fiche'}
-      subtitle={phone ? formatPhone(phone) : 'Pas de numéro'}
-      onPress={customer && pressable ? () => router.push(`/customers/${customer.id}`) : undefined}
-      trailing={
-        phone ? (
-          <View style={styles.actions}>
-            <RoundAction
-              icon={MessageCircle}
-              label="WhatsApp"
-              onPress={() => openWhatsApp(phone)}
-            />
-            <RoundAction
-              icon={Phone}
-              label={`Appeler ${formatPhone(phone)}`}
-              onPress={() => callPhone(phone)}
-            />
-          </View>
-        ) : undefined
-      }
-    />
+    <>
+      <InfoLine
+        divider
+        icon={User}
+        title={customer?.name ?? 'Client sans fiche'}
+        subtitle={phone ? formatPhone(phone) : 'Pas de numéro'}
+        onPress={customer && pressable ? () => router.push(`/customers/${customer.id}`) : undefined}
+        trailing={
+          phone ? (
+            <View style={styles.actions}>
+              <RoundAction
+                icon={MessageCircle}
+                label="WhatsApp"
+                onPress={() => openWhatsApp(phone)}
+              />
+              <RoundAction
+                icon={Phone}
+                label={`Appeler ${formatPhone(phone)}`}
+                onPress={() => callPhone(phone)}
+              />
+            </View>
+          ) : undefined
+        }
+      />
+      {others.map((other) => (
+        <InfoLine
+          key={other}
+          divider
+          icon={Phone}
+          title={formatPhone(other)}
+          subtitle="Autre numéro"
+          trailing={
+            <View style={styles.actions}>
+              <RoundAction
+                icon={MessageCircle}
+                label="WhatsApp"
+                onPress={() => openWhatsApp(other)}
+              />
+              <RoundAction
+                icon={Phone}
+                label={`Appeler ${formatPhone(other)}`}
+                onPress={() => callPhone(other)}
+              />
+            </View>
+          }
+        />
+      ))}
+    </>
   );
 }
 

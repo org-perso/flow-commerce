@@ -195,6 +195,7 @@ export default function OrdersScreen() {
       )}
 
       <SectionList
+        contentContainerStyle={styles.listContent}
         sections={hasOrders ? sections : []}
         keyExtractor={(o) => o.id}
         renderItem={({ item, section }) => (
@@ -288,6 +289,9 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
     marginTop: -theme.spacing[1],
+  },
+  listContent: {
+    paddingBottom: theme.layout.fabClearance,
   },
   sectionTitle: {
     fontFamily: theme.typography.heading.fontFamily,

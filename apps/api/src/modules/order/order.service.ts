@@ -23,7 +23,9 @@ export type DeliveryInput = {
 export type CreateOrderInput = {
   customerId: string | null;
   /** New or returning customer typed in the order form (matched by phone). */
-  customer: { name: string; phone: string | null } | null;
+  customer: { name: string; phones: string[] } | null;
+  /** Numbers for this order (first = main); absent from older apps (delivery.phone only). */
+  phones?: string[];
   items: ItemInput[];
   source: OrderSource | null;
   /** Planned day (YYYY-MM-DD); null means today. */
@@ -38,19 +40,34 @@ export type CreateOrderInput = {
   status: 'EN_ATTENTE' | 'CONFIRMEE';
 };
 
-export type UpdateOrderInput = Partial<Omit<CreateOrderInput, 'status' | 'customer'>>;
+export type UpdateOrderInput = Partial<Omit<CreateOrderInput, 'status'>>;
+
+/**
+ * The order's numbers: the list sent by the app, or, from an older app, its delivery number
+ * (or the customer's). The first one is the delivery number (delivery_phone).
+ */
+function orderPhones(
+  phones: string[] | undefined,
+  delivery: DeliveryInput | null | undefined,
+  customer?: { phones: string[] } | null,
+): string[] | undefined {
+  if (phones) return phones;
+  if (delivery?.phone) return [delivery.phone];
+  if (customer?.phones.length) return customer.phones.slice(0, 3);
+  return undefined;
+}
 
 type LockedOrder = { status: OrderStatus; deliveryFee: number; totalAmount: number };
 
-/** Column values for a delivery (or its absence). */
-function deliveryColumns(delivery: DeliveryInput | null) {
+/** Column values for a delivery (or its absence); its number is the order's main one. */
+function deliveryColumns(delivery: DeliveryInput | null, phones?: string[]) {
   return [
     delivery !== null,
     delivery?.place ?? null,
     delivery?.address ?? null,
     delivery?.note ?? null,
     delivery?.fee ?? 0,
-    delivery?.phone ?? null,
+    delivery ? (phones?.[0] ?? delivery.phone ?? null) : null,
   ] as const;
 }
 
@@ -172,6 +189,8 @@ export function createOrder(shopId: string, input: CreateOrderInput): Promise<Or
       customerId = (await findOrCreateCustomer(client, shopId, input.customer)).id;
     }
 
+    const phones = orderPhones(input.phones, input.delivery, input.customer) ?? [];
+
     // Next number of the shop; the row lock serializes concurrent orders.
     const { rows: counter } = await client.query<{ number: number }>(
       `UPDATE shops SET last_order_number = last_order_number + 1
@@ -181,10 +200,10 @@ export function createOrder(shopId: string, input: CreateOrderInput): Promise<Or
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO orders (shop_id, customer_id, status, source, payment_method,
          is_delivery, delivery_place, delivery_address, delivery_note, delivery_fee,
-         delivery_phone, scheduled_date, paid_at, number, slot_from, slot_to)
+         delivery_phone, scheduled_date, paid_at, number, slot_from, slot_to, phones)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
          COALESCE($12::date, (now() AT TIME ZONE 'Indian/Antananarivo')::date),
-         CASE WHEN $13::boolean THEN now() END, $14, $15::time, $16::time)
+         CASE WHEN $13::boolean THEN now() END, $14, $15::time, $16::time, $17)
        RETURNING id`,
       [
         shopId,
@@ -192,12 +211,13 @@ export function createOrder(shopId: string, input: CreateOrderInput): Promise<Or
         input.status,
         input.source,
         input.paymentMethod,
-        ...deliveryColumns(input.delivery),
+        ...deliveryColumns(input.delivery, phones),
         input.scheduledDate,
         input.isPaid,
         counter[0]!.number,
         input.timeSlot?.from ?? null,
         input.timeSlot?.to ?? null,
+        phones,
       ],
     );
     const orderId = rows[0]!.id;
@@ -237,6 +257,15 @@ export function updateOrder(
       );
     }
     if (patch.customerId) await assertCustomer(client, shopId, patch.customerId);
+    if (patch.customer) {
+      patch = {
+        ...patch,
+        customerId: (await findOrCreateCustomer(client, shopId, patch.customer)).id,
+      };
+    }
+    // Older apps only send delivery.phone: it becomes the main number, the others stay.
+    const legacyPhone = patch.phones === undefined ? (patch.delivery?.phone ?? null) : null;
+    const phones = patch.phones;
 
     let itemsAmount = order.totalAmount - order.deliveryFee;
     if (patch.items) {
@@ -247,7 +276,22 @@ export function updateOrder(
       await client.query(
         `UPDATE orders SET is_delivery = $2, delivery_place = $3, delivery_address = $4,
            delivery_note = $5, delivery_fee = $6, delivery_phone = $7 WHERE id = $1`,
-        [orderId, ...deliveryColumns(patch.delivery)],
+        [orderId, ...deliveryColumns(patch.delivery, phones)],
+      );
+    }
+    if (phones !== undefined) {
+      // New numbers: the order's list, and the first one as the delivery number.
+      await client.query(
+        `UPDATE orders SET phones = $2,
+           delivery_phone = CASE WHEN is_delivery THEN $3 ELSE NULL END
+         WHERE id = $1`,
+        [orderId, phones, phones[0] ?? null],
+      );
+    } else if (legacyPhone) {
+      await client.query(
+        `UPDATE orders SET phones = (ARRAY[$2]::varchar[] || array_remove(phones, $2))[1:3]
+         WHERE id = $1`,
+        [orderId, legacyPhone],
       );
     }
     const deliveryFee =

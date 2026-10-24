@@ -2,7 +2,8 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 
-import { auth, storage } from '@/lib/firebase';
+import { apiFetch } from '@/lib/api-client';
+import { auth } from '@/lib/firebase';
 
 /** Longest side after resizing: plenty for a phone screen, light on mobile data. */
 const MAX_SIDE = 1024;
@@ -29,65 +30,84 @@ export async function pickProductImage(source: 'camera' | 'library'): Promise<st
   return result.canceled ? null : (result.assets[0]?.uri ?? null);
 }
 
+export type UploadKind = 'product' | 'logo';
+
+type UploadSignature = {
+  apiKey: string;
+  timestamp: number;
+  folder: string;
+  signature: string;
+  uploadUrl: string;
+};
+
 /**
- * Compresses the local image and uploads it to Firebase Storage under the shop.
- * Returns the public download URL stored on the product.
+ * Compresses the local image and uploads it to Cloudinary, into the shop's folder.
+ * Returns the URL stored on the product (or as the shop logo).
  */
-export async function uploadProductImage(shopId: string, localUri: string): Promise<string> {
+export async function uploadImage(
+  shopId: string,
+  kind: UploadKind,
+  localUri: string,
+): Promise<string> {
   const context = ImageManipulator.manipulate(localUri);
   context.resize({ width: MAX_SIDE });
   const image = await context.renderAsync();
   const { uri } = await image.saveAsync({ compress: JPEG_QUALITY, format: SaveFormat.JPEG });
 
-  const path = `shops/${shopId}/products/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
   try {
-    return await uploadToStorage(uri, path);
+    return await uploadToCloudinary(shopId, kind, uri);
   } catch (error) {
-    console.warn('Product image upload failed', error);
+    console.warn('Image upload failed', error);
     throw error instanceof ImageUploadError
       ? error
       : new ImageUploadError(imageUploadMessage(error));
   }
 }
 
-/**
- * Sends the file straight to the Firebase Storage REST API, with the user's ID token
- * (Storage rules apply as with the SDK). The JS SDK's uploadBytes needs a Blob, and
- * React Native blobs make it fail on Android with storage/unknown.
- */
-async function uploadToStorage(localUri: string, path: string): Promise<string> {
-  const bucket = storage.app.options.storageBucket;
-  if (!bucket) throw new ImageUploadError('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET est vide.');
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new ImageUploadError('Session expirée. Reconnectez-vous.');
+export const uploadProductImage = (shopId: string, localUri: string) =>
+  uploadImage(shopId, 'product', localUri);
 
-  const base = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o`;
-  const response = await FileSystem.uploadAsync(
-    `${base}?uploadType=media&name=${encodeURIComponent(path)}`,
-    localUri,
-    {
-      httpMethod: 'POST',
-      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-      headers: { Authorization: `Firebase ${token}`, 'Content-Type': 'image/jpeg' },
+/**
+ * The API signs the upload (the Cloudinary secret stays on the server, and the signature only
+ * allows this shop's folder), then the file goes straight to Cloudinary.
+ */
+async function uploadToCloudinary(shopId: string, kind: UploadKind, localUri: string) {
+  const sig = await apiFetch<UploadSignature>(`/shops/${shopId}/uploads/signature`, {
+    method: 'POST',
+    body: JSON.stringify({ kind }),
+  });
+  const response = await FileSystem.uploadAsync(sig.uploadUrl, localUri, {
+    httpMethod: 'POST',
+    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    fieldName: 'file',
+    mimeType: 'image/jpeg',
+    parameters: {
+      api_key: sig.apiKey,
+      timestamp: String(sig.timestamp),
+      folder: sig.folder,
+      signature: sig.signature,
     },
-  );
-  if (response.status < 200 || response.status >= 300) {
-    console.warn('Storage upload', response.status, response.body, `bucket: ${bucket}`);
-    throw new ImageUploadError(storageStatusMessage(response.status));
+  });
+  const body = JSON.parse(response.body || '{}') as {
+    secure_url?: string;
+    error?: { message?: string };
+  };
+  if (response.status < 200 || response.status >= 300 || !body.secure_url) {
+    console.warn('Cloudinary upload', response.status, body.error?.message);
+    throw new ImageUploadError(
+      `La photo n'a pas pu être envoyée (HTTP ${response.status}). Réessayez, ou enregistrez sans photo.`,
+    );
   }
-  const { downloadTokens } = JSON.parse(response.body) as { downloadTokens?: string };
-  const token0 = downloadTokens?.split(',')[0];
-  return `${base}/${encodeURIComponent(path)}?alt=media${token0 ? `&token=${token0}` : ''}`;
+  return body.secure_url;
 }
 
-function storageStatusMessage(status: number): string {
-  if (status === 401 || status === 403) {
-    return 'Envoi de la photo refusé : vérifiez les règles de sécurité de Firebase Storage.';
-  }
-  if (status === 404) {
-    return 'Bucket Firebase Storage introuvable : Storage est-il activé, et le nom du bucket exact ?';
-  }
-  return `La photo n'a pas pu être envoyée (HTTP ${status}). Réessayez, ou enregistrez sans photo.`;
+/**
+ * Cloudinary URL resized on the fly (square, WebP/AVIF when supported): light thumbnails in
+ * lists. Other URLs (older Firebase photos) are returned as they are.
+ */
+export function sizedImage(url: string, px: number): string {
+  if (!url.startsWith('https://res.cloudinary.com/')) return url;
+  return url.replace('/image/upload/', `/image/upload/c_fill,w_${px},h_${px},f_auto,q_auto/`);
 }
 
 /** Anything else: usually no network during the upload. */

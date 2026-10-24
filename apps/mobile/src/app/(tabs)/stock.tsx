@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     marginTop: -theme.spacing[1],
   },
   listContent: {
-    paddingBottom: theme.spacing[4],
+    paddingBottom: theme.layout.fabClearance,
   },
   separator: {
     height: theme.spacing[3],

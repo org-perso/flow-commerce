@@ -27,6 +27,11 @@ export const theme = {
     shopLogo: 32,
     /** Central "new order" button of the tab bar. */
     tabAction: 56,
+    /**
+     * Space under the last item of a tab's list: the "new order" button (raised in the tab
+     * bar, or floating for a CM) never covers it once scrolled to the bottom.
+     */
+    fabClearance: 56 + 24,
     /** Product photo preview in forms and details. */
     thumbnail: 96,
     /** Minimum height of a list row. */

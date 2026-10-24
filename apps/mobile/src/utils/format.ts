@@ -81,6 +81,29 @@ export function formatPhone(phone: string): string {
   return m ? m.slice(1).join(' ') : phone;
 }
 
+export type Operator = 'Telma' | 'Orange' | 'Airtel' | 'Autre';
+
+/** Madagascar mobile prefixes. A wrong or new prefix only changes this table. */
+const OPERATOR_PREFIXES: Record<string, Exclude<Operator, 'Autre'>> = {
+  '034': 'Telma',
+  '038': 'Telma',
+  '032': 'Orange',
+  '037': 'Orange',
+  '033': 'Airtel',
+  '035': 'Airtel',
+};
+
+/**
+ * Network of a number ('+261 34…' and '034…' alike): known as soon as the prefix is typed;
+ * 'Autre' for a complete number with another prefix; null while it is too short to tell.
+ */
+export function operatorOf(phone: string): Operator | null {
+  const raw = phone.replace(/\D/g, '');
+  const digits = /^261\d{0,9}$/.test(raw) && raw.length > 3 ? `0${raw.slice(3)}` : raw;
+  if (digits.length < 3) return null;
+  return OPERATOR_PREFIXES[digits.slice(0, 3)] ?? (digits.length >= 10 ? 'Autre' : null);
+}
+
 const TZ = 'Indian/Antananarivo';
 const dayKey = (date: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(date);
 const timeFormat = new Intl.DateTimeFormat('fr-FR', {

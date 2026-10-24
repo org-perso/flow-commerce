@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { useAuthStore } from '@/features/auth/auth-store';
+import { isLocalImage, uploadImage } from '@/lib/product-image';
 import type { StatusColors } from '@/theme/state-colors';
 
 import { useActiveShopStore } from './active-shop-store';
@@ -11,6 +12,7 @@ import {
   listShops,
   setMyNickname,
   updateShop,
+  updateShopLogo,
   updateStatusColors,
   type Shop,
   type ShopInput,
@@ -74,6 +76,24 @@ export function useUpdateShop(shopId: string) {
     mutationFn: (input: ShopInput) => updateShop(shopId, input),
     onSuccess: (shop) => {
       // Merged: the PATCH response has no pseudo (nickname), the list does.
+      queryClient.setQueryData<Shop[]>(shopsQueryKey(uid), (shops = []) =>
+        shops.map((s) => (s.id === shop.id ? { ...s, ...shop } : s)),
+      );
+    },
+  });
+}
+
+/** Picked photo (local uri) → uploaded to Cloudinary then saved as the logo; null removes it. */
+export function useUpdateShopLogo(shopId: string) {
+  const uid = useUid();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (uri: string | null) =>
+      updateShopLogo(
+        shopId,
+        uri && isLocalImage(uri) ? await uploadImage(shopId, 'logo', uri) : uri,
+      ),
+    onSuccess: (shop) => {
       queryClient.setQueryData<Shop[]>(shopsQueryKey(uid), (shops = []) =>
         shops.map((s) => (s.id === shop.id ? { ...s, ...shop } : s)),
       );

@@ -49,14 +49,32 @@ const delivery = z
   })
   .nullable();
 
+/** 1 to 3 numbers to reach the customer for this order, first = main. */
+const phones = z
+  .array(phoneField)
+  .max(3, 'Three phone numbers at most.')
+  .transform((list) => [...new Set(list.filter((p): p is string => !!p))]);
+
+/** Customer saved from the order form (matched by any of its numbers), instead of customerId. */
+const customer = z
+  .object({
+    name: requiredText(150),
+    /** Older apps: one number. */
+    phone: phoneField.default(null),
+    phones: phones.optional(),
+  })
+  .transform(({ name, phone, phones: list }) => ({
+    name,
+    phones: list ?? (phone ? [phone] : []),
+  }));
+
 const createOrderSchema = z
   .object({
     customerId: z.uuid().nullable().default(null),
     /** New or returning customer (matched by phone), instead of customerId. */
-    customer: z
-      .object({ name: requiredText(150), phone: phoneField.default(null) })
-      .nullable()
-      .default(null),
+    customer: customer.nullable().default(null),
+    /** Optional: older apps only send delivery.phone. */
+    phones: phones.optional(),
     items,
     source: z.enum(ORDER_SOURCES).nullable().default(null),
     /** Planned delivery / hand-over day; defaults to today (Madagascar). */
@@ -77,6 +95,9 @@ const createOrderSchema = z
 const updateOrderSchema = z
   .object({
     customerId: z.uuid().nullable(),
+    /** Customer saved from the edit form (instead of customerId). */
+    customer,
+    phones,
     items,
     source: z.enum(ORDER_SOURCES).nullable(),
     scheduledDate: isoDate,
@@ -86,10 +107,17 @@ const updateOrderSchema = z
     isPaid: z.boolean(),
   })
   .partial()
-  .strict();
+  .strict()
+  .refine((o) => !(o.customerId && o.customer), {
+    message: 'Provide customerId or customer, not both.',
+    path: ['customer'],
+  });
 
 /** What a driver may change on their own delivery: the payment. */
-const driverUpdateSchema = updateOrderSchema.pick({ paymentMethod: true, isPaid: true });
+const driverUpdateSchema = z
+  .object({ paymentMethod: optionalText(30), isPaid: z.boolean() })
+  .partial()
+  .strict();
 
 const statusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
 const driverSchema = z.object({ userId: z.uuid() }).strict();

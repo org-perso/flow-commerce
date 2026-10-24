@@ -21,6 +21,12 @@ export const updateShopSchema = z
     description: description.optional(),
     /** The whole set of chosen colors; {} goes back to the defaults. */
     statusColors: statusColorsSchema.optional(),
+    /** Logo URL from an upload (null removes it). Optional: older apps never send it. */
+    logo: z
+      .url({ protocol: /^https$/ })
+      .max(500)
+      .nullable()
+      .optional(),
   })
   .refine((v) => Object.values(v).some((field) => field !== undefined), {
     message: 'Provide at least one field to update.',

@@ -7,6 +7,8 @@ export type OrderItem = {
   id: string;
   productId: string;
   productName: string;
+  /** The product's current photo (not frozen with the order): to recognize the item. */
+  productImage: string | null;
   quantity: number;
   unitSellingPrice: number;
   unitPurchasePrice: number;
@@ -31,6 +33,8 @@ export type Order = {
   source: OrderSource | null;
   /** Planned delivery / hand-over day (YYYY-MM-DD, Madagascar). */
   scheduledDate: string;
+  /** Numbers to reach the customer for this order (first = main). */
+  phones: string[];
   /** `phone` is the customer's main number. */
   customer: { id: string; name: string; phone: string | null } | null;
   /** null when the order is not delivered (pickup, hand delivery). */
@@ -89,7 +93,7 @@ const orderColumns = `o.id, o.number, o.status, o.source,
   CASE WHEN o.slot_from IS NULL AND o.slot_to IS NULL THEN NULL
        ELSE json_build_object('from', to_char(o.slot_from, 'HH24:MI'),
                               'to', to_char(o.slot_to, 'HH24:MI')) END AS "timeSlot",
-  o.route_position AS "routePosition",
+  o.route_position AS "routePosition", o.phones,
   CASE WHEN c.id IS NULL THEN NULL
        ELSE json_build_object('id', c.id, 'name', c.name, 'phone',
          (SELECT cp.phone FROM customer_phones cp WHERE cp.customer_id = c.id
@@ -111,7 +115,7 @@ async function attachItems(db: Db, orders: Omit<Order, 'items'>[]): Promise<Orde
   if (orders.length === 0) return [];
   const { rows } = await db.query<OrderItem & { orderId: string }>(
     `SELECT i.id, i.order_id AS "orderId", i.product_id AS "productId", p.name AS "productName",
-       i.quantity, i.unit_selling_price AS "unitSellingPrice",
+       p.image AS "productImage", i.quantity, i.unit_selling_price AS "unitSellingPrice",
        i.unit_purchase_price AS "unitPurchasePrice", i.subtotal
      FROM order_items i JOIN products p ON p.id = i.product_id
      WHERE i.order_id = ANY($1)
@@ -160,6 +164,7 @@ function orderConditions(
             OR o.delivery_address ILIKE '%' || $7 || '%'
             OR ($9::text IS NOT NULL AND (
               o.delivery_phone LIKE '%' || $9 || '%'
+              OR EXISTS (SELECT 1 FROM unnest(o.phones) ph WHERE ph LIKE '%' || $9 || '%')
               OR EXISTS (
                 SELECT 1 FROM customer_phones cp
                 WHERE cp.customer_id = o.customer_id AND cp.phone LIKE '%' || $9 || '%')))

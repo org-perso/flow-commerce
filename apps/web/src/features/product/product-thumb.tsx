@@ -1,8 +1,9 @@
 import { Package } from "lucide-react";
 
+import { sizedImage } from "@/lib/product-image";
 import { cn } from "@/lib/utils";
 
-/** Product photo (Firebase Storage URL) or a neutral placeholder. */
+/** Product photo (Cloudinary, or Firebase for older photos) or a neutral placeholder. */
 export function ProductThumb({
   src,
   name,
@@ -23,7 +24,7 @@ export function ProductThumb({
         // Remote Storage URLs with tokens: a plain img avoids configuring next/image domains.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          src={sizedImage(src, 96)}
           alt={name}
           className="size-full object-cover"
           loading="lazy"

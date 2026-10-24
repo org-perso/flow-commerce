@@ -1,15 +1,17 @@
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { ChevronDown } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useActiveShop } from '@/features/shop/use-shop';
+import { sizedImage } from '@/lib/product-image';
 import { theme } from '@/theme';
 
 import { AppText } from './app-text';
 import { initials } from './avatar';
 
 /**
- * Shop logo (initials on gold until real logos exist) and name with a chevron,
+ * Shop logo (or its initials on gold) and name with a chevron,
  * white on the navy header: a tap opens the switcher (other shops, or create one).
  */
 export function ShopSwitcher() {
@@ -22,11 +24,20 @@ export function ShopSwitcher() {
       accessibilityLabel={`Boutique ${shop.name}. Changer de boutique`}
       style={({ pressed }) => [styles.root, pressed && styles.pressed]}
     >
-      <View style={styles.logo}>
-        <AppText variant="caption" color="onGold" style={styles.logoText}>
-          {initials(shop.name)}
-        </AppText>
-      </View>
+      {shop.logo ? (
+        <Image
+          source={{ uri: sizedImage(shop.logo, 96) }}
+          style={styles.logo}
+          contentFit="cover"
+          accessibilityIgnoresInvertColors
+        />
+      ) : (
+        <View style={styles.logo}>
+          <AppText variant="caption" color="onGold" style={styles.logoText}>
+            {initials(shop.name)}
+          </AppText>
+        </View>
+      )}
       <AppText variant="heading" color="onNavy" numberOfLines={1} style={styles.name}>
         {shop.name}
       </AppText>

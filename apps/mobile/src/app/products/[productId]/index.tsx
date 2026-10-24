@@ -1,4 +1,6 @@
 import { Image } from 'expo-image';
+
+import { sizedImage } from '@/lib/product-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
   Archive,
@@ -118,7 +120,11 @@ export default function ProductScreen() {
       {/* Identity: photo, name, category, description. */}
       <View style={[styles.card, styles.identity]}>
         {p.image ? (
-          <Image source={{ uri: p.image }} style={styles.thumb} contentFit="cover" />
+          <Image
+            source={{ uri: sizedImage(p.image, 600) }}
+            style={styles.thumb}
+            contentFit="cover"
+          />
         ) : (
           <View style={[styles.thumb, styles.thumbEmpty]}>
             <Package size={theme.layout.iconLg} color={theme.colors.inkMuted} strokeWidth={1.5} />

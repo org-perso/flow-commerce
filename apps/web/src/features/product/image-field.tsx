@@ -10,10 +10,15 @@ export function ImageField({
   url,
   file,
   onChange,
+  alt = "Photo du produit",
+  disabled,
 }: {
   url: string | null;
   file: File | null;
   onChange: (value: { url: string | null; file: File | null }) => void;
+  alt?: string;
+  /** Upload in progress (field saved on its own, e.g. the shop logo). */
+  disabled?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -33,11 +38,7 @@ export function ImageField({
       <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-navy-soft text-navy">
         {shown ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={shown}
-            alt="Photo du produit"
-            className="size-full object-cover"
-          />
+          <img src={shown} alt={alt} className="size-full object-cover" />
         ) : (
           <ImagePlus className="size-7" aria-hidden="true" />
         )}
@@ -48,6 +49,7 @@ export function ImageField({
             type="button"
             variant="outline"
             size="sm"
+            disabled={disabled}
             onClick={() => input.current?.click()}
           >
             <ImagePlus /> {shown ? "Changer la photo" : "Ajouter une photo"}
@@ -57,6 +59,7 @@ export function ImageField({
               type="button"
               variant="ghost"
               size="sm"
+              disabled={disabled}
               onClick={() => onChange({ url: null, file: null })}
             >
               <Trash2 /> Retirer

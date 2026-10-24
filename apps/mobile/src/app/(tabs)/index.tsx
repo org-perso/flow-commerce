@@ -102,6 +102,8 @@ function DashboardScreen() {
           <ProfitDetail dashboard={d} />
         </>
       )}
+      {/* Room for the raised "new order" button of the tab bar. */}
+      <View style={styles.fabSpace} />
     </Screen>
   );
 }
@@ -210,6 +212,9 @@ function Line({
 }
 
 const styles = StyleSheet.create({
+  fabSpace: {
+    height: theme.spacing[4],
+  },
   periods: {
     alignSelf: 'flex-start',
     marginBottom: -theme.spacing[3],

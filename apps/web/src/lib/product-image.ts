@@ -1,5 +1,5 @@
-import { ImageUploadError } from "@/lib/api-client";
-import { getFirebaseAuth, storageBucket } from "@/lib/firebase";
+import { ApiError, apiFetch, ImageUploadError } from "@/lib/api-client";
+import { getFirebaseAuth } from "@/lib/firebase";
 
 /** Width after resizing (as on mobile): plenty for a screen, light on mobile data. */
 const MAX_WIDTH = 1024;
@@ -33,65 +33,70 @@ export async function compressImage(file: File): Promise<Blob> {
   );
 }
 
+export type UploadKind = "product" | "logo";
+
+type UploadSignature = {
+  apiKey: string;
+  timestamp: number;
+  folder: string;
+  signature: string;
+  uploadUrl: string;
+};
+
 /**
- * Compresses the picked image and uploads it to Firebase Storage under the shop
- * (shops/{shopId}/products/...), through the Storage REST API like the mobile app.
- * Returns the public download URL stored on the product.
+ * Compresses the picked image and uploads it to Cloudinary, into the shop's folder (the API
+ * signs the upload: the secret stays on the server). Returns the URL to store.
  */
-export async function uploadProductImage(
+export async function uploadImage(
   shopId: string,
+  kind: UploadKind,
   file: File,
 ): Promise<string> {
   const blob = await compressImage(file);
-  const path = `shops/${shopId}/products/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
   try {
-    return await uploadToStorage(blob, path);
+    const sig = await apiFetch<UploadSignature>(
+      `/shops/${shopId}/uploads/signature`,
+      { method: "POST", body: JSON.stringify({ kind }) },
+    );
+    const form = new FormData();
+    form.append("file", blob, "photo.jpg");
+    form.append("api_key", sig.apiKey);
+    form.append("timestamp", String(sig.timestamp));
+    form.append("folder", sig.folder);
+    form.append("signature", sig.signature);
+    const response = await fetch(sig.uploadUrl, { method: "POST", body: form });
+    const body = (await response.json().catch(() => ({}))) as {
+      secure_url?: string;
+      error?: { message?: string };
+    };
+    if (!response.ok || !body.secure_url) {
+      console.warn("Cloudinary upload", response.status, body.error?.message);
+      throw new ImageUploadError(
+        `La photo n'a pas pu être envoyée (HTTP ${response.status}). Réessayez, ou enregistrez sans photo.`,
+      );
+    }
+    return body.secure_url;
   } catch (error) {
-    console.warn("Product image upload failed", error);
-    throw error instanceof ImageUploadError
-      ? error
-      : new ImageUploadError(imageUploadMessage(error));
+    console.warn("Image upload failed", error);
+    if (error instanceof ImageUploadError || error instanceof ApiError)
+      throw error;
+    throw new ImageUploadError(imageUploadMessage(error));
   }
 }
 
-async function uploadToStorage(blob: Blob, path: string): Promise<string> {
-  const bucket = storageBucket();
-  if (!bucket)
-    throw new ImageUploadError("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET est vide.");
-  const token = await getFirebaseAuth().currentUser?.getIdToken();
-  if (!token) throw new ImageUploadError("Session expirée. Reconnectez-vous.");
+export const uploadProductImage = (shopId: string, file: File) =>
+  uploadImage(shopId, "product", file);
 
-  const base = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o`;
-  const response = await fetch(
-    `${base}?uploadType=media&name=${encodeURIComponent(path)}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Firebase ${token}`,
-        "Content-Type": "image/jpeg",
-      },
-      body: blob,
-    },
+/**
+ * Cloudinary URL resized on the fly (square, WebP/AVIF when supported): light thumbnails.
+ * Other URLs (older Firebase photos) are returned as they are.
+ */
+export function sizedImage(url: string, px: number): string {
+  if (!url.startsWith("https://res.cloudinary.com/")) return url;
+  return url.replace(
+    "/image/upload/",
+    `/image/upload/c_fill,w_${px},h_${px},f_auto,q_auto/`,
   );
-  if (!response.ok) {
-    console.warn("Storage upload", response.status, `bucket: ${bucket}`);
-    throw new ImageUploadError(storageStatusMessage(response.status));
-  }
-  const { downloadTokens } = (await response.json()) as {
-    downloadTokens?: string;
-  };
-  const firstToken = downloadTokens?.split(",")[0];
-  return `${base}/${encodeURIComponent(path)}?alt=media${firstToken ? `&token=${firstToken}` : ""}`;
-}
-
-function storageStatusMessage(status: number): string {
-  if (status === 401 || status === 403) {
-    return "Envoi de la photo refusé : vérifiez les règles de sécurité de Firebase Storage.";
-  }
-  if (status === 404) {
-    return "Bucket Firebase Storage introuvable : Storage est-il activé, et le nom du bucket exact ?";
-  }
-  return `La photo n'a pas pu être envoyée (HTTP ${status}). Réessayez, ou enregistrez sans photo.`;
 }
 
 function imageUploadMessage(error: unknown): string {

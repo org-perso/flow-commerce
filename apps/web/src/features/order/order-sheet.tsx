@@ -43,6 +43,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProductThumb } from "@/features/product/product-thumb";
 import { useCan, useShop, useShopId } from "@/features/shop/shop-context";
 import { apiErrorMessage } from "@/lib/api-client";
 import {
@@ -50,6 +51,7 @@ import {
   formatDateTime,
   formatDayLabel,
   formatPhone,
+  operatorOf,
   whatsAppUrl,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -69,6 +71,7 @@ import {
   isOverdue,
   orderErrorMessage,
   phoneOf,
+  phonesOf,
 } from "./order-utils";
 import { PaymentDialog } from "./payment-dialog";
 import { DateChoice, TimeSlotChoice } from "./schedule-fields";
@@ -272,6 +275,7 @@ function OrderDetail({ order }: { order: Order }) {
   const editable = TRANSITIONS[order.status].length > 0;
   const overdue = isOverdue(order);
   const phone = phoneOf(order);
+  const phones = phonesOf(order);
   const slot = slotLabel(order.timeSlot);
   const profit =
     canCosts && order.items?.every((i) => i.unitPurchasePrice !== undefined)
@@ -356,39 +360,49 @@ function OrderDetail({ order }: { order: Order }) {
             ) : undefined
           }
         >
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="font-semibold">{customerName(order)}</p>
-              {phone ? (
-                <p className="text-sm text-muted-foreground">
-                  {formatPhone(phone)}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Pas de téléphone
-                </p>
-              )}
-            </div>
-            {phone && (
-              <div className="flex gap-1.5">
-                <Button variant="outline" size="icon-sm" asChild>
-                  <a href={`tel:${phone}`} aria-label="Appeler">
-                    <Phone />
-                  </a>
-                </Button>
-                <Button variant="outline" size="icon-sm" asChild>
-                  <a
-                    href={whatsAppUrl(phone)}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="WhatsApp"
-                  >
-                    <MessageCircle />
-                  </a>
-                </Button>
-              </div>
-            )}
-          </div>
+          <p className="font-semibold">{customerName(order)}</p>
+          {phones.length === 0 && (
+            <p className="text-sm text-muted-foreground">Pas de téléphone</p>
+          )}
+          <ul className="mt-1 flex flex-col gap-1.5">
+            {phones.map((p, index) => (
+              <li key={p} className="flex items-center justify-between gap-2">
+                <span className="text-sm">
+                  {formatPhone(p)}
+                  {operatorOf(p) && (
+                    <span className="ml-1.5 text-xs text-muted-foreground">
+                      {operatorOf(p)}
+                    </span>
+                  )}
+                  {index === 0 && phones.length > 1 && (
+                    <span className="ml-1.5 text-xs text-muted-foreground">
+                      principal
+                    </span>
+                  )}
+                </span>
+                <span className="flex gap-1.5">
+                  <Button variant="outline" size="icon-sm" asChild>
+                    <a
+                      href={`tel:${p}`}
+                      aria-label={`Appeler ${formatPhone(p)}`}
+                    >
+                      <Phone />
+                    </a>
+                  </Button>
+                  <Button variant="outline" size="icon-sm" asChild>
+                    <a
+                      href={whatsAppUrl(p)}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`WhatsApp ${formatPhone(p)}`}
+                    >
+                      <MessageCircle />
+                    </a>
+                  </Button>
+                </span>
+              </li>
+            ))}
+          </ul>
         </Section>
 
         <Section
@@ -426,11 +440,6 @@ function OrderDetail({ order }: { order: Order }) {
               {order.delivery.note && (
                 <p className="text-muted-foreground">{order.delivery.note}</p>
               )}
-              {order.delivery.phone && (
-                <p className="text-muted-foreground">
-                  Tél. livraison : {formatPhone(order.delivery.phone)}
-                </p>
-              )}
               <div className="mt-2 flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">
                   Livreur
@@ -447,8 +456,13 @@ function OrderDetail({ order }: { order: Order }) {
           {order.items ? (
             <ul className="flex flex-col gap-2 text-sm">
               {order.items.map((item) => (
-                <li key={item.id} className="flex justify-between gap-3">
-                  <span className="min-w-0">
+                <li key={item.id} className="flex items-center gap-3">
+                  <ProductThumb
+                    src={item.productImage ?? null}
+                    name={item.productName}
+                    className="size-9"
+                  />
+                  <span className="min-w-0 flex-1">
                     <span className="font-medium">{item.quantity} ×</span>{" "}
                     {item.productName}
                     <span className="block text-xs text-muted-foreground">

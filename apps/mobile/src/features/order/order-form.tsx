@@ -1,5 +1,5 @@
 import { router, Stack } from 'expo-router';
-import { Check, MapPin, Plus, Store, TriangleAlert, Truck, UserPlus, X } from 'lucide-react-native';
+import { Check, MapPin, Plus, Store, TriangleAlert, Truck, X } from 'lucide-react-native';
 import { useDeferredValue, useState, type ReactNode } from 'react';
 import { Keyboard, Pressable, StyleSheet, Switch, View } from 'react-native';
 
@@ -32,13 +32,17 @@ import type { Product } from '@/features/product/product-api';
 import { useProducts } from '@/features/product/use-products';
 import { ApiError, apiErrorMessage } from '@/lib/api-client';
 import { hitSlopFor, textStyles, theme } from '@/theme';
-import { businessToday, formatAr, formatPhone } from '@/utils/format';
+import { businessToday, formatAr, formatPhone, operatorOf, type Operator } from '@/utils/format';
 
 type Line = { product: Product; quantity: number };
-type CustomerChoice =
-  | { kind: 'none' }
-  | { kind: 'existing'; customer: Customer }
-  | { kind: 'new'; name: string; phone: string };
+/** At most 3 numbers per order (the API refuses more). */
+const MAX_PHONES = 3;
+
+/** Digits of a number as the API stores it: "+261 34 12 345 67" → "0341234567". */
+function phoneDigits(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  return /^261\d{9}$/.test(digits) ? `0${digits.slice(3)}` : digits;
+}
 
 const toInt = (text: string) => {
   const digits = text.replace(/\s/g, '');
@@ -84,19 +88,49 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
   const base = order ?? template;
 
   const prefill = useCustomer(base ? (base.customer?.id ?? undefined) : customerId);
-  const [prefillDismissed, setPrefillDismissed] = useState(false);
 
-  // Customer
-  const [choice, setChoice] = useState<CustomerChoice>({ kind: 'none' });
-  const customer: CustomerChoice =
-    choice.kind === 'none' && prefill.data && !prefillDismissed
-      ? { kind: 'existing', customer: prefill.data }
-      : choice;
-  const [customerSearch, setCustomerSearch] = useState('');
-  const customerQuery = useDeferredValue(customerSearch.trim());
-  const customerMatches = useCustomers(customerQuery, {
-    enabled: customer.kind === 'none' && customerQuery.length >= 2,
+  // Phones: up to 3, the first one is the number the driver calls.
+  const [phones, setPhones] = useState<string[]>(() => {
+    const start = base?.phones?.length
+      ? base.phones
+      : base?.delivery?.phone
+        ? [base.delivery.phone]
+        : [];
+    return start.length > 0 ? start.map(formatPhone) : [''];
   });
+  const filledPhones = phones.map((p) => p.trim()).filter(Boolean);
+  const setPhoneAt = (index: number, value: string) =>
+    setPhones((list) => list.map((p, i) => (i === index ? value : p)));
+
+  // Customer: saved by default; a known number (or the customer the form was opened for)
+  // links the order to that customer's card.
+  const [saveCustomer, setSaveCustomer] = useState(base ? !!base.customer : true);
+  const [customerName, setCustomerName] = useState('');
+  const [ignoredId, setIgnoredId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Customer | null>(null);
+  const lookupPhone = filledPhones.map(phoneDigits).find((d) => d.length >= 9) ?? '';
+  const byPhone = useCustomers(lookupPhone, { enabled: lookupPhone.length >= 9 });
+  const phoneMatch =
+    byPhone.data?.find((c) => c.phones.some((p) => phoneDigits(p) === lookupPhone)) ?? null;
+  const linked = [picked, phoneMatch, prefill.data].find((c) => c && c.id !== ignoredId) ?? null;
+  // Name typed for a new customer: existing customers with that name are suggested.
+  const nameQuery = useDeferredValue(customerName.trim());
+  const byName = useCustomers(nameQuery, {
+    enabled: saveCustomer && !linked && nameQuery.length >= 2,
+  });
+
+  /** Picks a suggested customer: their numbers fill the empty slots. */
+  const pickCustomer = (c: Customer) => {
+    setPicked(c);
+    setIgnoredId(null);
+    setPhones((list) => {
+      const kept = list.map((p) => p.trim()).filter(Boolean);
+      const known = new Set(kept.map(phoneDigits));
+      const added = c.phones.filter((p) => !known.has(phoneDigits(p))).map(formatPhone);
+      const next = [...kept, ...added].slice(0, MAX_PHONES);
+      return next.length > 0 ? next : [''];
+    });
+  };
 
   // Products
   const [lineState, setLines] = useState<Line[]>(
@@ -124,7 +158,6 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
   const [deliveryPlace, setDeliveryPlace] = useState(base?.delivery?.place ?? '');
   const [deliveryAddress, setDeliveryAddress] = useState(base?.delivery?.address ?? '');
   const [deliveryNote, setDeliveryNote] = useState(base?.delivery?.note ?? '');
-  const [deliveryPhone, setDeliveryPhone] = useState(base?.delivery?.phone ?? '');
   const [deliveryMore, setDeliveryMore] = useState(false);
   const showDeliveryMore = deliveryMore || !!deliveryAddress || !!deliveryNote;
   const [deliveryFee, setDeliveryFee] = useState(base?.deliveryFee ? String(base.deliveryFee) : '');
@@ -145,23 +178,6 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
 
   const itemsAmount = lines.reduce((sum, l) => sum + l.quantity * l.product.sellingPrice, 0);
   const fee = isDelivery ? (toInt(deliveryFee) ?? 0) : 0;
-  // The driver must be able to call: a delivery always needs a number. A known customer
-  // without one, or a walk-in customer, gets a number field on the delivery itself.
-  const customerPhone = customer.kind === 'existing' ? (customer.customer.phones[0] ?? null) : null;
-  const needsDeliveryPhone = isDelivery && customer.kind !== 'new' && !customerPhone;
-
-  const resetCustomer = () => {
-    setPrefillDismissed(true);
-    setChoice({ kind: 'none' });
-  };
-
-  const startNewCustomer = () => {
-    // Prefill from what was typed: digits go to the phone, text to the name.
-    const typed = customerSearch.trim();
-    const isPhone = /^[\d\s+.-]+$/.test(typed);
-    setChoice({ kind: 'new', name: isPhone ? '' : typed, phone: isPhone ? typed : '' });
-  };
-
   const addProduct = (product: Product) => {
     setLines((current) =>
       current.some((l) => l.product.id === product.id)
@@ -181,16 +197,16 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
   const submit = async () => {
     setFormError(undefined);
     if (lines.length === 0) return setFormError('Ajoutez au moins un produit.');
-    if (customer.kind === 'new' && !customer.name.trim()) {
-      return setFormError('Indiquez le nom du nouveau client.');
+    if (filledPhones.some((p) => phoneDigits(p).length < 6)) {
+      return setFormError('Un des numéros de téléphone est incomplet.');
+    }
+    if (isDelivery && filledPhones.length === 0) {
+      return setFormError('Indiquez un numéro : le livreur doit pouvoir appeler.');
+    }
+    if (saveCustomer && !linked && !customerName.trim()) {
+      return setFormError('Indiquez le nom du client, ou décochez « Enregistrer le client ».');
     }
     if (!scheduledDate) return setFormError('Indiquez une date valide (JJ/MM/AAAA).');
-    if (isDelivery && customer.kind === 'new' && !customer.phone.trim()) {
-      return setFormError('Indiquez le téléphone du client : le livreur doit pouvoir appeler.');
-    }
-    if (needsDeliveryPhone && !deliveryPhone.trim()) {
-      return setFormError('Indiquez un numéro à appeler pour la livraison.');
-    }
     if (isDelivery && deliveryFee.trim() && toInt(deliveryFee) === null) {
       return setFormError('Frais de livraison : montant en Ariary, sans virgule.');
     }
@@ -201,19 +217,28 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
           address: deliveryAddress.trim() || null,
           note: deliveryNote.trim() || null,
           fee,
-          phone: needsDeliveryPhone ? deliveryPhone.trim() : null,
+          phone: filledPhones[0] ?? null,
         }
       : null;
+    // Saved customer: sent with the numbers (the API finds the card by any of them and adds the
+    // new ones). A known customer without any number typed is linked by its id.
+    const customerFields = !saveCustomer
+      ? { customerId: null, customer: null }
+      : filledPhones.length > 0
+        ? {
+            customerId: null,
+            customer: { name: (linked?.name ?? customerName).trim(), phones: filledPhones },
+          }
+        : linked
+          ? { customerId: linked.id, customer: null }
+          : { customerId: null, customer: { name: customerName.trim(), phones: [] } };
 
     if (order) {
       const patch: OrderPatch = {
-        // Customer file still loading: keep the order's customer unless it was removed.
-        customerId:
-          customer.kind === 'existing'
-            ? customer.customer.id
-            : !prefillDismissed
-              ? (order.customer?.id ?? null)
-              : null,
+        ...(customerFields.customer
+          ? { customer: customerFields.customer }
+          : { customerId: customerFields.customerId }),
+        phones: filledPhones,
         scheduledDate,
         timeSlot,
         delivery,
@@ -234,11 +259,8 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
 
     try {
       const created = await createOrder.mutateAsync({
-        customerId: customer.kind === 'existing' ? customer.customer.id : null,
-        customer:
-          customer.kind === 'new'
-            ? { name: customer.name.trim(), phone: customer.phone.trim() || null }
-            : null,
+        ...customerFields,
+        phones: filledPhones,
         items: lines.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
         source: null,
         scheduledDate,
@@ -423,9 +445,131 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
         )}
       </View>
 
-      {/* 2. Livraison */}
+      {/* 2. Téléphone(s): the numbers to reach the customer, first = the one the driver calls. */}
       <View style={styles.stepCard}>
-        <StepHeader step={2} title="Livraison" />
+        <StepHeader step={2} title={phones.length > 1 ? 'Téléphones' : 'Téléphone'} />
+        {phones.map((value, index) => (
+          <View key={index} style={styles.phoneRow}>
+            <View style={styles.flex}>
+              <TextField
+                label={
+                  index === 0
+                    ? isDelivery
+                      ? 'Numéro principal (obligatoire pour livrer)'
+                      : 'Numéro principal'
+                    : `Autre numéro ${index}`
+                }
+                value={value}
+                onChangeText={(text) => setPhoneAt(index, text)}
+                placeholder="034 00 000 00"
+                keyboardType="phone-pad"
+              />
+            </View>
+            <OperatorBadge phone={value} />
+            {phones.length > 1 && (
+              <Pressable
+                onPress={() => setPhones((list) => list.filter((_, i) => i !== index))}
+                accessibilityRole="button"
+                accessibilityLabel="Retirer ce numéro"
+                hitSlop={hitSlopFor(theme.layout.iconLg)}
+                style={styles.phoneRemove}
+              >
+                <X size={theme.layout.iconMd} color={theme.colors.inkMuted} strokeWidth={2} />
+              </Pressable>
+            )}
+          </View>
+        ))}
+        {phones.length < MAX_PHONES && (
+          <View style={styles.links}>
+            <Button
+              label="Ajouter un autre numéro"
+              icon={Plus}
+              variant="ghost"
+              compact
+              onPress={() => setPhones((list) => [...list, ''])}
+            />
+          </View>
+        )}
+      </View>
+
+      {/* 3. Client: saved with the numbers above, or a walk-in customer. */}
+      <View style={styles.stepCard}>
+        <StepHeader step={3} title="Client" />
+        <Pressable
+          onPress={() => setSaveCustomer((v) => !v)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: saveCustomer }}
+          style={styles.row}
+        >
+          <View style={[styles.checkbox, saveCustomer && styles.checkboxOn]}>
+            {saveCustomer && (
+              <Check size={theme.layout.iconSm} color={theme.colors.onNavy} strokeWidth={3} />
+            )}
+          </View>
+          <View style={styles.flex}>
+            <AppText style={styles.strong}>Enregistrer le client</AppText>
+            <AppText variant="caption" color="inkMuted">
+              {saveCustomer
+                ? 'Avec les numéros ci-dessus, dans vos clients.'
+                : 'Client de passage : les numéros restent sur la commande.'}
+            </AppText>
+          </View>
+        </Pressable>
+        {saveCustomer && linked && (
+          <View style={[styles.inset, styles.row]}>
+            <Avatar name={linked.name} size="sm" />
+            <View style={styles.flex}>
+              <AppText variant="caption" color="inkMuted">
+                Client connu
+              </AppText>
+              <AppText style={styles.strong} numberOfLines={1}>
+                {linked.name}
+              </AppText>
+              <AppText variant="caption" color="inkMuted">
+                {`${linked.orderCount} commande${linked.orderCount > 1 ? 's' : ''} passée${linked.orderCount > 1 ? 's' : ''}`}
+              </AppText>
+            </View>
+            <Button
+              label="Ce n’est pas lui"
+              variant="ghost"
+              compact
+              onPress={() => {
+                setIgnoredId(linked.id);
+                setPicked(null);
+              }}
+            />
+          </View>
+        )}
+        {saveCustomer && !linked && (
+          <>
+            <TextField
+              label="Nom du client"
+              value={customerName}
+              onChangeText={setCustomerName}
+              placeholder="Ex. Rakoto Jean"
+              autoCapitalize="words"
+              maxLength={150}
+            />
+            {!!byName.data?.length && (
+              <ListGroup>
+                {byName.data.slice(0, 3).map((c) => (
+                  <ListRow
+                    key={c.id}
+                    leading={<Avatar name={c.name} />}
+                    title={c.name}
+                    subtitle={c.phones[0] ? formatPhone(c.phones[0]) : 'Client existant'}
+                    onPress={() => pickCustomer(c)}
+                  />
+                ))}
+              </ListGroup>
+            )}
+          </>
+        )}
+      </View>
+
+      {/* 4. Livraison */}
+      <View style={styles.stepCard}>
+        <StepHeader step={4} title="Livraison" />
         <ModeToggle isDelivery={isDelivery} onChange={setIsDelivery} />
         {isDelivery && (
           <>
@@ -513,107 +657,9 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
         <TimeSlotChoice value={timeSlot} onChange={setTimeSlot} />
       </View>
 
-      {/* 3. Client: after the delivery, once the order itself is known. */}
-      <View style={styles.stepCard}>
-        <StepHeader step={3} title="Client (optionnel)" />
-        {customer.kind === 'existing' && (
-          <View style={[styles.inset, styles.row]}>
-            <Avatar name={customer.customer.name} size="sm" />
-            <View style={styles.flex}>
-              <AppText style={styles.strong} numberOfLines={1}>
-                {customer.customer.name}
-              </AppText>
-              <AppText variant="caption" color="inkMuted">
-                {[
-                  customer.customer.phones[0] ? formatPhone(customer.customer.phones[0]) : null,
-                  `${customer.customer.orderCount} commande${customer.customer.orderCount > 1 ? 's' : ''} passée${customer.customer.orderCount > 1 ? 's' : ''}`,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </AppText>
-            </View>
-            <Button label="Changer" variant="ghost" compact onPress={resetCustomer} />
-          </View>
-        )}
-        {customer.kind === 'new' && (
-          <View style={styles.section}>
-            <TextField
-              label="Nom du client"
-              value={customer.name}
-              onChangeText={(name) => setChoice({ ...customer, name })}
-              autoCapitalize="words"
-            />
-            <TextField
-              label={isDelivery ? 'Téléphone (obligatoire pour livrer)' : 'Téléphone'}
-              hint="Numéro déjà connu : sa fiche est reprise."
-              value={customer.phone}
-              onChangeText={(phone) => setChoice({ ...customer, phone })}
-              keyboardType="phone-pad"
-            />
-          </View>
-        )}
-        {customer.kind === 'none' && (
-          <>
-            <SearchBar
-              value={customerSearch}
-              onChangeText={setCustomerSearch}
-              placeholder="Nom, téléphone ou profil du client"
-            />
-            {customerQuery.length >= 2 && !!customerMatches.data?.length && (
-              <ListGroup>
-                {customerMatches.data.slice(0, 5).map((c) => (
-                  <ListRow
-                    key={c.id}
-                    leading={<Avatar name={c.name} />}
-                    title={c.name}
-                    subtitle={
-                      c.phones[0] ? formatPhone(c.phones[0]) : (c.socialProfile ?? undefined)
-                    }
-                    onPress={() => setChoice({ kind: 'existing', customer: c })}
-                  />
-                ))}
-              </ListGroup>
-            )}
-          </>
-        )}
-        {/* For a delivery, a number to call when the customer has none. */}
-        {needsDeliveryPhone && (
-          <TextField
-            label="Téléphone pour la livraison"
-            value={deliveryPhone}
-            onChangeText={setDeliveryPhone}
-            placeholder="034 00 000 00"
-            keyboardType="phone-pad"
-            hint={
-              customer.kind === 'existing'
-                ? 'Ce client n’a pas de numéro : celui que le livreur appellera.'
-                : 'Client sans fiche : le numéro que le livreur appellera.'
-            }
-          />
-        )}
-        <View style={styles.links}>
-          {customer.kind === 'none' ? (
-            <AppText variant="caption" color="inkMuted">
-              Sans client choisi : client de passage.
-            </AppText>
-          ) : (
-            <Button label="Sans fiche" variant="ghost" compact onPress={resetCustomer} />
-          )}
-          {customer.kind !== 'new' && !editing && (
-            <Button
-              label="Nouveau client"
-              icon={UserPlus}
-              variant="ghost"
-              compact
-              onPress={startNewCustomer}
-            />
-          )}
-        </View>
-      </View>
-
       {/* 4. Paiement */}
       <View style={styles.stepCard}>
-        <StepHeader step={4} title="Paiement" />
+        <StepHeader step={5} title="Paiement" />
         {/* One switch: not ticked means still to pay. */}
         <Pressable
           onPress={() => setIsPaid((v) => !v)}
@@ -652,6 +698,27 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
         />
       )}
     </Screen>
+  );
+}
+
+const OPERATOR_COLORS: Record<Operator, { bg: string; fg: string }> = {
+  Telma: { bg: theme.colors.statusDeliveredBg, fg: theme.colors.statusDeliveredFg },
+  Orange: { bg: theme.colors.goldSoft, fg: theme.colors.goldInk },
+  Airtel: { bg: theme.colors.statusCancelledBg, fg: theme.colors.statusCancelledFg },
+  Autre: { bg: theme.colors.navySoft, fg: theme.colors.inkMuted },
+};
+
+/** Telma / Orange / Airtel next to a number, as soon as its prefix is typed. */
+function OperatorBadge({ phone }: { phone: string }) {
+  const operator = operatorOf(phone);
+  if (!operator) return null;
+  const { bg, fg } = OPERATOR_COLORS[operator];
+  return (
+    <View style={[styles.operator, { backgroundColor: bg }]}>
+      <AppText variant="caption" style={[styles.operatorText, { color: fg }]}>
+        {operator}
+      </AppText>
+    </View>
   );
 }
 
@@ -847,6 +914,37 @@ function insufficientStockMessage(error: ApiError, lines: Line[]): string {
 const PRODUCTS_STEP = 5;
 
 const styles = StyleSheet.create({
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: theme.spacing[2],
+  },
+  operator: {
+    height: theme.layout.controlHeight,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing[2],
+    borderRadius: theme.radius.md,
+  },
+  operatorText: {
+    fontFamily: theme.typography.heading.fontFamily,
+  },
+  phoneRemove: {
+    height: theme.layout.controlHeight,
+    justifyContent: 'center',
+  },
+  checkbox: {
+    width: theme.layout.iconLg,
+    height: theme.layout.iconLg,
+    borderRadius: theme.radius.sm,
+    borderWidth: 2,
+    borderColor: theme.colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxOn: {
+    backgroundColor: theme.colors.navy,
+    borderColor: theme.colors.navy,
+  },
   section: {
     gap: theme.spacing[3],
   },

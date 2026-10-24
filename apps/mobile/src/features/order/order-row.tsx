@@ -1,9 +1,9 @@
-import { ArrowRight, Bike, Clock, MapPin, Phone, Store, Wallet } from 'lucide-react-native';
+import { ArrowRight, Bike, Clock, MapPin, Store, Wallet } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Button, StatusBadge } from '@/components/ui';
-import { callPhone, formatPhone } from '@/features/customer/contact';
-import { hitSlopFor, theme } from '@/theme';
+import { CallButton } from '@/features/order/call-button';
+import { theme } from '@/theme';
 import { useStateColor } from '@/theme/state-colors';
 import {
   businessNow,
@@ -83,7 +83,9 @@ export function OrderRow({
 }: OrderRowProps) {
   const today = businessToday();
   const overdue = isOverdue(order, today);
-  const phone = hideCustomer ? null : (order.customer?.phone ?? order.delivery?.phone);
+  const phone = hideCustomer
+    ? null
+    : (order.phones?.[0] ?? order.customer?.phone ?? order.delivery?.phone);
   const place = order.delivery
     ? (order.delivery.place ?? order.delivery.address ?? 'À livrer')
     : 'À récupérer';
@@ -185,15 +187,7 @@ export function OrderRow({
           </View>
         )}
         {phone && (
-          <Pressable
-            onPress={() => callPhone(phone)}
-            accessibilityRole="button"
-            accessibilityLabel={`Appeler ${formatPhone(phone)}`}
-            hitSlop={hitSlopFor(theme.layout.controlHeight)}
-            style={({ pressed }) => [styles.phone, pressed && styles.pressed]}
-          >
-            <Phone size={theme.layout.iconSm} color={theme.colors.blue} strokeWidth={2} />
-          </Pressable>
+          <CallButton phone={phone} others={Math.max(0, (order.phones?.length ?? 0) - 1)} />
         )}
       </Pressable>
       {showActions && <QuickActions order={order} />}
@@ -274,14 +268,6 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing[3],
     borderTopWidth: theme.layout.border,
     borderTopColor: theme.colors.line,
-  },
-  phone: {
-    width: theme.layout.controlHeight,
-    height: theme.layout.controlHeight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.navySoft,
   },
   place: {
     flex: 1,

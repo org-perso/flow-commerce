@@ -23,10 +23,22 @@ export function placeOf(order: Pick<Order, "delivery">): string {
 }
 
 /** Number to call: the customer's, else the delivery one (walk-in customer). */
+/** The number to call: the order's main one, else the customer's or the delivery's. */
 export function phoneOf(
-  order: Pick<Order, "customer" | "delivery">,
+  order: Pick<Order, "customer" | "delivery" | "phones">,
 ): string | null {
-  return order.customer?.phone ?? order.delivery?.phone ?? null;
+  return (
+    order.phones?.[0] ?? order.customer?.phone ?? order.delivery?.phone ?? null
+  );
+}
+
+/** Every number of the order (main first); older orders: the one we know. */
+export function phonesOf(
+  order: Pick<Order, "customer" | "delivery" | "phones">,
+): string[] {
+  if (order.phones?.length) return order.phones;
+  const main = phoneOf(order);
+  return main ? [main] : [];
 }
 
 export const customerName = (order: Pick<Order, "customer">) =>

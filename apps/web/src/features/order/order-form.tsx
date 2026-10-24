@@ -10,7 +10,6 @@ import {
   Store,
   Trash2,
   Truck,
-  UserPlus,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +18,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { Avatar } from "@/components/app/avatar";
+import { ProductThumb } from "@/features/product/product-thumb";
 import { Field } from "@/components/app/field";
 import { InlineAlert } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,14 @@ import { useProducts } from "@/features/product/use-products";
 import { useCan, useShopId } from "@/features/shop/shop-context";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { toInt } from "@/lib/form-fields";
-import { businessToday, formatAr, formatPhone, plural } from "@/lib/format";
+import {
+  businessToday,
+  formatAr,
+  formatPhone,
+  operatorOf,
+  plural,
+  type Operator,
+} from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { Order, OrderPatch } from "./order-api";
@@ -45,10 +52,14 @@ import type { TimeSlot } from "./time-slot";
 import { useCreateOrder, useRecentPlaces, useUpdateOrder } from "./use-orders";
 
 type Line = { product: Product; quantity: number };
-type CustomerChoice =
-  | { kind: "none" }
-  | { kind: "existing"; customer: Customer }
-  | { kind: "new"; name: string; phone: string };
+/** At most 3 numbers per order (the API refuses more). */
+const MAX_PHONES = 3;
+
+/** Digits of a number as the API stores it: "+261 34 12 345 67" → "0341234567". */
+function phoneDigits(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  return /^261\d{9}$/.test(digits) ? `0${digits.slice(3)}` : digits;
+}
 
 /** A product known only from an order line (until the product list has loaded). */
 const lineProduct = (item: NonNullable<Order["items"]>[number]): Product => ({
@@ -166,21 +177,64 @@ export function OrderForm({
   const prefill = useCustomer(
     start ? (start.customer?.id ?? undefined) : customerId,
   );
-  const [prefillDismissed, setPrefillDismissed] = useState(false);
 
-  // Customer
-  const [choice, setChoice] = useState<CustomerChoice>({ kind: "none" });
-  const customer: CustomerChoice =
-    choice.kind === "none" && prefill.data && !prefillDismissed
-      ? { kind: "existing", customer: prefill.data }
-      : choice;
-  const [customerSearch, setCustomerSearch] = useState("");
-  const customerQuery = useDebouncedValue(customerSearch.trim(), 250);
-  const customerMatches = useCustomers(
-    customerQuery,
-    { limit: 6, offset: 0 },
-    customer.kind === "none" && customerQuery.length >= 2,
+  // Phones: up to 3, the first one is the number the driver calls.
+  const [phones, setPhones] = useState<string[]>(() => {
+    const first = start?.phones?.length
+      ? start.phones
+      : start?.delivery?.phone
+        ? [start.delivery.phone]
+        : [];
+    return first.length > 0 ? first.map(formatPhone) : [""];
+  });
+  const filledPhones = phones.map((p) => p.trim()).filter(Boolean);
+  const setPhoneAt = (index: number, value: string) =>
+    setPhones((list) => list.map((p, i) => (i === index ? value : p)));
+
+  // Customer: saved by default; a known number (or the customer the form was opened for)
+  // links the order to that customer's card.
+  const [saveCustomer, setSaveCustomer] = useState(
+    start ? !!start.customer : true,
   );
+  const [customerName, setCustomerName] = useState("");
+  const [ignoredId, setIgnoredId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Customer | null>(null);
+  const lookupPhone =
+    filledPhones.map(phoneDigits).find((d) => d.length >= 9) ?? "";
+  const byPhone = useCustomers(
+    lookupPhone,
+    { limit: 6, offset: 0 },
+    lookupPhone.length >= 9,
+  );
+  const phoneMatch =
+    byPhone.data?.find((c) =>
+      c.phones.some((p) => phoneDigits(p) === lookupPhone),
+    ) ?? null;
+  const linked =
+    [picked, phoneMatch, prefill.data].find((c) => c && c.id !== ignoredId) ??
+    null;
+  // Name typed for a new customer: existing customers with that name are suggested.
+  const nameQuery = useDebouncedValue(customerName.trim(), 250);
+  const byName = useCustomers(
+    nameQuery,
+    { limit: 3, offset: 0 },
+    saveCustomer && !linked && nameQuery.length >= 2,
+  );
+
+  /** Picks a suggested customer: their numbers fill the empty slots. */
+  const pickCustomer = (c: Customer) => {
+    setPicked(c);
+    setIgnoredId(null);
+    setPhones((list) => {
+      const kept = list.map((p) => p.trim()).filter(Boolean);
+      const known = new Set(kept.map(phoneDigits));
+      const added = c.phones
+        .filter((p) => !known.has(phoneDigits(p)))
+        .map(formatPhone);
+      const next = [...kept, ...added].slice(0, MAX_PHONES);
+      return next.length > 0 ? next : [""];
+    });
+  };
 
   // Products
   const [lineState, setLines] = useState<Line[]>(
@@ -221,9 +275,6 @@ export function OrderForm({
     start?.delivery?.address ?? "",
   );
   const [deliveryNote, setDeliveryNote] = useState(start?.delivery?.note ?? "");
-  const [deliveryPhone, setDeliveryPhone] = useState(
-    start?.delivery?.phone ?? "",
-  );
   const [deliveryFee, setDeliveryFee] = useState(
     start?.deliveryFee ? String(start.deliveryFee) : "",
   );
@@ -239,11 +290,6 @@ export function OrderForm({
     0,
   );
   const fee = isDelivery ? (toInt(deliveryFee) ?? 0) : 0;
-  // The driver must be able to call: a delivery always needs a number.
-  const customerPhone =
-    customer.kind === "existing" ? (customer.customer.phones[0] ?? null) : null;
-  const needsDeliveryPhone =
-    isDelivery && customer.kind !== "new" && !customerPhone;
   const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
   // Without purchase prices (CM) there is no profit to show.
   const profit =
@@ -256,21 +302,6 @@ export function OrderForm({
           0,
         )
       : null;
-
-  const resetCustomer = () => {
-    setPrefillDismissed(true);
-    setChoice({ kind: "none" });
-  };
-
-  const startNewCustomer = () => {
-    const typed = customerSearch.trim();
-    const isPhone = /^[\d\s+.-]+$/.test(typed);
-    setChoice({
-      kind: "new",
-      name: isPhone ? "" : typed,
-      phone: isPhone ? typed : "",
-    });
-  };
 
   const addProduct = (product: Product) => {
     setLines((current) =>
@@ -299,16 +330,17 @@ export function OrderForm({
   const submit = async () => {
     setFormError(undefined);
     if (lines.length === 0) return setFormError("Ajoutez au moins un produit.");
-    if (customer.kind === "new" && !customer.name.trim())
-      return setFormError("Indiquez le nom du nouveau client.");
-    if (!scheduledDate) return setFormError("Indiquez une date valide.");
-    if (isDelivery && customer.kind === "new" && !customer.phone.trim()) {
+    if (filledPhones.some((p) => phoneDigits(p).length < 6))
+      return setFormError("Un des numéros de téléphone est incomplet.");
+    if (isDelivery && filledPhones.length === 0)
       return setFormError(
-        "Indiquez le téléphone du client : le livreur doit pouvoir appeler.",
+        "Indiquez un numéro : le livreur doit pouvoir appeler.",
       );
-    }
-    if (needsDeliveryPhone && !deliveryPhone.trim())
-      return setFormError("Indiquez un numéro à appeler pour la livraison.");
+    if (saveCustomer && !linked && !customerName.trim())
+      return setFormError(
+        "Indiquez le nom du client, ou décochez « Enregistrer le client ».",
+      );
+    if (!scheduledDate) return setFormError("Indiquez une date valide.");
     if (isDelivery && deliveryFee.trim() && toInt(deliveryFee) === null) {
       return setFormError(
         "Frais de livraison : montant en Ariary, sans virgule.",
@@ -321,19 +353,35 @@ export function OrderForm({
           address: deliveryAddress.trim() || null,
           note: deliveryNote.trim() || null,
           fee,
-          phone: needsDeliveryPhone ? deliveryPhone.trim() : null,
+          phone: filledPhones[0] ?? null,
         }
       : null;
+    // Saved customer: sent with the numbers (the API finds the card by any of them and adds
+    // the new ones). A known customer without any number typed is linked by its id.
+    const customerFields = !saveCustomer
+      ? { customerId: null, customer: null }
+      : filledPhones.length > 0
+        ? {
+            customerId: null,
+            customer: {
+              name: (linked?.name ?? customerName).trim(),
+              phones: filledPhones,
+            },
+          }
+        : linked
+          ? { customerId: linked.id, customer: null }
+          : {
+              customerId: null,
+              customer: { name: customerName.trim(), phones: [] },
+            };
 
     try {
       if (order) {
         const patch: OrderPatch = {
-          customerId:
-            customer.kind === "existing"
-              ? customer.customer.id
-              : !prefillDismissed
-                ? (order.customer?.id ?? null)
-                : null,
+          ...(customerFields.customer
+            ? { customer: customerFields.customer }
+            : { customerId: customerFields.customerId }),
+          phones: filledPhones,
           scheduledDate,
           timeSlot,
           delivery,
@@ -353,15 +401,8 @@ export function OrderForm({
         router.push(`${base}?commande=${order.id}`);
       } else {
         const created = await createOrder.mutateAsync({
-          customerId:
-            customer.kind === "existing" ? customer.customer.id : null,
-          customer:
-            customer.kind === "new"
-              ? {
-                  name: customer.name.trim(),
-                  phone: customer.phone.trim() || null,
-                }
-              : null,
+          ...customerFields,
+          phones: filledPhones,
           items: lines.map((l) => ({
             productId: l.product.id,
             quantity: l.quantity,
@@ -478,7 +519,11 @@ export function OrderForm({
                         onClick={() => addProduct(p)}
                         className="flex h-10 items-center gap-2 rounded-lg border border-dashed bg-card pr-3 pl-1.5 text-sm hover:border-solid hover:bg-accent disabled:opacity-50"
                       >
-                        <Avatar name={p.name} className="size-7 rounded-md" />
+                        <ProductThumb
+                          src={p.image}
+                          name={p.name}
+                          className="size-7"
+                        />
                         <span className="font-medium">{p.name}</span>
                         <span className="text-muted-foreground">
                           {formatAr(p.sellingPrice)} ·{" "}
@@ -534,9 +579,10 @@ export function OrderForm({
                     key={line.product.id}
                     className="flex flex-wrap items-center gap-3 p-3"
                   >
-                    <Avatar
+                    <ProductThumb
+                      src={line.product.image}
                       name={line.product.name}
-                      className="size-9 rounded-md"
+                      className="size-9"
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">
@@ -583,8 +629,146 @@ export function OrderForm({
           )}
         </Step>
 
-        {/* 2. Livraison */}
-        <Step n={2} title="Livraison">
+        {/* 2. Téléphone(s): first = the number the driver calls. */}
+        <Step n={2} title={phones.length > 1 ? "Téléphones" : "Téléphone"}>
+          <div className="flex flex-col gap-2">
+            {phones.map((value, index) => (
+              <Field
+                key={index}
+                label={
+                  index === 0
+                    ? isDelivery
+                      ? "Numéro principal (obligatoire pour livrer)"
+                      : "Numéro principal"
+                    : `Autre numéro ${index}`
+                }
+                htmlFor={`phone-${index}`}
+              >
+                <div className="flex gap-2">
+                  <Input
+                    id={`phone-${index}`}
+                    type="tel"
+                    value={value}
+                    onChange={(e) => setPhoneAt(index, e.target.value)}
+                    placeholder="034 00 000 00"
+                    className="max-w-64"
+                  />
+                  <OperatorBadge phone={value} />
+                  {phones.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Retirer ce numéro"
+                      onClick={() =>
+                        setPhones((list) => list.filter((_, i) => i !== index))
+                      }
+                    >
+                      <X />
+                    </Button>
+                  )}
+                </div>
+              </Field>
+            ))}
+          </div>
+          {phones.length < MAX_PHONES && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-link hover:underline"
+              onClick={() => setPhones((list) => [...list, ""])}
+            >
+              <Plus className="size-4" /> Ajouter un autre numéro
+            </button>
+          )}
+        </Step>
+
+        {/* 3. Client: saved with the numbers above, or a walk-in customer. */}
+        <Step n={3} title="Client">
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border bg-card px-4 py-3">
+            <Checkbox
+              checked={saveCustomer}
+              onCheckedChange={(v) => setSaveCustomer(v === true)}
+            />
+            <span className="flex flex-col">
+              <span className="text-sm font-semibold">
+                Enregistrer le client
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {saveCustomer
+                  ? "Avec les numéros ci-dessus, dans vos clients."
+                  : "Client de passage : les numéros restent sur la commande."}
+              </span>
+            </span>
+          </label>
+          {saveCustomer && linked && (
+            <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
+              <Avatar name={linked.name} className="size-10" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground">Client connu</p>
+                <p className="truncate font-semibold">{linked.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {plural(
+                    linked.orderCount,
+                    "commande passée",
+                    "commandes passées",
+                  )}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIgnoredId(linked.id);
+                  setPicked(null);
+                }}
+              >
+                Ce n’est pas lui
+              </Button>
+            </div>
+          )}
+          {saveCustomer && !linked && (
+            <div className="flex flex-col gap-2">
+              <Field label="Nom du client" htmlFor="customer-name">
+                <Input
+                  id="customer-name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Ex. Rakoto Jean"
+                  className="max-w-md"
+                />
+              </Field>
+              {!!byName.data?.length && (
+                <ul className="max-w-md divide-y rounded-lg border">
+                  {byName.data.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => pickCustomer(c)}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-accent"
+                      >
+                        <Avatar name={c.name} />
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate text-sm font-medium">
+                            {c.name}
+                          </span>
+                          <span className="truncate text-xs text-muted-foreground">
+                            {c.phones[0]
+                              ? formatPhone(c.phones[0])
+                              : "Client existant"}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </Step>
+
+        {/* 4. Livraison */}
+        <Step n={4} title="Livraison">
           <RadioGroup
             value={isDelivery ? "delivery" : "pickup"}
             onValueChange={(v) => setIsDelivery(v === "delivery")}
@@ -675,151 +859,8 @@ export function OrderForm({
           </div>
         </Step>
 
-        {/* 3. Client: after the delivery, as on mobile. */}
-        <Step n={3} title="Client (optionnel)">
-          {customer.kind === "existing" && (
-            <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
-              <Avatar name={customer.customer.name} className="size-10" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">
-                  {customer.customer.name}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {[
-                    customer.customer.phones[0]
-                      ? formatPhone(customer.customer.phones[0])
-                      : "Pas de téléphone",
-                    `${plural(customer.customer.orderCount, "commande passée", "commandes passées")}`,
-                  ].join(" · ")}
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={resetCustomer}>
-                Changer
-              </Button>
-            </div>
-          )}
-          {customer.kind === "new" && (
-            <div className="grid gap-3 rounded-lg border bg-muted/40 p-3 sm:grid-cols-2">
-              <Field label="Nom du client" htmlFor="new-name">
-                <Input
-                  id="new-name"
-                  value={customer.name}
-                  onChange={(e) =>
-                    setChoice({ ...customer, name: e.target.value })
-                  }
-                  autoFocus
-                />
-              </Field>
-              <Field
-                label={
-                  isDelivery
-                    ? "Téléphone (obligatoire pour livrer)"
-                    : "Téléphone"
-                }
-                htmlFor="new-phone"
-                hint="Numéro déjà connu : sa fiche est reprise."
-              >
-                <Input
-                  id="new-phone"
-                  type="tel"
-                  value={customer.phone}
-                  placeholder="034 12 345 67"
-                  onChange={(e) =>
-                    setChoice({ ...customer, phone: e.target.value })
-                  }
-                />
-              </Field>
-            </div>
-          )}
-          {customer.kind === "none" && (
-            <div className="relative">
-              <label className="flex h-10 items-center gap-2 rounded-md border bg-card px-3 text-muted-foreground focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/30">
-                <Search className="size-4" />
-                <input
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
-                  placeholder="Nom, téléphone ou profil du client"
-                  aria-label="Rechercher un client"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none"
-                />
-              </label>
-              {customerQuery.length >= 2 && !!customerMatches.data?.length && (
-                <ul className="mt-2 divide-y rounded-lg border">
-                  {customerMatches.data.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setChoice({ kind: "existing", customer: c })
-                        }
-                        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-accent"
-                      >
-                        <Avatar name={c.name} />
-                        <span className="flex min-w-0 flex-col">
-                          <span className="truncate text-sm font-medium">
-                            {c.name}
-                          </span>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {c.phones[0]
-                              ? formatPhone(c.phones[0])
-                              : (c.socialProfile ?? "")}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-            {customer.kind === "none" ? (
-              <span className="text-muted-foreground">
-                Sans client choisi : client de passage.
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="font-medium text-link hover:underline"
-                onClick={resetCustomer}
-              >
-                Sans fiche
-              </button>
-            )}
-            {customer.kind !== "new" && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 font-medium text-link hover:underline"
-                onClick={startNewCustomer}
-              >
-                <UserPlus className="size-4" /> Nouveau client
-              </button>
-            )}
-          </div>
-          {/* For a delivery, a number to call when the customer has none. */}
-          {needsDeliveryPhone && (
-            <Field
-              label="Téléphone pour la livraison"
-              htmlFor="delivery-phone"
-              hint={
-                customer.kind === "existing"
-                  ? "Ce client n’a pas de numéro : le livreur doit pouvoir appeler."
-                  : "Client sans fiche : le livreur doit pouvoir appeler."
-              }
-            >
-              <Input
-                id="delivery-phone"
-                type="tel"
-                value={deliveryPhone}
-                onChange={(e) => setDeliveryPhone(e.target.value)}
-                placeholder="034 00 000 00"
-              />
-            </Field>
-          )}
-        </Step>
-
         {/* 4. Paiement */}
-        <Step n={4} title="Paiement">
+        <Step n={5} title="Paiement">
           {/* One checkbox: not ticked means still to pay. */}
           <label className="flex cursor-pointer items-center gap-3 rounded-lg border bg-card px-4 py-3">
             <Checkbox
@@ -936,5 +977,25 @@ export function OrderForm({
         </div>
       </aside>
     </div>
+  );
+}
+
+const OPERATOR_STYLES: Record<Operator, string> = {
+  Telma: "bg-success-soft text-success",
+  Orange: "bg-gold-soft text-gold-ink",
+  Airtel: "bg-danger-soft text-danger",
+  Autre: "bg-muted text-muted-foreground",
+};
+
+/** Telma / Orange / Airtel next to a number, as soon as its prefix is typed. */
+function OperatorBadge({ phone }: { phone: string }) {
+  const operator = operatorOf(phone);
+  if (!operator) return null;
+  return (
+    <span
+      className={`inline-flex h-9 items-center rounded-md px-2.5 text-xs font-semibold ${OPERATOR_STYLES[operator]}`}
+    >
+      {operator}
+    </span>
   );
 }

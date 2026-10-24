@@ -1,32 +1,30 @@
 import { Image } from 'expo-image';
-import { Camera, Crown, ImagePlus, Trash2 } from 'lucide-react-native';
+import { Camera, ImagePlus, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText, Button } from '@/components/ui';
-import { pickProductImage } from '@/lib/product-image';
+import { pickProductImage, sizedImage } from '@/lib/product-image';
 import { theme } from '@/theme';
-
-/** Photos need Firebase Storage (Blaze plan): shown as a Premium feature until it is enabled. */
-const PHOTO_PREMIUM = true;
 
 type ImageFieldProps = {
   /** Local uri (just picked) or stored URL. */
   value: string | null;
   onChange: (uri: string | null) => void;
+  label?: string;
+  /** Busy from outside (e.g. the logo is being uploaded). */
+  loading?: boolean;
 };
 
-export function ImageField({ value, onChange }: ImageFieldProps) {
+export function ImageField({
+  value,
+  onChange,
+  label = 'Photo (facultatif)',
+  loading,
+}: ImageFieldProps) {
   const [busy, setBusy] = useState(false);
 
   const pick = async (source: 'camera' | 'library') => {
-    if (PHOTO_PREMIUM) {
-      Alert.alert(
-        'Fonction Premium',
-        'Les photos des produits arrivent bientôt avec l’offre Premium.',
-      );
-      return;
-    }
     setBusy(true);
     try {
       const uri = await pickProductImage(source);
@@ -46,20 +44,16 @@ export function ImageField({ value, onChange }: ImageFieldProps) {
   return (
     <View style={styles.root}>
       <View style={styles.labelRow}>
-        <AppText variant="label">Photo (facultatif)</AppText>
-        {PHOTO_PREMIUM && (
-          <View style={styles.premium}>
-            <Crown size={theme.layout.iconSm} color={theme.colors.goldInk} strokeWidth={2} />
-            <AppText variant="caption" color="goldInk">
-              Premium
-            </AppText>
-          </View>
-        )}
+        <AppText variant="label">{label}</AppText>
       </View>
       <View style={styles.row}>
         <View style={styles.preview}>
           {value ? (
-            <Image source={{ uri: value }} style={styles.image} contentFit="cover" />
+            <Image
+              source={{ uri: value.startsWith('http') ? sizedImage(value, 240) : value }}
+              style={styles.image}
+              contentFit="cover"
+            />
           ) : (
             <ImagePlus size={theme.layout.iconLg} color={theme.colors.inkMuted} strokeWidth={2} />
           )}
@@ -69,7 +63,7 @@ export function ImageField({ value, onChange }: ImageFieldProps) {
             label="Galerie"
             icon={ImagePlus}
             compact
-            loading={busy}
+            loading={busy || loading}
             onPress={() => pick('library')}
           />
           <Button label="Appareil photo" icon={Camera} compact onPress={() => pick('camera')} />
@@ -96,15 +90,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing[2],
-  },
-  premium: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing[1],
-    paddingHorizontal: theme.spacing[2],
-    paddingVertical: theme.spacing[1],
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.goldSoft,
   },
   row: {
     flexDirection: 'row',

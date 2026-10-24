@@ -8,6 +8,8 @@ export type OrderItem = {
   id: string;
   productId: string;
   productName: string;
+  /** Current photo of the product (absent on an older API). */
+  productImage?: string | null;
   quantity: number;
   unitSellingPrice: number;
   /** Absent for CM and drivers (RG-60). */
@@ -49,6 +51,8 @@ export type Order = {
   routePosition?: number | null;
   /** `phone` is the customer's main number. */
   customer: { id: string; name: string; phone: string | null } | null;
+  /** Numbers to reach the customer for this order (first = main); absent on an older API. */
+  phones?: string[];
   /** null when the order is not delivered (pickup, hand delivery). */
   delivery: OrderDelivery | null;
   /** Sum of the lines (the sale, excluding delivery). */
@@ -93,8 +97,10 @@ export type OrderFilters = {
 
 export type CreateOrderInput = {
   customerId: string | null;
-  /** New or returning customer (the API matches it by phone). */
-  customer: { name: string; phone: string | null } | null;
+  /** Customer to save (the API finds it by any of its numbers, or creates it). */
+  customer: { name: string; phones: string[] } | null;
+  /** 1 to 3 numbers for this order, first = main. */
+  phones: string[];
   items: { productId: string; quantity: number }[];
   source: OrderSource | null;
   /** YYYY-MM-DD; null means today. */
@@ -109,6 +115,8 @@ export type CreateOrderInput = {
 
 export type OrderPatch = Partial<{
   customerId: string | null;
+  customer: { name: string; phones: string[] };
+  phones: string[];
   /** Only while the order is pending (RG-24). */
   items: { productId: string; quantity: number }[];
   source: OrderSource | null;

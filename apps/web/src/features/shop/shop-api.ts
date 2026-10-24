@@ -13,6 +13,8 @@ export type Shop = {
   nickname: string | null;
   /** Colors picked for the order states; absent on an older API. */
   statusColors?: StatusColors;
+  /** Logo URL (Cloudinary), or null: the initial is shown. Absent on an older API. */
+  logo?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -21,6 +23,17 @@ export type ShopInput = {
   name: string;
   description: string | null;
 };
+
+/** Sets (URL) or removes (null) the shop logo. Owner only. */
+export function updateShopLogo(
+  shopId: string,
+  logo: string | null,
+): Promise<Shop> {
+  return apiFetch(`/shops/${shopId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ logo }),
+  });
+}
 
 export function listShops(): Promise<Shop[]> {
   return apiFetch("/shops");

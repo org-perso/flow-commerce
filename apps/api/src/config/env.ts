@@ -33,6 +33,18 @@ const envSchema = z.object({
    * 32-byte key (base64) encrypting the admins' TOTP secrets. Optional so the seller API starts
    * without it; the admin sign-in answers 503 until it is set. `openssl rand -base64 32`.
    */
+  /**
+   * Cloudinary (photos of products and shop logos). Optional: without them the API starts,
+   * and only the upload signature answers 503. The secret never leaves the server.
+   */
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  /** Root folder of this environment's files, e.g. "flowco" (production), "flowco-dev". */
+  CLOUDINARY_FOLDER: z
+    .string()
+    .regex(/^[a-z0-9_-]+$/)
+    .default('flowco'),
   ADMIN_MFA_KEY: z
     .string()
     .optional()

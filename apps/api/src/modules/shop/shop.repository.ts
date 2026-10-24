@@ -11,6 +11,8 @@ export type Shop = {
   statusColors: StatusColors;
   /** Set by the platform admins: a SUSPENDED shop is read-only (af-v3-admin RG-73). */
   status: 'ACTIVE' | 'SUSPENDED';
+  /** Logo URL (Cloudinary), or null: the apps show the initial. */
+  logo: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -25,12 +27,13 @@ export type ShopInput = {
   name: string;
   description: string | null;
   statusColors?: StatusColors;
+  logo?: string | null;
 };
 
-const columns = `id, name, description, COALESCE(status_colors, '{}') AS "statusColors", status,
+const columns = `id, name, description, COALESCE(status_colors, '{}') AS "statusColors", status, logo,
   created_at AS "createdAt", updated_at AS "updatedAt"`;
 const shopColumns = `s.id, s.name, s.description, COALESCE(s.status_colors, '{}') AS "statusColors",
-  s.status, s.created_at AS "createdAt", s.updated_at AS "updatedAt"`;
+  s.status, s.logo, s.created_at AS "createdAt", s.updated_at AS "updatedAt"`;
 
 /** Shops the user is a member of, with their role. */
 export async function listShopsForUser(userId: string): Promise<ShopWithRole[]> {
@@ -81,7 +84,8 @@ export async function updateShop(shopId: string, patch: Partial<ShopInput>): Pro
     `UPDATE shops SET
        name          = COALESCE($2, name),
        description   = CASE WHEN $3::boolean THEN $4 ELSE description END,
-       status_colors = CASE WHEN $5::boolean THEN $6::jsonb ELSE status_colors END
+       status_colors = CASE WHEN $5::boolean THEN $6::jsonb ELSE status_colors END,
+       logo          = CASE WHEN $7::boolean THEN $8 ELSE logo END
      WHERE id = $1
      RETURNING ${columns}`,
     [
@@ -91,6 +95,8 @@ export async function updateShop(shopId: string, patch: Partial<ShopInput>): Pro
       patch.description ?? null,
       patch.statusColors !== undefined,
       JSON.stringify(patch.statusColors ?? {}),
+      patch.logo !== undefined,
+      patch.logo ?? null,
     ],
   );
   return rows[0]!;

@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
+import { sizedImage } from '@/lib/product-image';
 import { theme } from '@/theme';
 
 import { AppText } from './app-text';
@@ -25,7 +26,7 @@ export function Avatar({ name, imageUri, size = 'md' }: AvatarProps) {
   if (imageUri) {
     return (
       <Image
-        source={{ uri: imageUri }}
+        source={{ uri: sizedImage(imageUri, 128) }}
         style={[styles.base, sized, styles.image]}
         contentFit="cover"
         accessibilityIgnoresInvertColors
