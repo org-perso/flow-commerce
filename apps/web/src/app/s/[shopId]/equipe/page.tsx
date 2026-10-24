@@ -51,6 +51,14 @@ import {
 } from "@/components/ui/table";
 import { useMe } from "@/features/me/use-me";
 import {
+  planLimitOf,
+  usePlanGate,
+  type Limit,
+} from "@/features/subscription/plan-gate";
+import { PlanLock } from "@/features/subscription/plan-lock";
+import { useSubscription } from "@/features/subscription/subscription";
+import { UpgradeDialog } from "@/features/subscription/upgrade-dialog";
+import {
   canManageRole,
   ROLE_DESCRIPTIONS,
   ROLE_LABELS,
@@ -89,12 +97,24 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
     allowed.includes("CM") ? "CM" : allowed[0]!,
   );
   const [invitation, setInvitation] = useState<Invitation | null>(null);
+  // Limits on: roles the plan does not include wear a crown and open the upgrade sheet.
+  const isOwner = useCan("shop.settings");
+  const membersGate = usePlanGate("members");
+  const driversGate = usePlanGate("drivers");
+  const gateFor = (r: InvitableRole) =>
+    r === "DRIVER" ? driversGate : membersGate;
+  const [upgrade, setUpgrade] = useState<Limit | null>(null);
+  const subscription = useSubscription(isOwner).data;
 
   const generate = async () => {
+    if (gateFor(role).locked)
+      return setUpgrade(role === "DRIVER" ? "drivers" : "members");
     try {
       setInvitation(await create.mutateAsync(role));
-    } catch {
-      // Shown below.
+    } catch (error) {
+      // A plan limit opens the upgrade sheet; other errors are shown below.
+      const limit = planLimitOf(error);
+      if (limit) setUpgrade(limit);
     }
   };
   const message = invitation
@@ -110,83 +130,97 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Inviter dans l’équipe</DialogTitle>
-          <DialogDescription>
-            Un code à usage unique, valable 7 jours, à envoyer à la personne.
-          </DialogDescription>
-        </DialogHeader>
-        {!invitation ? (
-          <>
-            {create.isError && <ErrorState error={create.error} />}
-            <RadioGroup
-              value={role}
-              onValueChange={(v) => setRole(v as InvitableRole)}
-              aria-label="Rôle"
-            >
-              {allowed.map((r) => (
-                <RadioCard key={r} value={r}>
-                  <span className="text-sm font-semibold">
-                    {ROLE_LABELS[r]}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {ROLE_DESCRIPTIONS[r]}
-                  </span>
-                </RadioCard>
-              ))}
-            </RadioGroup>
-            <DialogFooter>
-              <Button variant="outline" onClick={onClose}>
-                Annuler
-              </Button>
-              <Button onClick={generate} disabled={create.isPending}>
-                {create.isPending && <Loader2 className="animate-spin" />}
-                Créer le code
-              </Button>
-            </DialogFooter>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-col items-center gap-2 rounded-xl bg-navy-soft py-6">
-              <span className="text-xs font-medium text-muted-foreground">
-                Code pour un {ROLE_LABELS[invitation.role].toLowerCase()}
-              </span>
-              <span className="font-mono text-4xl font-bold tracking-[0.3em] text-navy">
-                {invitation.code}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {expiresIn(invitation.expiresAt)}
-              </span>
-            </div>
-            <p className="rounded-lg border bg-muted/40 p-3 text-sm">
-              {message}
-            </p>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => copy(invitation.code, "Code copié.")}
+    <>
+      <UpgradeDialog
+        limit={upgrade}
+        onClose={() => setUpgrade(null)}
+        shopId={shop.id}
+        currentPlan={subscription?.plan}
+        isOwner={isOwner}
+      />
+      <Dialog open={!upgrade} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Inviter dans l’équipe</DialogTitle>
+            <DialogDescription>
+              Un code à usage unique, valable 7 jours, à envoyer à la personne.
+            </DialogDescription>
+          </DialogHeader>
+          {!invitation ? (
+            <>
+              {create.isError && !planLimitOf(create.error) && (
+                <ErrorState error={create.error} />
+              )}
+              <RadioGroup
+                value={role}
+                onValueChange={(v) => setRole(v as InvitableRole)}
+                aria-label="Rôle"
               >
-                <Copy /> Copier le code
-              </Button>
-              <Button variant="outline" asChild>
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(message)}`}
-                  target="_blank"
-                  rel="noreferrer"
+                {allowed.map((r) => (
+                  <RadioCard key={r} value={r}>
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      {ROLE_LABELS[r]}
+                      {gateFor(r).required && (
+                        <PlanLock plan={gateFor(r).required!} />
+                      )}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {ROLE_DESCRIPTIONS[r]}
+                    </span>
+                  </RadioCard>
+                ))}
+              </RadioGroup>
+              <DialogFooter>
+                <Button variant="outline" onClick={onClose}>
+                  Annuler
+                </Button>
+                <Button onClick={generate} disabled={create.isPending}>
+                  {create.isPending && <Loader2 className="animate-spin" />}
+                  Créer le code
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col items-center gap-2 rounded-xl bg-navy-soft py-6">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Code pour un {ROLE_LABELS[invitation.role].toLowerCase()}
+                </span>
+                <span className="font-mono text-4xl font-bold tracking-[0.3em] text-navy">
+                  {invitation.code}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {expiresIn(invitation.expiresAt)}
+                </span>
+              </div>
+              <p className="rounded-lg border bg-muted/40 p-3 text-sm">
+                {message}
+              </p>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => copy(invitation.code, "Code copié.")}
                 >
-                  <MessageCircle /> Partager sur WhatsApp
-                </a>
-              </Button>
-              <Button onClick={() => copy(message, "Message copié.")}>
-                Copier le message
-              </Button>
-            </DialogFooter>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
+                  <Copy /> Copier le code
+                </Button>
+                <Button variant="outline" asChild>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <MessageCircle /> Partager sur WhatsApp
+                  </a>
+                </Button>
+                <Button onClick={() => copy(message, "Message copié.")}>
+                  Copier le message
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

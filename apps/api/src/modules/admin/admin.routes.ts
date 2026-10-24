@@ -6,6 +6,7 @@ import { ProblemError } from '../../http/problem.js';
 import { adminAuthRouter } from './admin-auth.routes.js';
 import { adminDashboardRouter } from './admin-dashboard.routes.js';
 import { adminShopsRouter } from './admin-shops.routes.js';
+import { adminSubscriptionsRouter } from './admin-subscriptions.routes.js';
 import { adminUsersRouter } from './admin-users.routes.js';
 import { adminsRouter } from './admins.routes.js';
 import { requireAdmin } from './admin-session.js';
@@ -24,6 +25,7 @@ export function createAdminRouter() {
   admin.use('/shops', adminShopsRouter);
   admin.use('/users', adminUsersRouter);
   admin.use('/admins', adminsRouter);
+  admin.use('/', adminSubscriptionsRouter);
 
   // Unknown admin routes stop here: they must not fall through to the seller API.
   admin.use((req) => {

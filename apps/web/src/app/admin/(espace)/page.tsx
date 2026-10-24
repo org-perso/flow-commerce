@@ -13,6 +13,7 @@ import {
   useAdminDashboard,
 } from "@/features/admin/use-admin";
 import type { ActivityDay, Plan } from "@/features/admin/admin-api";
+import { formatAr } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** F-20: platform figures (counts only). */
@@ -112,10 +113,27 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
             ))}
-            <p className="w-full text-xs text-muted-foreground">
-              Abonnements pas encore branchés : toutes les boutiques sont en
-              Gratuit.
-            </p>
+            <div>
+              <p className="text-muted-foreground">Encaissé ce mois-ci</p>
+              <p className="tabular text-xl font-bold">
+                {formatAr(d.plans.revenueThisMonth)}
+              </p>
+            </div>
+            <Link href="/admin/paiements" className="hover:underline">
+              <p className="text-muted-foreground">Paiements à valider</p>
+              <p
+                className={cn(
+                  "tabular text-xl font-bold",
+                  d.plans.pendingPayments > 0 && "text-gold-ink",
+                )}
+              >
+                {d.plans.pendingPayments}
+              </p>
+            </Link>
+            <div>
+              <p className="text-muted-foreground">Finissent sous 7 jours</p>
+              <p className="tabular text-xl font-bold">{d.plans.endingSoon}</p>
+            </div>
           </div>
         </SectionCard>
       )}

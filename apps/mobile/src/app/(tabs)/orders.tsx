@@ -22,6 +22,7 @@ import {
   SearchBar,
   type OrderStatus,
 } from '@/components/ui';
+import { PlanBanner } from '@/features/subscription/plan-banner';
 import type { Order } from '@/features/order/order-api';
 import { NotifyDriversButton } from '@/features/order/notify-drivers-button';
 import { isOverdue, OrderRow } from '@/features/order/order-row';
@@ -194,6 +195,7 @@ export default function OrdersScreen() {
         />
       )}
 
+      <PlanBanner />
       <SectionList
         contentContainerStyle={styles.listContent}
         sections={hasOrders ? sections : []}

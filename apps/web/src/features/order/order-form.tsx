@@ -19,6 +19,9 @@ import { toast } from "sonner";
 
 import { Avatar } from "@/components/app/avatar";
 import { ProductThumb } from "@/features/product/product-thumb";
+import { planLimitOf } from "@/features/subscription/plan-gate";
+import { useSubscription } from "@/features/subscription/subscription";
+import { UpgradeDialog } from "@/features/subscription/upgrade-dialog";
 import { Field } from "@/components/app/field";
 import { InlineAlert } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -459,14 +462,28 @@ export function OrderForm({
     createOrder.reset();
     updateOrder.reset();
   };
-  const errorMessage =
-    formError ??
-    (apiError
-      ? orderErrorMessage(
-          apiError,
-          (id) => lines.find((l) => l.product.id === id)?.product.name,
-        )
-      : undefined);
+  // Plan limit reached: the "Passer à Pro" sheet instead of an error; the form stays filled.
+  const isOwner = useCan("shop.settings");
+  const subscription = useSubscription(isOwner).data;
+  const limitHit = planLimitOf(apiError);
+  const [dismissedError, setDismissedError] = useState<unknown>(null);
+  const upgradeLimit =
+    limitHit && apiError !== dismissedError ? limitHit : null;
+  const ordersLeft =
+    !editing &&
+    subscription?.enforced &&
+    subscription.limits.ordersPerMonth !== null
+      ? subscription.limits.ordersPerMonth - subscription.usage.ordersThisMonth
+      : null;
+  const errorMessage = limitHit
+    ? undefined
+    : (formError ??
+      (apiError
+        ? orderErrorMessage(
+            apiError,
+            (id) => lines.find((l) => l.product.id === id)?.product.name,
+          )
+        : undefined));
 
   // 5 products at a time ("Voir plus" adds 5); back to 5 when the search changes.
   const [more, setMore] = useState({ query: "", shown: PRODUCTS_STEP });
@@ -931,6 +948,20 @@ export function OrderForm({
           </div>
         </Card>
 
+        {ordersLeft !== null && ordersLeft <= 5 && (
+          <p className="text-sm text-gold-ink">
+            {ordersLeft > 0
+              ? `Il vous reste ${ordersLeft} commande${ordersLeft > 1 ? "s" : ""} ce mois-ci (formule Gratuit).`
+              : "Limite de commandes du mois atteinte (formule Gratuit)."}
+          </p>
+        )}
+        <UpgradeDialog
+          limit={upgradeLimit}
+          onClose={() => setDismissedError(apiError)}
+          shopId={shopId}
+          currentPlan={subscription?.plan}
+          isOwner={isOwner}
+        />
         {errorMessage && (
           <InlineAlert
             tone="danger"

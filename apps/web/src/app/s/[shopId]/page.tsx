@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { PageHeader } from "@/components/app/page-header";
+import { PlanBanner } from "@/features/subscription/plan-banner";
 import { Segmented } from "@/components/app/segmented";
 import { EmptyState, ErrorState } from "@/components/app/states";
 import { PaymentBadge, StatusBadge } from "@/components/app/status-badge";
@@ -337,6 +338,7 @@ export default function DashboardPage() {
           />
         }
       />
+      <PlanBanner />
       {dashboard.isError && (
         <ErrorState
           error={dashboard.error}

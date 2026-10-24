@@ -21,7 +21,8 @@ const listSchema = z.object({
   ...pagination,
 });
 
-const summary = `s.id, s.name, s.status, s.plan, s.flagged_at AS "flaggedAt",
+const summary = `s.id, s.name, s.status, s.plan, s.plan_ends_at AS "planEndsAt",
+  s.flagged_at AS "flaggedAt",
   s.created_at AS "createdAt",
   json_build_object('id', u.id, 'name', u.name, 'email', u.email) AS owner,
   (SELECT count(*)::int FROM shop_members m WHERE m.shop_id = s.id) AS "membersCount",

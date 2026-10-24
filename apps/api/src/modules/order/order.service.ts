@@ -4,6 +4,7 @@ import { withTransaction } from '../../db/pool.js';
 import { notFound } from '../../http/params.js';
 import { ProblemError } from '../../http/problem.js';
 import { findCustomer, findOrCreateCustomer } from '../customer/customer.repository.js';
+import { assertWithinLimit } from '../subscription/plans.js';
 import { applyStockMovement } from '../stock/stock.service.js';
 import { holdsStock, TRANSITIONS, type OrderStatus } from './order-status.js';
 import type { OrderSource } from './order-source.js';
@@ -182,6 +183,8 @@ async function lockOrder(client: pg.PoolClient, shopId: string, orderId: string)
 
 export function createOrder(shopId: string, input: CreateOrderInput): Promise<Order> {
   return withTransaction(async (client) => {
+    // Free plan: orders per month (docs/subscription.md), when the limits are on.
+    await assertWithinLimit(shopId, 'orders', client);
     let customerId = input.customerId;
     if (input.customerId) {
       await assertCustomer(client, shopId, input.customerId);

@@ -26,6 +26,7 @@ import {
   membersRouter,
   myMembershipRouter,
 } from './modules/team/team.routes.js';
+import { subscriptionRouter } from './modules/subscription/subscription.routes.js';
 import { uploadsRouter } from './modules/upload/upload.routes.js';
 import { meRouter } from './modules/user/me.routes.js';
 import { requireUser } from './modules/user/user.middleware.js';
@@ -56,6 +57,8 @@ export function createApiRouter(verifyToken: TokenVerifier) {
   shopScoped.use('/me', myMembershipRouter);
   // Photo upload permission (Cloudinary); each kind checks its own permission.
   shopScoped.use('/uploads', uploadsRouter);
+  // Plan, usage and payments: the owner only (RG-96).
+  shopScoped.use('/subscription', requirePermission('shop.settings'), subscriptionRouter);
   const catalog = requireReadWrite('catalog.read', 'catalog.write');
   shopScoped.use('/categories', catalog, categoriesRouter);
   shopScoped.use('/products', catalog, productsRouter);

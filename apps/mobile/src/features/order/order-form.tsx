@@ -14,6 +14,10 @@ import {
   SearchBar,
   TextField,
 } from '@/components/ui';
+import { useCan } from '@/features/shop/use-shop';
+import { planLimitOf } from '@/features/subscription/plan-gate';
+import { useSubscription } from '@/features/subscription/subscription';
+import { UpgradeSheet } from '@/features/subscription/upgrade-sheet';
 import type { Customer } from '@/features/customer/customer-api';
 import { useCustomer, useCustomers } from '@/features/customer/use-customers';
 import type { Order, OrderPatch } from '@/features/order/order-api';
@@ -294,13 +298,24 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
     createOrder.reset();
     updateOrder.reset();
   };
-  const errorMessage =
-    formError ??
-    (apiError instanceof ApiError && apiError.title === 'Insufficient Stock'
-      ? insufficientStockMessage(apiError, lines)
-      : apiError
-        ? apiErrorMessage(apiError)
-        : undefined);
+  // Plan limit reached: the "Passer à Pro" sheet instead of an error; the form stays filled.
+  const isOwner = useCan('shop.settings');
+  const subscription = useSubscription(isOwner).data;
+  const limitHit = planLimitOf(apiError);
+  const [dismissedError, setDismissedError] = useState<unknown>(null);
+  const upgradeLimit = limitHit && apiError !== dismissedError ? limitHit : null;
+  const ordersLeft =
+    !editing && subscription?.enforced && subscription.limits.ordersPerMonth !== null
+      ? subscription.limits.ordersPerMonth - subscription.usage.ordersThisMonth
+      : null;
+  const errorMessage = limitHit
+    ? undefined
+    : (formError ??
+      (apiError instanceof ApiError && apiError.title === 'Insufficient Stock'
+        ? insufficientStockMessage(apiError, lines)
+        : apiError
+          ? apiErrorMessage(apiError)
+          : undefined));
 
   // 5 products at a time ("Voir plus" adds 5); back to 5 when the search changes.
   const [more, setMore] = useState({ query: '', shown: PRODUCTS_STEP });
@@ -688,6 +703,19 @@ export function OrderForm({ order, customerId, template }: OrderFormProps) {
         />
       </View>
 
+      {ordersLeft !== null && ordersLeft <= 5 && (
+        <AppText variant="caption" color="goldInk">
+          {ordersLeft > 0
+            ? `Il vous reste ${ordersLeft} commande${ordersLeft > 1 ? 's' : ''} ce mois-ci (formule Gratuit).`
+            : 'Limite de commandes du mois atteinte (formule Gratuit).'}
+        </AppText>
+      )}
+      <UpgradeSheet
+        limit={upgradeLimit}
+        onClose={() => setDismissedError(apiError)}
+        currentPlan={subscription?.plan}
+        isOwner={isOwner}
+      />
       {errorMessage && <AlertBanner tone="danger" message={errorMessage} />}
       {stockFix && (
         <Button

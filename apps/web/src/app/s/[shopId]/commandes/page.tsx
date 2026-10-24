@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { PageHeader } from "@/components/app/page-header";
+import { PlanBanner } from "@/features/subscription/plan-banner";
 import { Pagination } from "@/components/app/pagination";
 import { SearchInput } from "@/components/app/search-input";
 import {
@@ -200,6 +201,7 @@ function OrdersView() {
           </>
         }
       />
+      <PlanBanner />
 
       <div className="flex flex-col gap-3">
         {/* Filters: search first, then status, then creation dates. */}

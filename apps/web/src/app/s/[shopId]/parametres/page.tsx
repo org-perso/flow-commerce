@@ -40,6 +40,7 @@ import { ROLE_LABELS } from "@/features/shop/roles";
 import { useCan, useShop } from "@/features/shop/shop-context";
 import { ShopForm } from "@/features/shop/shop-form";
 import { LogoCard } from "@/features/shop/logo-card";
+import { PlanSummaryCard } from "@/features/subscription/plan-summary-card";
 import { StatusColorsCard } from "@/features/shop/status-colors-card";
 import { useSetMyNickname, useUpdateShop } from "@/features/shop/use-shops";
 import { useLeaveShop } from "@/features/team/use-team";
@@ -282,6 +283,8 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         )}
+
+        {canSettings && <PlanSummaryCard key={`plan-${shop.id}`} />}
 
         {canSettings && <LogoCard key={`logo-${shop.id}`} />}
 

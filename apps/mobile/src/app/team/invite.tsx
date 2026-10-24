@@ -5,8 +5,12 @@ import { useState } from 'react';
 import { Linking, Share, StyleSheet, View } from 'react-native';
 
 import { AlertBanner, AppText, Button, ListGroup, ListRow, Screen } from '@/components/ui';
+import { useCan, useActiveShop } from '@/features/shop/use-shop';
+import { planLimitOf, usePlanGate, type Limit } from '@/features/subscription/plan-gate';
+import { PlanLock } from '@/features/subscription/plan-lock';
+import { useSubscription } from '@/features/subscription/subscription';
+import { UpgradeSheet } from '@/features/subscription/upgrade-sheet';
 import { canManageRole, ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/features/shop/roles';
-import { useActiveShop } from '@/features/shop/use-shop';
 import { expiresIn, invitationMessage } from '@/features/team/format';
 import type { InvitableRole, Invitation } from '@/features/team/team-api';
 import { useCreateInvitation } from '@/features/team/use-team';
@@ -21,12 +25,27 @@ export default function InviteScreen() {
   const create = useCreateInvitation();
   const [invitation, setInvitation] = useState<Invitation>();
   const [copied, setCopied] = useState(false);
+  // Limits on: roles the plan does not include wear a crown and open the upgrade sheet.
+  const isOwner = useCan('shop.settings');
+  const membersGate = usePlanGate('members');
+  const driversGate = usePlanGate('drivers');
+  const subscription = useSubscription(isOwner).data;
+  const [upgrade, setUpgrade] = useState<Limit | null>(null);
+  const gateFor = (role: string) => (role === 'DRIVER' ? driversGate : membersGate);
 
   if (!invitation) {
     return (
       <Screen edges={[]}>
         <AppText color="inkMuted">Quel rôle aura la personne invitée ?</AppText>
-        {create.isError && <AlertBanner tone="danger" message={apiErrorMessage(create.error)} />}
+        {create.isError && !planLimitOf(create.error) && (
+          <AlertBanner tone="danger" message={apiErrorMessage(create.error)} />
+        )}
+        <UpgradeSheet
+          limit={upgrade}
+          onClose={() => setUpgrade(null)}
+          currentPlan={subscription?.plan}
+          isOwner={isOwner}
+        />
         <ListGroup>
           {INVITABLE.filter((role) => canManageRole(shop.role, role)).map((role, i) => (
             <ListRow
@@ -34,10 +53,19 @@ export default function InviteScreen() {
               divider={i > 0}
               title={ROLE_LABELS[role]}
               subtitle={ROLE_DESCRIPTIONS[role]}
+              trailing={
+                gateFor(role).required ? <PlanLock plan={gateFor(role).required!} /> : undefined
+              }
               onPress={
                 create.isPending
                   ? undefined
-                  : () => create.mutate(role, { onSuccess: setInvitation })
+                  : gateFor(role).locked
+                    ? () => setUpgrade(role === 'DRIVER' ? 'drivers' : 'members')
+                    : () =>
+                        create.mutate(role, {
+                          onSuccess: setInvitation,
+                          onError: (error) => setUpgrade(planLimitOf(error)),
+                        })
               }
             />
           ))}

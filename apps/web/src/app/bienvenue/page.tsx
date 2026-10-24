@@ -16,6 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/auth-provider";
+import { planLimitOf } from "@/features/subscription/plan-gate";
+import { UpgradeDialog } from "@/features/subscription/upgrade-dialog";
 import { signOut } from "@/features/auth/auth-service";
 import { ShopForm } from "@/features/shop/shop-form";
 import { useCreateShop, useShops } from "@/features/shop/use-shops";
@@ -86,10 +88,16 @@ function Onboarding() {
             <CardContent>
               <ShopForm
                 submitLabel="Créer la boutique"
-                error={createShop.error}
+                // A plan limit opens the upgrade sheet instead of an error.
+                error={planLimitOf(createShop.error) ? null : createShop.error}
                 onSubmit={async (input) =>
                   open((await createShop.mutateAsync(input)).id)
                 }
+              />
+              <UpgradeDialog
+                limit={planLimitOf(createShop.error)}
+                onClose={() => createShop.reset()}
+                isOwner
               />
             </CardContent>
           </Card>

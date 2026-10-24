@@ -23,6 +23,7 @@ import {
   type AdminShop,
   type AdminShopDetail,
   type AdminUser,
+  type AdminPayment,
   type AdminUserDetail,
   type AuditEntry,
   type Dashboard,
@@ -41,6 +42,7 @@ export const adminKeys = {
   user: (id: string) => ["admin", "users", id] as const,
   admins: ["admin", "admins"] as const,
   sessions: ["admin", "sessions"] as const,
+  payments: (status: string) => ["admin", "payments", status] as const,
 };
 
 /** The signed-in admin; a 401 means signed out (not retried). */
@@ -123,6 +125,16 @@ export function useAdminAccounts() {
   return useQuery({
     queryKey: adminKeys.admins,
     queryFn: () => adminFetch<AdminAccount[]>("/admins"),
+  });
+}
+
+export function useAdminPayments(status: AdminPayment["status"] | "all") {
+  return useQuery({
+    queryKey: adminKeys.payments(status),
+    queryFn: () =>
+      adminFetch<AdminPayment[]>(
+        `/payments${queryString({ status: status === "all" ? undefined : status })}`,
+      ),
   });
 }
 

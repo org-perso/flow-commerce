@@ -35,7 +35,18 @@ adminDashboardRouter.get('/', async (_req, res) => {
        ) AS orders,
        json_build_object(
          'byPlan', (SELECT COALESCE(json_object_agg(plan, n), '{}')
-                    FROM (SELECT plan, count(*) AS n FROM shops GROUP BY plan) p)
+                    FROM (SELECT plan, count(*) AS n FROM shops
+                          WHERE plan = 'FREE' OR plan_ends_at IS NULL OR plan_ends_at > now()
+                          GROUP BY plan) p),
+         'pendingPayments', (SELECT count(*)::int FROM subscription_payments
+                             WHERE status = 'PENDING'),
+         'revenueThisMonth', (SELECT COALESCE(sum(amount), 0)::bigint FROM subscription_payments
+                              WHERE status = 'VALIDATED'
+                                AND reviewed_at >= date_trunc('month', now()
+                                      AT TIME ZONE '${BUSINESS_TZ}') AT TIME ZONE '${BUSINESS_TZ}'),
+         'endingSoon', (SELECT count(*)::int FROM shops
+                        WHERE plan <> 'FREE' AND plan_ends_at BETWEEN now()
+                              AND now() + interval '7 days')
        ) AS plans`,
   );
   res.json(rows[0]);

@@ -111,7 +111,12 @@ export type Dashboard = {
     flagged: number;
   };
   orders: { today: number; last30Days: number };
-  plans: { byPlan: Partial<Record<Plan, number>> };
+  plans: {
+    byPlan: Partial<Record<Plan, number>>;
+    pendingPayments: number;
+    revenueThisMonth: number;
+    endingSoon: number;
+  };
 };
 
 export type ActivityDay = {
@@ -130,6 +135,7 @@ export type AdminShop = {
   name: string;
   status: ShopStatus;
   plan: Plan;
+  planEndsAt: string | null;
   flaggedAt: string | null;
   createdAt: string;
   owner: { id: string; name: string | null; email: string | null };
@@ -188,6 +194,21 @@ export type AdminUserDetail = AdminUser & {
 };
 
 export type Paged<T> = { items: T[]; total: number };
+
+export type AdminPayment = {
+  id: string;
+  plan: Exclude<Plan, "FREE">;
+  months: number;
+  amount: number;
+  operator: "MVOLA" | "ORANGE_MONEY" | "AIRTEL_MONEY";
+  reference: string;
+  payerPhone: string | null;
+  status: "PENDING" | "VALIDATED" | "REJECTED";
+  rejectReason: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  shop: { id: string; name: string; plan: Plan; planEndsAt: string | null };
+};
 
 export const ACTION_REASONS = [
   "CONTENT",

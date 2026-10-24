@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  CreditCard,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -35,6 +36,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/admin", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/admin/boutiques", label: "Boutiques", icon: Store },
   { href: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
+  { href: "/admin/paiements", label: "Paiements", icon: CreditCard },
   { href: "/admin/admins", label: "Admins", icon: ShieldCheck },
 ];
 

@@ -31,6 +31,7 @@ import {
   ShopStatusBadges,
 } from "@/features/admin/admin-ui";
 import { PLAN_LABELS, reasonLabel } from "@/features/admin/labels";
+import { PlanCard } from "@/features/admin/plan-card";
 import {
   useAdminAction,
   useAdminShop,
@@ -179,6 +180,8 @@ export default function AdminShopPage() {
             ))}
           </ul>
         </SectionCard>
+
+        <PlanCard shopId={s.id} plan={s.plan} endsAt={s.planEndsAt} />
 
         <SectionCard title="Commandes par mois">
           {s.ordersByMonth.length === 0 ? (

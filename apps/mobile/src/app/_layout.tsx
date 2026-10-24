@@ -89,6 +89,10 @@ function RootNavigator({ ready }: { ready: boolean }) {
           />
           <Stack.Screen name="sales-report" options={headerOptions('Recap des ventes')} />
           <Stack.Screen
+            name="subscription"
+            options={headerOptions('Abonnement', { showShop: false })}
+          />
+          <Stack.Screen
             name="status-colors"
             options={headerOptions('Couleurs des états', { showShop: false })}
           />

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { currentMember, currentShop, currentUser } from '../../http/context.js';
+import { assertCanCreateShop } from '../subscription/plans.js';
 import { requirePermission } from './permissions.js';
 import { createShop, listShopsForUser, updateShop } from './shop.repository.js';
 import { createShopSchema, updateShopSchema } from './shop.schemas.js';
@@ -14,6 +15,7 @@ shopsRouter.get('/', async (req, res) => {
 
 shopsRouter.post('/', async (req, res) => {
   const input = createShopSchema.parse(req.body);
+  await assertCanCreateShop(currentUser(req).id);
   const shop = await createShop(currentUser(req).id, input);
   res.status(201).location(`${req.baseUrl}/${shop.id}`).json(shop);
 });

@@ -60,6 +60,15 @@ export async function apiFetch<T>(
 }
 
 /** Business errors the API names with a `code` (team, deliveries). */
+/** Codes whose message is written by the API, in French, for the seller. */
+const SERVER_WORDED_CODES = [
+  "PLAN_LIMIT_REACHED",
+  "PAYMENT_PENDING",
+  "PAYMENT_REFERENCE_USED",
+  "SHOP_SUSPENDED",
+  "ACCOUNT_SUSPENDED",
+];
+
 const CODE_MESSAGES: Record<string, string> = {
   LAST_OWNER:
     "La boutique doit garder au moins un propriétaire. Nommez-en un autre avant.",
@@ -86,6 +95,9 @@ export function apiErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     const code =
       typeof error.body.code === "string" ? error.body.code : undefined;
+    // Plan limits, payments, suspensions: the API's message is already for the seller.
+    if (code && SERVER_WORDED_CODES.includes(code) && error.detail)
+      return error.detail;
     if (code && code in CODE_MESSAGES) return CODE_MESSAGES[code]!;
     if (error.status === 403) return "Votre rôle ne permet pas cette action.";
     if (error.status === 401) return "Session expirée. Reconnectez-vous.";

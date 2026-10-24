@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   ChevronsUpDown,
+  Crown,
   CircleHelp,
   ExternalLink,
   Keyboard,
@@ -60,6 +61,11 @@ import { useShops } from "@/features/shop/use-shops";
 import { THEME_LABELS, useTheme } from "@/features/theme/theme";
 import { useHotkey } from "@/hooks/use-hotkey";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { usePlanGate } from "@/features/subscription/plan-gate";
+import {
+  PLAN_LABELS,
+  useSubscription,
+} from "@/features/subscription/subscription";
 import { sizedImage } from "@/lib/product-image";
 import { cn } from "@/lib/utils";
 
@@ -89,6 +95,8 @@ function SidebarNav({
   const canStock = useCan("catalog.read");
   const lowStock = useStockSummary();
   const lowStockCount = canStock ? (lowStock.data?.lowStockCount ?? 0) : 0;
+  // Limits on: the team needs another plan to grow (gold crown, docs/subscription.md §3.5).
+  const teamGate = usePlanGate("members");
 
   return (
     <nav aria-label="Navigation principale" className="flex flex-col gap-0.5">
@@ -112,6 +120,12 @@ function SidebarNav({
             {!collapsed && (
               <span className="flex-1 truncate">{item.label}</span>
             )}
+            {!collapsed && item.path === "/equipe" && teamGate.required && (
+              <Crown
+                className="size-3.5 text-gold"
+                aria-label="Formule supérieure"
+              />
+            )}
             {!collapsed && badge && (
               <span
                 className="flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1.5 text-[11px] font-bold text-on-gold"
@@ -132,6 +146,30 @@ function SidebarNav({
         );
       })}
     </nav>
+  );
+}
+
+/** Owner, limits on: the shop's plan, gold when paid; a tap opens the subscription. */
+function ShopPlanPill() {
+  const shop = useShop();
+  const isOwner = useCan("shop.settings");
+  const s = useSubscription(isOwner).data;
+  if (!s?.enforced) return null;
+  const paid = s.plan !== "FREE";
+  return (
+    <Link
+      href={`/s/${shop.id}/abonnement`}
+      className={cn(
+        "hidden items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold sm:inline-flex",
+        paid
+          ? "bg-gold-soft text-gold-ink"
+          : "border bg-muted text-muted-foreground",
+      )}
+      title="Votre formule"
+    >
+      {paid && <Crown className="size-3.5" />}
+      {PLAN_LABELS[s.plan]}
+    </Link>
   );
 }
 
@@ -505,6 +543,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <UserRound className="size-3.5" />
               {ROLE_LABELS[shop.role]}
             </span>
+            <ShopPlanPill />
             {canOrders && !onOrders && (
               <Button variant="gold" size="sm" asChild>
                 <Link

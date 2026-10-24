@@ -11,6 +11,7 @@ import {
   SegmentedControl,
   type OrderStatus,
 } from '@/components/ui';
+import { PlanBanner } from '@/features/subscription/plan-banner';
 import type { Dashboard, DashboardPeriod } from '@/features/dashboard/dashboard-api';
 import { GettingStarted } from '@/features/dashboard/getting-started';
 import { RevenueCard } from '@/features/dashboard/revenue-card';
@@ -64,6 +65,7 @@ function DashboardScreen() {
       onRefresh={() => dashboard.refetch()}
       refreshing={dashboard.isRefetching}
     >
+      <PlanBanner />
       {d && !hasOrders && (
         <GettingStarted hasProducts={hasProducts} hasOrders={hasOrders} hasExpenses={hasExpenses} />
       )}

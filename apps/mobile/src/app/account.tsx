@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   ChartColumn,
   ChevronRight,
+  CreditCard,
   DoorOpen,
   LogOut,
   Palette,
@@ -17,6 +18,7 @@ import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText, Avatar, InlineBanner, ListGroup, ListRow, Screen } from '@/components/ui';
+import { planSummary, useSubscription } from '@/features/subscription/subscription';
 import { authErrorMessage } from '@/features/auth/auth-errors';
 import { signOut } from '@/features/auth/auth-service';
 import { useAuthStore } from '@/features/auth/auth-store';
@@ -61,6 +63,8 @@ export default function AccountScreen() {
   const canManageTeam = useCan('team');
   const canSeeSales = useCan('orders');
   const leave = useLeaveShop();
+  // Owner only: the current plan, shown on the Abonnement row.
+  const subscription = useSubscription(canEditShop);
   const [error, setError] = useState<string>();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -124,6 +128,16 @@ export default function AccountScreen() {
             trailing={canEditShop ? chevron : undefined}
             onPress={canEditShop ? () => router.push('/shop-settings') : undefined}
           />
+          {canEditShop && (
+            <ListRow
+              divider
+              leading={<RowIcon icon={CreditCard} />}
+              title="Abonnement"
+              subtitle={subscription.data ? planSummary(subscription.data) : 'Formule, paiements'}
+              trailing={chevron}
+              onPress={() => router.push('/subscription')}
+            />
+          )}
           {canEditShop && (
             <ListRow
               divider

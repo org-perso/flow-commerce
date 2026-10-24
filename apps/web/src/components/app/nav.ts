@@ -1,5 +1,6 @@
 import {
   ChartColumn,
+  CreditCard,
   LayoutDashboard,
   Package,
   ReceiptText,
@@ -79,6 +80,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: UsersRound,
     permission: "team",
     key: "q",
+  },
+  {
+    path: "/abonnement",
+    label: "Abonnement",
+    icon: CreditCard,
+    permission: "shop.settings",
+    key: "a",
   },
   {
     path: "/parametres",

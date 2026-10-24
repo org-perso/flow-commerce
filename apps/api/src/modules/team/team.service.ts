@@ -3,6 +3,7 @@ import { randomInt } from 'node:crypto';
 import type pg from 'pg';
 
 import { pool, withTransaction, type Db } from '../../db/pool.js';
+import { assertWithinLimit } from '../subscription/plans.js';
 import { ProblemError } from '../../http/problem.js';
 import type { Member, ShopWithRole } from '../shop/shop.repository.js';
 import type { Role } from '../shop/permissions.js';
@@ -225,6 +226,8 @@ export async function createInvitation(
   role: InvitableRole,
 ): Promise<Invitation> {
   if (!canManageRole(actor.role, role)) throw forbidden('Your role cannot invite this role.');
+  // The plan's team size, checked again when the code is used.
+  await assertWithinLimit(shopId, role === 'DRIVER' ? 'drivers' : 'members');
   // A clash among ~900 million codes is rare: retry a few times on the unique code.
   for (let attempt = 0; ; attempt++) {
     try {
@@ -291,6 +294,11 @@ export function joinWithCode(
     // The pseudo chosen with the code must be free in that shop (checked under the shop lock).
     await client.query('SELECT 1 FROM shops WHERE id = $1 FOR UPDATE', [invitation.shopId]);
     if (nickname) await assertNicknameFree(client, invitation.shopId, userId, nickname);
+    await assertWithinLimit(
+      invitation.shopId,
+      invitation.role === 'DRIVER' ? 'drivers' : 'members',
+      client,
+    );
     const joined = await client.query(
       `INSERT INTO shop_members (shop_id, user_id, role, nickname) VALUES ($1, $2, $3, $4)
        ON CONFLICT DO NOTHING`,

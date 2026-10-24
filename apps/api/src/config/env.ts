@@ -45,6 +45,18 @@ const envSchema = z.object({
     .string()
     .regex(/^[a-z0-9_-]+$/)
     .default('flowco'),
+  /**
+   * Plan limits (docs/subscription.md). Off by default: everyone has everything until the
+   * launch offer ends. Read on each check, so tests can switch it.
+   */
+  SUBSCRIPTIONS_ENFORCED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /** Numbers receiving the subscription payments, shown to the owners (optional). */
+  PAYMENT_NUMBER_MVOLA: z.string().optional(),
+  PAYMENT_NUMBER_ORANGE_MONEY: z.string().optional(),
+  PAYMENT_NUMBER_AIRTEL_MONEY: z.string().optional(),
   ADMIN_MFA_KEY: z
     .string()
     .optional()

@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { ChevronDown } from 'lucide-react-native';
+import { ChevronDown, Crown } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useActiveShop } from '@/features/shop/use-shop';
+import { useActiveShop, useCan } from '@/features/shop/use-shop';
+import { useSubscription } from '@/features/subscription/subscription';
 import { sizedImage } from '@/lib/product-image';
 import { theme } from '@/theme';
 
@@ -16,6 +17,10 @@ import { initials } from './avatar';
  */
 export function ShopSwitcher() {
   const shop = useActiveShop();
+  // Owner, limits on: a gold crown tells the shop is on a paid plan.
+  const isOwner = useCan('shop.settings');
+  const subscription = useSubscription(isOwner).data;
+  const paidPlan = subscription?.enforced && subscription.plan !== 'FREE';
 
   return (
     <Pressable
@@ -41,6 +46,7 @@ export function ShopSwitcher() {
       <AppText variant="heading" color="onNavy" numberOfLines={1} style={styles.name}>
         {shop.name}
       </AppText>
+      {paidPlan && <Crown size={theme.layout.iconSm} color={theme.colors.gold} strokeWidth={2.5} />}
       <ChevronDown size={theme.layout.iconMd} color={theme.colors.onNavyMuted} strokeWidth={2} />
     </Pressable>
   );

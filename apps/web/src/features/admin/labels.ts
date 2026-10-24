@@ -30,6 +30,15 @@ export const ACTION_LABELS: Record<string, string> = {
   ADMIN_MFA_RESET: "MFA réinitialisée",
   ADMIN_MFA_REQUIRED: "MFA rendue obligatoire",
   ADMIN_MFA_OPTIONAL: "MFA rendue facultative",
+  SUBSCRIPTION_VALIDATED: "Paiement validé",
+  SUBSCRIPTION_REJECTED: "Paiement refusé",
+  SHOP_PLAN_CHANGED: "Formule modifiée",
+};
+
+export const OPERATOR_LABELS: Record<string, string> = {
+  MVOLA: "MVola",
+  ORANGE_MONEY: "Orange Money",
+  AIRTEL_MONEY: "Airtel Money",
 };
 
 export const reasonLabel = (reason: string | null) =>
