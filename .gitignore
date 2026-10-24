@@ -1,1 +1,7 @@
 .DS_Store
+
+# Private business documents: kept on disk, never pushed (the repository may be public).
+/docs/lancement.md
+/docs/landing.md
+/docs/subscription.md
+/docs/suivi-flowcommerce.xlsx
